@@ -1,0 +1,6 @@
+.vscode
+build*
+khafile.js
+Sources/Main.hx
+*.blend*
+!*.blend
