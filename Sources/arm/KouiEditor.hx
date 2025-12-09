@@ -215,20 +215,7 @@ class KouiEditor extends iron.Trait {
 		}
 	}
 
-	function render2D(g2: Graphics) {
-		if (uiBase == null) return;
-
-		g2.end();
-		uiBase.ui.begin(g2);
-
-		drawElementsPanel();
-		drawRightPanels();
-		drawBottomPanel();
-
-		uiBase.ui.end();
-		Koui.render(g2);
-		g2.begin(false);
-
+	function drawAnchorPane(g2: Graphics) {
 		// Draw border with g2 in screen coordinates using drawX/drawY
 		if (anchorPane != null) {
 			var thickness: Int = 1;
@@ -244,6 +231,24 @@ class KouiEditor extends iron.Trait {
 			g2.fillRect(x, y + thickness, thickness, h - thickness * 2);
 			g2.fillRect(x + w - thickness, y + thickness, thickness, h - thickness * 2);
 		}
+	}
+
+	function render2D(g2: Graphics) {
+		if (uiBase == null) return;
+
+		g2.end();
+
+		Koui.render(g2);
+		drawAnchorPane(g2);
+
+		uiBase.ui.begin(g2);
+
+		drawElementsPanel();
+		drawRightPanels();
+		drawBottomPanel();
+
+		uiBase.ui.end();
+		g2.begin(false);
 	}
 
 	function onAppResized() {

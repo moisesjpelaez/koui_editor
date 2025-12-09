@@ -97,11 +97,14 @@ class UIBase {
 			}
 		}
 
-		// Reset cursor if not hovering border this frame
-		if (cursorSet) {
-			cursorSet = false;
-		} else if (borderHandle == null) {
-			Krom.setMouseCursor(0); // Default cursor
+		// Reset cursor only when mouse moves and not hovering any border
+		// This allows the OS to show its own resize cursors when near window edges
+		if (mouse.movementX != 0 || mouse.movementY != 0) {
+			if (cursorSet) {
+				cursorSet = false;
+			} else if (borderHandle == null) {
+				Krom.setMouseCursor(0); // Default cursor
+			}
 		}
 	}
 
