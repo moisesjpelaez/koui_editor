@@ -2,12 +2,21 @@ package arm;
 
 import arm.Enums;
 import iron.App;
+import iron.Scene;
 import kha.Assets;
 import kha.graphics2.Graphics;
+import kha.Color;
 import zui.Id;
 import zui.Zui;
 import zui.Zui.Align;
 import zui.Zui.Handle;
+
+import koui.Koui;
+import koui.elements.Button;
+import koui.elements.Panel;
+import koui.elements.layouts.AnchorPane;
+import koui.elements.layouts.Layout.Anchor;
+import koui.utils.SceneManager;
 
 class KouiEditor extends iron.Trait {
 	var uiBase: UIBase;
@@ -15,6 +24,10 @@ class KouiEditor extends iron.Trait {
 	var sceneTabHandle: Handle;
 	var propertiesTabHandle: Handle;
 	var themeTabHandle: Handle;
+
+	// Main editing AnchorPane
+	var anchorPane: AnchorPane;
+	var button: Button;
 
 	// Dynamic scene tabs
 	var sceneTabs: Array<String> = ["Scene"];
@@ -36,6 +49,21 @@ class KouiEditor extends iron.Trait {
 			sceneTabHandle = new Handle();
 			propertiesTabHandle = new Handle();
 			themeTabHandle = new Handle();
+
+			Koui.init(function() {
+				Koui.setPadding(100, 100, 75, 75);
+
+				anchorPane = new AnchorPane(10, 10, 250, 250);
+				anchorPane.setTID("fixed_anchorpane");
+
+				button = new Button("Sample Button");
+				button.setPosition(0, 0);
+
+				anchorPane.add(button, Anchor.BottomRight);
+				Koui.add(anchorPane, Anchor.MiddleCenter);
+			});
+
+			App.onResize = onAppResized;
 		});
 
 		notifyOnUpdate(update);
@@ -198,6 +226,31 @@ class KouiEditor extends iron.Trait {
 		drawBottomPanel();
 
 		uiBase.ui.end();
+		Koui.render(g2);
 		g2.begin(false);
+
+		// Draw border with g2 in screen coordinates using drawX/drawY
+		if (anchorPane != null) {
+			var thickness: Int = 1;
+			g2.color = 0xffe7e7e7;
+
+			var x: Int = @:privateAccess anchorPane.drawX;
+			var y: Int = @:privateAccess anchorPane.drawY;
+			var w: Int = @:privateAccess anchorPane.drawWidth;
+			var h: Int = @:privateAccess anchorPane.drawHeight;
+
+			g2.fillRect(x, y, w, thickness);
+			g2.fillRect(x, y + h - thickness, w, thickness);
+			g2.fillRect(x, y + thickness, thickness, h - thickness * 2);
+			g2.fillRect(x + w - thickness, y + thickness, thickness, h - thickness * 2);
+		}
+	}
+
+	function onAppResized() {
+		Koui.uiScale = App.h() / 576;
+		@:privateAccess Koui.onResize(App.w(), App.h());
+		if (Scene.active != null && Scene.active.camera != null) {
+			Scene.active.camera.buildProjection();
+		}
 	}
 }
