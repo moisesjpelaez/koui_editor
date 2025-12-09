@@ -3,6 +3,8 @@ import subprocess
 import bpy
 from bpy.props import StringProperty
 import arm.utils
+import arm.props_traits as pt
+import arm.log as log
 
 # Stored originals for Armory patching
 _original_arm_edit_canvas_execute = None
@@ -52,7 +54,7 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
 
         # Build canvas path if a canvas name is provided
         canvas_arg = ""
-        if getattr(self, 'canvas_name', None):
+        if self.canvas_name:
             project_path = arm.utils.get_fp()
             canvas_arg = os.path.join(project_path, 'Bundled', 'canvas', self.canvas_name + '.json')
             canvas_arg = canvas_arg.replace('\\', '/')
@@ -64,7 +66,7 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
             cmd.append('--consolepid')
             cmd.append(str(os.getpid()))
 
-        print(f"Launching Koui Editor: {' '.join(cmd)}")
+        log.info(f"Launching Koui Editor: {' '.join(cmd)}")
         subprocess.Popen(cmd)
 
         return {'FINISHED'}
@@ -79,18 +81,25 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
-    # Patch Armory's Edit Canvas button to open Koui instead
-    import arm.props_traits as pt
-    if hasattr(pt, 'ArmEditCanvasButton'):
+    try:
+        ArmEditCanvasButton = pt.ArmEditCanvasButton
+    except Exception:
+        ArmEditCanvasButton = None
+
+    if ArmEditCanvasButton is not None:
         global _original_arm_edit_canvas_execute, _original_arm_edit_canvas_label
-        _original_arm_edit_canvas_execute = pt.ArmEditCanvasButton.execute
-        _original_arm_edit_canvas_label = getattr(pt.ArmEditCanvasButton, 'bl_label', None)
+        _original_arm_edit_canvas_execute = ArmEditCanvasButton.execute
+        try:
+            _original_arm_edit_canvas_label = ArmEditCanvasButton.bl_label
+        except Exception:
+            _original_arm_edit_canvas_label = None
 
         # Change label
-        pt.ArmEditCanvasButton.bl_label = 'Edit with Koui'
+        ArmEditCanvasButton.bl_label = 'Edit with Koui'
 
         # Define replacement execute
         def _koui_edit_canvas_execute(self, context):
+            canvas_name = ''
             try:
                 if self.is_object:
                     obj = bpy.context.object
@@ -98,30 +107,29 @@ def register():
                     obj = bpy.context.scene
                 item = obj.arm_traitlist[obj.arm_traitlist_index]
                 canvas_name = item.canvas_name_prop
-            except Exception:
-                canvas_name = ''
 
-            # Launch Koui editor via our operator
-            try:
+                # Launch Koui editor via our operator
                 bpy.ops.koui.launch_editor(canvas_name=canvas_name)
-            except Exception as e:
-                print(f"Koui Editor: failed to launch from patched button: {e}")
+            except Exception:
+                log.error("Koui Editor: could not launch from patched button")
             return {'FINISHED'}
 
-        pt.ArmEditCanvasButton.execute = _koui_edit_canvas_execute
-        print("Koui Editor: Patched ArmEditCanvasButton to open Koui")
-
-    print("Koui Editor: Registered")
+        ArmEditCanvasButton.execute = _koui_edit_canvas_execute
+        log.info("Koui Editor: Patched ArmEditCanvasButton to open Koui")
+    log.info("Koui Editor: Registered")
 
 
 def unregister():
-    # Restore ArmEditCanvasButton if patched
-    import arm.props_traits as pt
-    if hasattr(pt, 'ArmEditCanvasButton') and _original_arm_edit_canvas_execute is not None:
-        pt.ArmEditCanvasButton.execute = _original_arm_edit_canvas_execute
+    try:
+        ArmEditCanvasButton = pt.ArmEditCanvasButton
+    except Exception:
+        ArmEditCanvasButton = None
+
+    if ArmEditCanvasButton is not None and _original_arm_edit_canvas_execute is not None:
+        ArmEditCanvasButton.execute = _original_arm_edit_canvas_execute
         if _original_arm_edit_canvas_label is not None:
-            pt.ArmEditCanvasButton.bl_label = _original_arm_edit_canvas_label
-        print("Koui Editor: Restored ArmEditCanvasButton")
+            ArmEditCanvasButton.bl_label = _original_arm_edit_canvas_label
+        log.info("Koui Editor: Restored ArmEditCanvasButton")
 
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
