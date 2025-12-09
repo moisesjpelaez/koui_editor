@@ -33,6 +33,8 @@ class KouiEditor extends iron.Trait {
 	var sceneTabs: Array<String> = ["Scene"];
 	var sceneCounter: Int = 1;
 
+	var sizeInit: Bool = false;
+
 	public function new() {
 		super();
 
@@ -40,6 +42,7 @@ class KouiEditor extends iron.Trait {
 			// Initialize framework
 			Base.font = Assets.fonts.font_default;
 			Base.init();
+			Base.resizing.connect(onResized);
 
 			// Create UIBase with the loaded font
 			uiBase = new UIBase(Assets.fonts.font_default);
@@ -53,7 +56,7 @@ class KouiEditor extends iron.Trait {
 			Koui.init(function() {
 				Koui.setPadding(100, 100, 75, 75);
 
-				anchorPane = new AnchorPane(10, 10, 250, 250);
+				anchorPane = new AnchorPane(0, 0, Std.int(App.w() * 0.85), Std.int(App.h() * 0.85));
 				anchorPane.setTID("fixed_anchorpane");
 
 				button = new Button("Sample Button");
@@ -63,7 +66,7 @@ class KouiEditor extends iron.Trait {
 				Koui.add(anchorPane, Anchor.MiddleCenter);
 			});
 
-			App.onResize = onAppResized;
+			App.onResize = onResized;
 		});
 
 		notifyOnUpdate(update);
@@ -248,7 +251,6 @@ class KouiEditor extends iron.Trait {
 
 	function render2D(g2: Graphics) {
 		if (uiBase == null) return;
-
 		g2.end();
 
 		Koui.render(g2);
@@ -262,11 +264,16 @@ class KouiEditor extends iron.Trait {
 
 		uiBase.ui.end();
 		g2.begin(false);
+
+		if (!sizeInit) {
+			onResized();
+			sizeInit = true;
+		}
 	}
 
-	function onAppResized() {
-		Koui.uiScale = App.h() / 576;
-		@:privateAccess Koui.onResize(App.w(), App.h());
+	function onResized() {
+		Koui.uiScale = (App.h() - uiBase.getBottomH()) / 576;
+		@:privateAccess Koui.onResize(App.w() - uiBase.getSidebarW(), App.h() - uiBase.getBottomH());
 		if (Scene.active != null && Scene.active.camera != null) {
 			Scene.active.camera.buildProjection();
 		}
