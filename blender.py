@@ -80,61 +80,48 @@ def register():
         bpy.utils.register_class(cls)
 
     # Patch Armory's Edit Canvas button to open Koui instead
-    try:
-        import arm.props_traits as pt
-        if hasattr(pt, 'ArmEditCanvasButton'):
-            global _original_arm_edit_canvas_execute, _original_arm_edit_canvas_label
-            _original_arm_edit_canvas_execute = pt.ArmEditCanvasButton.execute
-            _original_arm_edit_canvas_label = getattr(pt.ArmEditCanvasButton, 'bl_label', None)
+    import arm.props_traits as pt
+    if hasattr(pt, 'ArmEditCanvasButton'):
+        global _original_arm_edit_canvas_execute, _original_arm_edit_canvas_label
+        _original_arm_edit_canvas_execute = pt.ArmEditCanvasButton.execute
+        _original_arm_edit_canvas_label = getattr(pt.ArmEditCanvasButton, 'bl_label', None)
 
-            # Change label
-            pt.ArmEditCanvasButton.bl_label = 'Edit with Koui'
+        # Change label
+        pt.ArmEditCanvasButton.bl_label = 'Edit with Koui'
 
-            # Define replacement execute
-            def _koui_edit_canvas_execute(self, context):
-                try:
-                    if self.is_object:
-                        obj = bpy.context.object
-                    else:
-                        obj = bpy.context.scene
-                    item = obj.arm_traitlist[obj.arm_traitlist_index]
-                    canvas_name = item.canvas_name_prop
-                except Exception:
-                    canvas_name = ''
+        # Define replacement execute
+        def _koui_edit_canvas_execute(self, context):
+            try:
+                if self.is_object:
+                    obj = bpy.context.object
+                else:
+                    obj = bpy.context.scene
+                item = obj.arm_traitlist[obj.arm_traitlist_index]
+                canvas_name = item.canvas_name_prop
+            except Exception:
+                canvas_name = ''
 
-                # Launch Koui editor via our operator
-                try:
-                    bpy.ops.koui.launch_editor(canvas_name=canvas_name)
-                except Exception as e:
-                    print(f"Koui Editor: failed to launch from patched button: {e}")
-                return {'FINISHED'}
+            # Launch Koui editor via our operator
+            try:
+                bpy.ops.koui.launch_editor(canvas_name=canvas_name)
+            except Exception as e:
+                print(f"Koui Editor: failed to launch from patched button: {e}")
+            return {'FINISHED'}
 
-            pt.ArmEditCanvasButton.execute = _koui_edit_canvas_execute
-            print("Koui Editor: Patched ArmEditCanvasButton to open Koui")
-    except Exception:
-        print("Koui Editor: ArmEditCanvasButton patch skipped (Armory not available)")
+        pt.ArmEditCanvasButton.execute = _koui_edit_canvas_execute
+        print("Koui Editor: Patched ArmEditCanvasButton to open Koui")
 
     print("Koui Editor: Registered")
 
 
 def unregister():
     # Restore ArmEditCanvasButton if patched
-    try:
-        import arm.props_traits as pt
-        if hasattr(pt, 'ArmEditCanvasButton') and _original_arm_edit_canvas_execute is not None:
-            try:
-                pt.ArmEditCanvasButton.execute = _original_arm_edit_canvas_execute
-                if _original_arm_edit_canvas_label is not None:
-                    pt.ArmEditCanvasButton.bl_label = _original_arm_edit_canvas_label
-                print("Koui Editor: Restored ArmEditCanvasButton")
-            except Exception:
-                pass
-    except Exception:
-        pass
+    import arm.props_traits as pt
+    if hasattr(pt, 'ArmEditCanvasButton') and _original_arm_edit_canvas_execute is not None:
+        pt.ArmEditCanvasButton.execute = _original_arm_edit_canvas_execute
+        if _original_arm_edit_canvas_label is not None:
+            pt.ArmEditCanvasButton.bl_label = _original_arm_edit_canvas_label
+        print("Koui Editor: Restored ArmEditCanvasButton")
 
     for cls in reversed(classes):
-        try:
-            bpy.utils.unregister_class(cls)
-        except Exception:
-            pass
-    print("Koui Editor: Unregistered")
+        bpy.utils.unregister_class(cls)

@@ -50,7 +50,7 @@ class KouiEditor extends iron.Trait {
 	function drawElementsPanel() {
 		// No background for this panel
 		uiBase.ui.t.FILL_WINDOW_BG = false;
-		if (uiBase.ui.window(Id.handle(), 10, 10, 100, App.h() - uiBase.getBottomH() - 20, true)) {
+		if (uiBase.ui.window(Id.handle(), 10, 10, 100, App.h() - uiBase.getBottomH() - 20, false)) {
 			if (uiBase.ui.panel(Id.handle({selected: true}), "Basic")) {
 				uiBase.ui.indent();
 
