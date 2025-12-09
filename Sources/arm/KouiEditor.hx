@@ -126,31 +126,35 @@ class KouiEditor extends iron.Trait {
 		var h0: Int = uiBase.getSidebarH0();
 		var h1: Int = uiBase.getSidebarH1();
 
-		// Top panel
+		// Top panel - Scene selector
 		if (uiBase.ui.window(uiBase.hwnds[PanelTop], tabx, 0, w, h0)) {
-			// Draw all scene tabs
-			for (i in 0...sceneTabs.length) {
-				if (uiBase.ui.tab(sceneTabHandle, sceneTabs[i])) {
-					// Content for scene tab at index i
-					uiBase.ui.row([6/7, 1/7]);
-					uiBase.ui.text('Editing: ${sceneTabs[i]}');
-					if (uiBase.ui.button("x")) {
-						if (sceneTabs.length > 1) {
-							sceneTabHandle.position = i - 1;
-							sceneTabs.remove(sceneTabs[i]);
-						}
+			// Scene selector row: [Dropdown] [+] [x]
+			uiBase.ui.row([0.7, 0.15, 0.15]);
+
+			// Scene dropdown
+			sceneTabHandle.position = uiBase.ui.combo(sceneTabHandle, sceneTabs, "", true);
+
+			// Add scene button
+			if (uiBase.ui.button("+")) {
+				sceneCounter++;
+				var newName = "Scene " + sceneCounter;
+				sceneTabs.push(newName);
+				sceneTabHandle.position = sceneTabs.length - 1;
+			}
+
+			// Delete scene button
+			if (uiBase.ui.button("-")) {
+				if (sceneTabs.length > 1) {
+					var currentIndex = sceneTabHandle.position;
+					if (currentIndex > 0) sceneTabHandle.position = currentIndex - 1;
+					sceneTabs.splice(currentIndex, 1);
+					if (sceneTabHandle.position >= sceneTabs.length) {
+						sceneTabHandle.position = sceneTabs.length - 1;
 					}
 				}
 			}
 
-			// "+" button to add new scene
-			if (uiBase.ui.tab(sceneTabHandle, "+")) {
-				sceneCounter++;
-				var newName = "Scene " + sceneCounter;
-				sceneTabs.push(newName);
-				sceneTabHandle.position = sceneTabs.length - 1; // Switch to new tab
-				trace("Added: " + newName);
-			}
+			uiBase.ui.text('Editing: ${sceneTabs[sceneTabHandle.position]}');
 		}
 
 		// Bottom panel
