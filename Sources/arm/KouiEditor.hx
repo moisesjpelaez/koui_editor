@@ -254,15 +254,16 @@ class KouiEditor extends iron.Trait {
 		g2.end();
 
 		Koui.render(g2);
+		g2.begin(false);
 		drawAnchorPane(g2);
+		g2.end();
 
 		uiBase.ui.begin(g2);
-
 		drawElementsPanel();
 		drawRightPanels();
 		drawBottomPanel();
-
 		uiBase.ui.end();
+
 		g2.begin(false);
 
 		if (!sizeInit) {
