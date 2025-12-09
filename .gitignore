@@ -1,7 +1,5 @@
 .vscode
 *.blend*
 !*.blend
-khafile.js
 build*
-Sources/Main.hx
 Sources/arm/node*

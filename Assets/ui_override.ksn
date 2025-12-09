@@ -1,0 +1,37 @@
+// Override
+_label > _root:
+	textShadow:
+		offsetX: 1
+		offsetY: 1
+
+_checkbox > _root:
+	color:
+		bg: #323337ff
+
+_checkbox!hover:
+	color:
+		bg: #323337ff
+
+_checkbox!click:
+	color:
+		bg: #323337ff
+
+_gridlayout > _layout:
+	size:
+		minHeight: 0
+		minWidth: 0
+
+_collayout > _gridlayout:
+	size:
+		minHeight: 0
+		minWidth: 0
+
+_rowlayout > _gridlayout:
+	size:
+		minHeight: 0
+		minWidth: 0
+
+_scrollpane > _layout:
+	size:
+		minHeight: 0
+		minWidth: 0
