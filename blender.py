@@ -77,21 +77,22 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     def execute(self, context):
+        # Get the path to this blender.py file (koui_editor library root)
+        this_dir = os.path.dirname(os.path.realpath(__file__))
+
+        # Fall back to SDK path
         sdk_path = get_sdk_path()
-
-        if not sdk_path:
-            self.report({'ERROR'}, 'Armory SDK path not found.')
-            return {'CANCELLED'}
-
-        # Determine graphics backend
         ext = 'd3d11' if get_os() == 'win' else 'opengl'
+        sdk_koui_path = os.path.join(this_dir, 'tools', ext) if sdk_path else ""
 
-        # Path to pre-built koui_editor
-        koui_editor_path = os.path.join(sdk_path, 'lib', 'armory_tools', 'koui_editor', ext)
-
-        # Check if koui_editor exists
-        if not os.path.exists(koui_editor_path):
-            self.report({'ERROR'}, f'Koui Editor not found at: {koui_editor_path}\nPlease build the standalone editor first.')
+        if sdk_koui_path and os.path.exists(sdk_koui_path):
+            koui_editor_path = sdk_koui_path
+            print(f"Koui Editor: Using SDK build at {koui_editor_path}")
+        else:
+            self.report({'ERROR'},
+                f'Koui Editor not found.\n'
+                f'SDK path: {sdk_koui_path}\n'
+                f'Please build the editor first (open koui_editor.blend and click Play).')
             return {'CANCELLED'}
 
         # Get Krom paths
@@ -119,73 +120,6 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class KOUI_OT_launch_with_scene(bpy.types.Operator):
-    """Launch the Koui Editor with the current scene exported"""
-    bl_idname = 'koui.launch_with_scene'
-    bl_label = 'Launch with Scene'
-    bl_description = 'Export current scene and open in Koui Editor'
-    bl_options = {'REGISTER'}
-
-    @classmethod
-    def poll(cls, context):
-        return ARMORY_AVAILABLE
-
-    def execute(self, context):
-        if not ARMORY_AVAILABLE:
-            self.report({'ERROR'}, 'Armory not available.')
-            return {'CANCELLED'}
-
-        from arm.exporter import ArmoryExporter
-
-        sdk_path = get_sdk_path()
-        ext = 'd3d11' if get_os() == 'win' else 'opengl'
-        koui_editor_path = os.path.join(sdk_path, 'lib', 'armory_tools', 'koui_editor', ext)
-
-        if not os.path.exists(koui_editor_path):
-            self.report({'ERROR'}, f'Koui Editor not found at: {koui_editor_path}')
-            return {'CANCELLED'}
-
-        # Export the current scene
-        scene = context.scene
-        scene_name = arm.utils.safestr(scene.name)
-
-        # Get build directory
-        build_dir = arm.utils.get_fp_build()
-        export_dir = os.path.join(build_dir, 'koui_preview', 'Assets')
-
-        if not os.path.exists(export_dir):
-            os.makedirs(export_dir)
-
-        # Export scene to .arm file
-        scene_path = os.path.join(export_dir, scene_name + '.arm')
-
-        try:
-            depsgraph = context.evaluated_depsgraph_get()
-            ArmoryExporter.export_scene(context, scene_path, scene=scene, depsgraph=depsgraph)
-        except Exception as e:
-            self.report({'ERROR'}, f'Failed to export scene: {str(e)}')
-            return {'CANCELLED'}
-
-        # Get Krom paths
-        krom_location, krom_path = get_krom_paths()
-        os.chdir(krom_location)
-
-        # Prepare command
-        scene_path_normalized = scene_path.replace('\\', '/')
-        uiscale = str(get_ui_scale())
-
-        cmd = [krom_path, koui_editor_path, koui_editor_path, scene_path_normalized, uiscale]
-
-        if get_os() == 'win':
-            cmd.append('--consolepid')
-            cmd.append(str(os.getpid()))
-
-        print(f"Launching Koui Editor with scene: {' '.join(cmd)}")
-        subprocess.Popen(cmd)
-
-        return {'FINISHED'}
-
-
 class KOUI_PT_panel(bpy.types.Panel):
     """Koui Editor Panel in the 3D View sidebar"""
     bl_label = "Koui Editor"
@@ -199,18 +133,11 @@ class KOUI_PT_panel(bpy.types.Panel):
 
         layout.operator("koui.launch_editor", icon='WINDOW')
 
-        if ARMORY_AVAILABLE:
-            layout.operator("koui.launch_with_scene", icon='SCENE_DATA')
-        else:
-            box = layout.box()
-            box.label(text="Armory not loaded", icon='INFO')
-
 
 # Registration
 classes = (
     KOUI_OT_launch_editor,
-    KOUI_OT_launch_with_scene,
-    KOUI_PT_panel,
+    KOUI_PT_panel
 )
 
 
