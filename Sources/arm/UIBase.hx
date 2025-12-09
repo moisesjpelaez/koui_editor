@@ -42,10 +42,14 @@ class UIBase {
 	public function update() {
 		if (ui == null) return;
 
+		// Skip updates when window is minimized or too small
+		if (App.w() < MIN_SIDEBAR_W || App.h() < MIN_PANEL_SIZE * 2) return;
+
 		var mouse = Input.getMouse();
 
 		// Clamp sidebar width when window is resized
 		var maxW = Std.int(App.w() * 0.7);
+		if (maxW < MIN_SIDEBAR_W) maxW = MIN_SIDEBAR_W;
 		if (Config.raw.layout[LayoutSidebarW] > maxW) {
 			Config.raw.layout[LayoutSidebarW] = maxW;
 		}
@@ -140,38 +144,75 @@ class UIBase {
 	}
 
 	public function getTabX(): Int {
-		return App.w() - Config.raw.layout[LayoutSidebarW];
+		var w = App.w();
+		if (w < MIN_SIDEBAR_W) return 0; // Window minimized or too small
+		var sidebarW = Config.raw.layout[LayoutSidebarW];
+		if (sidebarW > w - MIN_PANEL_SIZE) sidebarW = w - MIN_PANEL_SIZE;
+		return w - sidebarW;
 	}
 
 	public function getSidebarW(): Int {
-		return Config.raw.layout[LayoutSidebarW];
+		var w = App.w();
+		if (w < MIN_SIDEBAR_W) return MIN_SIDEBAR_W; // Return minimum when window too small
+		var sidebarW = Config.raw.layout[LayoutSidebarW];
+		if (sidebarW > w - MIN_PANEL_SIZE) return w - MIN_PANEL_SIZE;
+		if (sidebarW < MIN_SIDEBAR_W) return MIN_SIDEBAR_W;
+		return sidebarW;
 	}
 
 	public function getSidebarH0(): Int {
-		return Config.raw.layout[LayoutSidebarH0];
+		var h = Config.raw.layout[LayoutSidebarH0];
+		if (h < MIN_PANEL_SIZE) return MIN_PANEL_SIZE;
+		return h;
 	}
 
 	public function getSidebarH1(): Int {
-		return Config.raw.layout[LayoutSidebarH1];
+		var h = Config.raw.layout[LayoutSidebarH1];
+		if (h < MIN_PANEL_SIZE) return MIN_PANEL_SIZE;
+		return h;
 	}
 
 	public function getBottomH(): Int {
-		return Config.raw.layout[LayoutBottomH];
+		var h = Config.raw.layout[LayoutBottomH];
+		if (h < MIN_PANEL_SIZE) return MIN_PANEL_SIZE;
+		return h;
 	}
 
 	public function adjustHeightsToWindow() {
 		var totalH = App.h();
+
+		// Skip adjustment if window is minimized or too small
+		if (totalH < MIN_PANEL_SIZE * 2) return;
+
 		var currentTotal = Config.raw.layout[LayoutSidebarH0] + Config.raw.layout[LayoutSidebarH1];
-		if (currentTotal != totalH) {
+
+		// If heights are corrupted (zero or too small), reset to defaults
+		if (currentTotal < MIN_PANEL_SIZE * 2) {
+			Config.raw.layout[LayoutSidebarH0] = Std.int(totalH / 2);
+			Config.raw.layout[LayoutSidebarH1] = totalH - Config.raw.layout[LayoutSidebarH0];
+		} else if (currentTotal != totalH) {
 			var ratio = Config.raw.layout[LayoutSidebarH0] / currentTotal;
 			Config.raw.layout[LayoutSidebarH0] = Std.int(totalH * ratio);
-			Config.raw.layout[LayoutSidebarH1] = Std.int(totalH - Config.raw.layout[LayoutSidebarH0]);
+			Config.raw.layout[LayoutSidebarH1] = totalH - Config.raw.layout[LayoutSidebarH0];
+		}
+
+		// Ensure minimum sizes
+		if (Config.raw.layout[LayoutSidebarH0] < MIN_PANEL_SIZE) {
+			Config.raw.layout[LayoutSidebarH0] = MIN_PANEL_SIZE;
+			Config.raw.layout[LayoutSidebarH1] = totalH - MIN_PANEL_SIZE;
+		}
+		if (Config.raw.layout[LayoutSidebarH1] < MIN_PANEL_SIZE) {
+			Config.raw.layout[LayoutSidebarH1] = MIN_PANEL_SIZE;
+			Config.raw.layout[LayoutSidebarH0] = totalH - MIN_PANEL_SIZE;
 		}
 
 		// Clamp bottom panel height
 		var maxBottomH = Std.int(App.h() * 0.7);
 		if (Config.raw.layout[LayoutBottomH] > maxBottomH) {
 			Config.raw.layout[LayoutBottomH] = maxBottomH;
+		}
+		if (Config.raw.layout[LayoutBottomH] < MIN_PANEL_SIZE) {
+			Config.raw.layout[LayoutBottomH] = MIN_PANEL_SIZE;
 		}
 	}
 }

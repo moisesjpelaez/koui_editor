@@ -202,9 +202,22 @@ class KouiEditor extends iron.Trait {
 		var panelW: Int = uiBase.getTabX();
 
 		if (uiBase.ui.window(uiBase.hwnds[PanelCenter], panelX, panelY, panelW, bottomH)) {
-			// Tabs
 			uiBase.ui.tab(themeTabHandle, "Theme");
+			uiBase.ui.row([0.075, 0.075, 0.075, 0.075]);
+			if (uiBase.ui.button("Load")) {
+				trace("Load");
+			}
+			if (uiBase.ui.button("Save")) {
+				trace("Save");
+			}
+			if (uiBase.ui.button("Save As")) {
+				trace("Save As");
+			}
+			if (uiBase.ui.button("Clear")) {
+				trace("Clear");
+			}
 
+			uiBase.ui.row([1]);
 			if (themeTabHandle.position == 0) {
 				zui.Ext.textAreaLineNumbers = true;
 				zui.Ext.textAreaScrollPastEnd = true;
