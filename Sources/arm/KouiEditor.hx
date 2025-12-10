@@ -12,11 +12,14 @@ import zui.Zui.Align;
 import zui.Zui.Handle;
 
 import koui.Koui;
+import koui.elements.Element;
 import koui.elements.Button;
+import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.Layout.Anchor;
 import koui.utils.SceneManager;
+import iron.system.Input;
 
 class KouiEditor extends iron.Trait {
 	var uiBase: UIBase;
@@ -34,6 +37,16 @@ class KouiEditor extends iron.Trait {
 	var sceneCounter: Int = 1;
 
 	var sizeInit: Bool = false;
+
+	var buttons: Map<String, Button> = new Map();
+	var buttonsCount: Int = 0;
+	var labels: Map<String, Label> = new Map();
+	var labelsCount: Int = 0;
+
+	// Drag and drop state
+	var draggedElement: Element = null;
+	var dragOffsetX: Int = 0; // offset from element's posX to mouse position (in unscaled layout coords)
+	var dragOffsetY: Int = 0;
 
 	public function new() {
 		super();
@@ -59,10 +72,6 @@ class KouiEditor extends iron.Trait {
 				anchorPane = new AnchorPane(0, 0, Std.int(App.w() * 0.85), Std.int(App.h() * 0.85));
 				anchorPane.setTID("fixed_anchorpane");
 
-				button = new Button("Sample Button");
-				button.setPosition(0, 0);
-
-				anchorPane.add(button, Anchor.BottomRight);
 				Koui.add(anchorPane, Anchor.MiddleCenter);
 			});
 
@@ -76,6 +85,29 @@ class KouiEditor extends iron.Trait {
 	function update() {
 		if (uiBase == null) return;
 		uiBase.update();
+		updateDragAndDrop();
+	}
+
+	function updateDragAndDrop() {
+		var mouse: Mouse = Input.getMouse();
+
+		if (mouse.started()) {
+			var element: Element = Koui.getElementAtPosition(Std.int(mouse.x), Std.int(mouse.y));
+			if (element != null && element != anchorPane && !(element.parent is Button)) {
+				draggedElement = element;
+				dragOffsetX = Std.int(mouse.x - element.posX * Koui.uiScale);
+				dragOffsetY = Std.int(mouse.y - element.posY * Koui.uiScale);
+			}
+		} else if (mouse.down() && draggedElement != null) {
+			draggedElement.setPosition(Std.int(mouse.x) - dragOffsetX, Std.int(mouse.y) - dragOffsetY);
+			@:privateAccess draggedElement.invalidateElem();
+		} else {
+			if (draggedElement != null) {
+				draggedElement.setPosition(Std.int(draggedElement.posX / Koui.uiScale), Std.int(draggedElement.posY / Koui.uiScale));
+				@:privateAccess draggedElement.invalidateElem();
+			}
+			draggedElement = null;
+		}
 	}
 
 	function drawElementsPanel() {
@@ -86,7 +118,11 @@ class KouiEditor extends iron.Trait {
 				uiBase.ui.indent();
 
 				if (uiBase.ui.button("Label")) {
-					trace("Label");
+					var key: String = "label_" + Std.string(labelsCount);
+					var label: Label = new Label("New Label");
+					labels.set(key, label);
+					anchorPane.add(label, Anchor.TopLeft);
+					labelsCount++;
 				}
 
 				if (uiBase.ui.button("Image Panel")) {
@@ -104,7 +140,11 @@ class KouiEditor extends iron.Trait {
 				uiBase.ui.indent();
 
 				if (uiBase.ui.button("Button")) {
-					trace("Button");
+					var key: String = "button_" + Std.string(buttonsCount);
+					var button: Button = new Button("New Button");
+					buttons.set(key, button);
+					anchorPane.add(button, Anchor.TopLeft);
+					buttonsCount++;
 				}
 
 				if (uiBase.ui.button("Checkbox")) {
