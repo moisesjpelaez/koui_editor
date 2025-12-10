@@ -93,10 +93,11 @@ class KouiEditor extends iron.Trait {
 
 		if (mouse.started()) {
 			var element: Element = Koui.getElementAtPosition(Std.int(mouse.x), Std.int(mouse.y));
-			if (element != null && element != anchorPane && !(element.parent is Button)) {
-				draggedElement = element;
-				dragOffsetX = Std.int(mouse.x - element.posX * Koui.uiScale);
-				dragOffsetY = Std.int(mouse.y - element.posY * Koui.uiScale);
+			if (element != null && element != anchorPane) {
+				if (element.parent is Button) draggedElement = element.parent;
+				else draggedElement = element;
+				dragOffsetX = Std.int(mouse.x - draggedElement.posX * Koui.uiScale);
+				dragOffsetY = Std.int(mouse.y - draggedElement.posY * Koui.uiScale);
 			}
 		} else if (mouse.down() && draggedElement != null) {
 			draggedElement.setPosition(Std.int(mouse.x) - dragOffsetX, Std.int(mouse.y) - dragOffsetY);
