@@ -28,6 +28,9 @@ class HierarchyPanel {
 	// Expand/collapse state
 	var expanded: Map<String, Bool> = new Map();
 
+	// Selection state
+	var selectedItemIndex: Int = -1;
+
 	// Drag-drop state
 	var draggedItemIndex: Int = -1;
 	var dropTargetIndex: Int = -1;
@@ -121,6 +124,13 @@ class HierarchyPanel {
 		var rowH = ui.t.ELEMENT_H;
 		var indentWidth = depth * 15;
 
+		// Visual feedback: highlight if selected
+		if (selectedItemIndex == itemIndex) {
+			ui.g.color = ui.t.HIGHLIGHT_COL;
+			ui.g.fillRect(@:privateAccess ui._x, rowY, @:privateAccess ui._windowW, rowH);
+			ui.g.color = 0xFFFFFFFF;
+		}
+
 		// Visual feedback: highlight drop zone
 		if (dropTargetIndex == itemIndex && dropZone != None && draggedItemIndex != -1) {
 			ui.g.color = 0xFF469CFF;
@@ -156,14 +166,31 @@ class HierarchyPanel {
 			}
 		}
 
-		// Item name button (clickable and draggable)
+		// Item name button - has hover/pressed states
+		// Save button color and override if selected
+		var savedButtonCol = ui.t.BUTTON_COL;
+		var savedButtonHoverCol = ui.t.BUTTON_HOVER_COL;
+		var savedButtonPressedCol = ui.t.BUTTON_PRESSED_COL;
+
+		if (selectedItemIndex == itemIndex) {
+			ui.t.BUTTON_COL = ui.t.HIGHLIGHT_COL;
+			ui.t.BUTTON_HOVER_COL = ui.t.HIGHLIGHT_COL;
+			ui.t.BUTTON_PRESSED_COL = ui.t.HIGHLIGHT_COL;
+		}
+
 		var buttonPressed = ui.button(item.name, Left);
 
-		// Drag start
-		if (ui.inputStarted && ui.inputX > @:privateAccess ui._x && ui.inputX < @:privateAccess ui._x + @:privateAccess ui._windowW &&
-		    ui.inputY > rowY && ui.inputY < rowY + rowH) {
+		// Restore colors
+		ui.t.BUTTON_COL = savedButtonCol;
+		ui.t.BUTTON_HOVER_COL = savedButtonHoverCol;
+		ui.t.BUTTON_PRESSED_COL = savedButtonPressedCol;
+
+		// Handle selection on button press
+		if (buttonPressed) {
+			selectedItemIndex = itemIndex;
 			draggedItemIndex = itemIndex;
-			trace('Started dragging: ${item.name}');
+			trace('Selected: ${item.name}');
+			uiBase.hwnds[PanelTop].redraws = 2;
 		}
 
 		// Drag over (detect drop target and zone)
