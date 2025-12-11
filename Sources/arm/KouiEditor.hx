@@ -34,11 +34,13 @@ class KouiEditor extends iron.Trait {
 	var sceneTabs: Array<String> = ["Scene"];
 	var sceneCounter: Int = 1;
 
-	// Created elements
-	var buttons: Map<String, Button> = new Map();
+	// Created elements - using arrays to preserve insertion order
+	var elements: Array<{name: String, element: Element}> = [];
 	var buttonsCount: Int = 0;
-	var labels: Map<String, Label> = new Map();
 	var labelsCount: Int = 0;
+
+	// Hierarchy state - track expanded/collapsed state for all elements
+	var elementExpanded: Map<Element, Bool> = new Map();
 
 	// Drag and drop state
 	var selectedElement: Element = null;
@@ -87,19 +89,11 @@ class KouiEditor extends iron.Trait {
 		if (keyboard.started("delete")) {
 			anchorPane.remove(selectedElement);
 
-			if (selectedElement is Button) {
-				for (key in buttons.keys()) {
-					if (buttons.get(key) == selectedElement) {
-						buttons.remove(key);
-						break;
-					}
-				}
-			} else if (selectedElement is Label) {
-				for (key in labels.keys()) {
-					if (labels.get(key) == selectedElement) {
-						labels.remove(key);
-						break;
-					}
+			// Remove from elements array
+			for (i in 0...elements.length) {
+				if (elements[i].element == selectedElement) {
+					elements.splice(i, 1);
+					break;
 				}
 			}
 
@@ -147,7 +141,7 @@ class KouiEditor extends iron.Trait {
 				if (uiBase.ui.button("Label")) {
 					var key: String = "label_" + Std.string(labelsCount);
 					var label: Label = new Label("New Label");
-					labels.set(key, label);
+					elements.push({name: key, element: label});
 					anchorPane.add(label, Anchor.TopLeft);
 					labelsCount++;
 					selectedElement = label;
@@ -171,7 +165,7 @@ class KouiEditor extends iron.Trait {
 				if (uiBase.ui.button("Button")) {
 					var key: String = "button_" + Std.string(buttonsCount);
 					var button: Button = new Button("New Button");
-					buttons.set(key, button);
+					elements.push({name: key, element: button});
 					anchorPane.add(button, Anchor.TopLeft);
 					buttonsCount++;
 					selectedElement = button;
@@ -266,57 +260,103 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function drawHierarchy() {
-		uiBase.ui.text('${sceneTabs[sceneTabHandle.position]}', Align.Left);
-		uiBase.ui.separator(3, false);
-
-		// Draw all buttons
-		for (key in buttons.keys()) {
-			var elem = buttons.get(key);
-			drawHierarchyNode(key, elem, 0);
-		}
-
-		// Draw all labels
-		for (key in labels.keys()) {
-			var elem = labels.get(key);
-			drawHierarchyNode(key, elem, 0);
-		}
+		// Draw AnchorPane as root with its children
+		drawHierarchyNode("AnchorPane", anchorPane, 0);
 	}
 
-	function drawHierarchyNode(name: String, element: Element, indent: Int) {
+	function drawHierarchyNode(name: String, element: Element, level: Int) {
 		var ui = uiBase.ui;
 		var step = ui.t.ELEMENT_H;
 		var isSelected = (selectedElement == element);
 
 		@:privateAccess var listW = ui._w;
-		@:privateAccess var listX = ui._x;
-		@:privateAccess var _y = ui._y;
+
+		// Check if element has children
+		var hasChildren = getChildElements(element).length > 0;
+
+		// Get or initialize expanded state (default to true)
+		if (!elementExpanded.exists(element)) {
+			elementExpanded.set(element, true);
+		}
+		var isExpanded = elementExpanded.get(element);
 
 		// Indent based on hierarchy level
+		var indent = level * 15;
 		if (indent > 0) {
-			@:privateAccess ui._x += (indent * 10) * ui.SCALE();
+			@:privateAccess ui._x += indent * ui.SCALE();
 		}
 
-		// Draw highlight behind text first (before text to not affect text color)
+		// Draw highlight behind element
 		if (isSelected) {
 			@:privateAccess ui.fill(0, 0, listW / ui.SCALE(), step, ui.t.HIGHLIGHT_COL);
 		}
 
-		// Draw node name as text on top
-		var state = ui.text(name, Align.Left);
+		// Setup row layout based on whether element has children
+		if (hasChildren) {
+			ui.row([8 / 100, 92 / 100]);
 
-		// Draw hover highlight after checking hover state from text
+			// Expand/collapse button
+			var expandIcon = isExpanded ? "-" : "+";
+			if (ui.button(expandIcon)) {
+				elementExpanded.set(element, !isExpanded);
+			}
+
+			// Element name
+			var state = ui.text(name, Align.Left);
+
+			// Handle selection
+			if (state == Released) {
+				selectedElement = element;
+			}
+		} else {
+			// No children, just draw the name
+			var state = ui.text(name, Align.Left);
+
+			// Handle selection
+			if (state == Released) {
+				selectedElement = element;
+			}
+		}
+
+		// Draw hover highlight
 		if (!isSelected && ui.isHovered) {
 			@:privateAccess ui.fill(0, -step, listW / ui.SCALE(), step, ui.t.HIGHLIGHT_COL - 0x88000000);
 		}
 
-		// Handle selection
-		if (state == Released) {
-			selectedElement = element;
+		// Restore indentation
+		if (indent > 0) {
+			@:privateAccess ui._x -= indent * ui.SCALE();
 		}
 
-		if (indent > 0) {
-			@:privateAccess ui._x -= (indent * 10) * ui.SCALE();
+		// Draw child elements if expanded and has children
+		if (hasChildren && isExpanded) {
+			var children = getChildElements(element);
+			for (child in children) {
+				drawHierarchyNode(child.name, child.element, level + 1);
+			}
 		}
+	}
+
+	function getChildElements(parent: Element): Array<{name: String, element: Element}> {
+		var children: Array<{name: String, element: Element}> = [];
+
+		// If parent is anchorPane, return all root elements
+		if (parent == anchorPane) {
+			for (item in elements) {
+				if (item.element.parent == anchorPane) {
+					children.push(item);
+				}
+			}
+		} else {
+			// Otherwise find direct children of this element
+			for (item in elements) {
+				if (item.element.parent == parent) {
+					children.push(item);
+				}
+			}
+		}
+
+		return children;
 	}
 
 	function drawBottomPanel() {
@@ -375,7 +415,7 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function drawSelectedElement(g2: Graphics) {
-		if (selectedElement != null) {
+		if (selectedElement != null && selectedElement != anchorPane) {
 			var thickness: Int = 2;
 			g2.color = 0xff469cff;
 
