@@ -30,17 +30,17 @@ class KouiEditor extends iron.Trait {
 	var anchorPane: AnchorPane;
 	var sizeInit: Bool = false;
 
+	// Dynamic scene tabs
+	var sceneTabs: Array<String> = ["Scene"];
+	var sceneCounter: Int = 1;
+
 	// Created elements
 	var buttons: Map<String, Button> = new Map();
 	var buttonsCount: Int = 0;
 	var labels: Map<String, Label> = new Map();
 	var labelsCount: Int = 0;
 
-	// Dynamic scene tabs
-	var sceneTabs: Array<String> = ["Scene"];
-	var sceneCounter: Int = 1;
-
-	// Selection and dragging
+	// Drag and drop state
 	var selectedElement: Element = null;
 	var draggedElement: Element = null;
 	var dragOffsetX: Int = 0; // offset from element's posX to mouse position (in unscaled layout coords)
@@ -104,6 +104,7 @@ class KouiEditor extends iron.Trait {
 			}
 
 			selectedElement = null;
+			uiBase.hwnds[PanelTop].redraws = 2;
 		}
 	}
 
@@ -122,6 +123,7 @@ class KouiEditor extends iron.Trait {
 				selectedElement = null;
 				draggedElement = null;
 			}
+			uiBase.hwnds[PanelTop].redraws = 2;
 		} else if (mouse.down() && draggedElement != null) {
 			draggedElement.setPosition(Std.int(mouse.x) - dragOffsetX, Std.int(mouse.y) - dragOffsetY);
 			@:privateAccess draggedElement.invalidateElem();
@@ -131,6 +133,7 @@ class KouiEditor extends iron.Trait {
 				@:privateAccess draggedElement.invalidateElem();
 			}
 			draggedElement = null;
+			uiBase.hwnds[PanelTop].redraws = 2;
 		}
 	}
 
@@ -147,6 +150,8 @@ class KouiEditor extends iron.Trait {
 					labels.set(key, label);
 					anchorPane.add(label, Anchor.TopLeft);
 					labelsCount++;
+					selectedElement = label;
+					uiBase.hwnds[PanelTop].redraws = 2;
 				}
 
 				if (uiBase.ui.button("Image Panel")) {
@@ -169,6 +174,8 @@ class KouiEditor extends iron.Trait {
 					buttons.set(key, button);
 					anchorPane.add(button, Anchor.TopLeft);
 					buttonsCount++;
+					selectedElement = button;
+					uiBase.hwnds[PanelTop].redraws = 2;
 				}
 
 				if (uiBase.ui.button("Checkbox")) {
@@ -249,12 +256,66 @@ class KouiEditor extends iron.Trait {
 				}
 			}
 
-			uiBase.ui.text('Editing: ${sceneTabs[sceneTabHandle.position]}');
+			drawHierarchy();
 		}
 
 		// Bottom panel
 		if (uiBase.ui.window(uiBase.hwnds[PanelBottom], tabx, h0, w, h1)) {
 			uiBase.ui.tab(propertiesTabHandle, "Properties");
+		}
+	}
+
+	function drawHierarchy() {
+		uiBase.ui.text('${sceneTabs[sceneTabHandle.position]}', Align.Left);
+		uiBase.ui.separator(3, false);
+
+		// Draw all buttons
+		for (key in buttons.keys()) {
+			var elem = buttons.get(key);
+			drawHierarchyNode(key, elem, 0);
+		}
+
+		// Draw all labels
+		for (key in labels.keys()) {
+			var elem = labels.get(key);
+			drawHierarchyNode(key, elem, 0);
+		}
+	}
+
+	function drawHierarchyNode(name: String, element: Element, indent: Int) {
+		var ui = uiBase.ui;
+		var step = ui.t.ELEMENT_H;
+		var isSelected = (selectedElement == element);
+
+		@:privateAccess var listW = ui._w;
+		@:privateAccess var listX = ui._x;
+		@:privateAccess var _y = ui._y;
+
+		// Indent based on hierarchy level
+		if (indent > 0) {
+			@:privateAccess ui._x += (indent * 10) * ui.SCALE();
+		}
+
+		// Draw highlight behind text first (before text to not affect text color)
+		if (isSelected) {
+			@:privateAccess ui.fill(0, 0, listW / ui.SCALE(), step, ui.t.HIGHLIGHT_COL);
+		}
+
+		// Draw node name as text on top
+		var state = ui.text(name, Align.Left);
+
+		// Draw hover highlight after checking hover state from text
+		if (!isSelected && ui.isHovered) {
+			@:privateAccess ui.fill(0, -step, listW / ui.SCALE(), step, ui.t.HIGHLIGHT_COL - 0x88000000);
+		}
+
+		// Handle selection
+		if (state == Released) {
+			selectedElement = element;
+		}
+
+		if (indent > 0) {
+			@:privateAccess ui._x -= (indent * 10) * ui.SCALE();
 		}
 	}
 
