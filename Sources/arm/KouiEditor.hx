@@ -27,6 +27,7 @@ class KouiEditor extends iron.Trait {
 	var sceneTabHandle: Handle;
 	var propertiesTabHandle: Handle;
 	var themeTabHandle: Handle;
+	var anchorPane: AnchorPane;
 	var sizeInit: Bool = false;
 
 	// Created elements
@@ -65,7 +66,7 @@ class KouiEditor extends iron.Trait {
 
 			Koui.init(function() {
 				Koui.setPadding(100, 100, 75, 75);
-				var anchorPane: AnchorPane = new AnchorPane(0, 0, Std.int(App.w() * 0.85), Std.int(App.h() * 0.85));
+				anchorPane = new AnchorPane(0, 0, Std.int(App.w() * 0.85), Std.int(App.h() * 0.85));
 				anchorPane.setTID("fixed_anchorpane");
 				Koui.add(anchorPane, Anchor.MiddleCenter);
 			});
