@@ -21,32 +21,33 @@ import koui.elements.layouts.Layout.Anchor;
 import koui.utils.SceneManager;
 import iron.system.Input;
 
+import arm.panels.BottomPanel;
+import arm.panels.HierarchyPanel;
+import arm.panels.PropertiesPanel;
+import arm.panels.ElementsPanel;
+
 class KouiEditor extends iron.Trait {
 	var uiBase: UIBase;
-	var themeTextHandle: Handle;
-	var sceneTabHandle: Handle;
-	var propertiesTabHandle: Handle;
-	var themeTabHandle: Handle;
+
 	var anchorPane: AnchorPane;
 	var sizeInit: Bool = false;
 
-	// Dynamic scene tabs
-	var sceneTabs: Array<String> = ["Scene"];
-	var sceneCounter: Int = 1;
-
 	// Created elements - using arrays to preserve insertion order
-	var elements: Array<{name: String, element: Element}> = [];
-	var buttonsCount: Int = 0;
-	var labelsCount: Int = 0;
-
-	// Hierarchy state - track expanded/collapsed state for all elements
-	var elementExpanded: Map<Element, Bool> = new Map();
+	public static var elements: Array<{name: String, element: Element}> = [];
+	public static var buttonsCount: Int = 0;
+	public static var labelsCount: Int = 0;
 
 	// Drag and drop state
-	var selectedElement: Element = null;
-	var draggedElement: Element = null;
-	var dragOffsetX: Int = 0; // offset from element's posX to mouse position (in unscaled layout coords)
+	public static var selectedElement: Element = null;
+	public static var draggedElement: Element = null;
+	var dragOffsetX: Int = 0;
 	var dragOffsetY: Int = 0;
+
+	// Panels
+	var bottomPanel: BottomPanel = new BottomPanel();
+	var hierarchyPanel: HierarchyPanel = new HierarchyPanel();
+	var propertiesPanel: PropertiesPanel = new PropertiesPanel();
+	var elementsPanel: ElementsPanel = new ElementsPanel();
 
 	public function new() {
 		super();
@@ -59,12 +60,6 @@ class KouiEditor extends iron.Trait {
 
 			// Create UIBase with the loaded font
 			uiBase = new UIBase(Assets.fonts.font_default);
-
-			// Initialize handles
-			themeTextHandle = new Handle();
-			sceneTabHandle = new Handle();
-			propertiesTabHandle = new Handle();
-			themeTabHandle = new Handle();
 
 			Koui.init(function() {
 				Koui.setPadding(100, 100, 75, 75);
@@ -131,269 +126,15 @@ class KouiEditor extends iron.Trait {
 		}
 	}
 
-	function drawElementsPanel() {
-		// No background for this panel
-		uiBase.ui.t.FILL_WINDOW_BG = false;
-		if (uiBase.ui.window(Id.handle(), 10, 10, 100, App.h() - uiBase.getBottomH() - 20, false)) {
-			if (uiBase.ui.panel(Id.handle({selected: true}), "Basic")) {
-				uiBase.ui.indent();
-
-				if (uiBase.ui.button("Label")) {
-					var key: String = "label_" + Std.string(labelsCount);
-					var label: Label = new Label("New Label");
-					elements.push({name: key, element: label});
-					anchorPane.add(label, Anchor.TopLeft);
-					labelsCount++;
-					selectedElement = label;
-					uiBase.hwnds[PanelTop].redraws = 2;
-				}
-
-				if (uiBase.ui.button("Image Panel")) {
-					trace("Image Panel");
-				}
-
-				if (uiBase.ui.button("Panel")) {
-					trace("Panel");
-				}
-
-				uiBase.ui.unindent();
-			}
-
-			if (uiBase.ui.panel(Id.handle({selected: true}), "Buttons")) {
-				uiBase.ui.indent();
-
-				if (uiBase.ui.button("Button")) {
-					var key: String = "button_" + Std.string(buttonsCount);
-					var button: Button = new Button("New Button");
-					elements.push({name: key, element: button});
-					anchorPane.add(button, Anchor.TopLeft);
-					buttonsCount++;
-					selectedElement = button;
-					uiBase.hwnds[PanelTop].redraws = 2;
-				}
-
-				if (uiBase.ui.button("Checkbox")) {
-					trace("Checkbox");
-				}
-
-				if (uiBase.ui.button("Radio")) {
-					trace("Radio");
-				}
-
-				uiBase.ui.unindent();
-			}
-
-			if (uiBase.ui.panel(Id.handle({selected: true}), "Layout")) {
-				uiBase.ui.indent();
-
-				if (uiBase.ui.button("AnchorPane")) {
-					trace("AnchorPane");
-				}
-
-				if (uiBase.ui.button("GridLayout")) {
-					trace("GridLayout");
-				}
-
-				if (uiBase.ui.button("ColLayout")) {
-					trace("ColLayout");
-				}
-
-				if (uiBase.ui.button("RowLayout")) {
-					trace("RowLayout");
-				}
-
-				if (uiBase.ui.button("Expander")) {
-					trace("Expander");
-				}
-
-				uiBase.ui.unindent();
-			}
-		}
-		// Restore background for other panels
-		uiBase.ui.t.FILL_WINDOW_BG = true;
-	}
-
 	function drawRightPanels() {
 		// Adjust heights if window was resized
-		uiBase.adjustHeightsToWindow();
-
 		var tabx: Int = uiBase.getTabX();
 		var w: Int = uiBase.getSidebarW();
 		var h0: Int = uiBase.getSidebarH0();
 		var h1: Int = uiBase.getSidebarH1();
 
-		// Top panel - Scene selector
-		if (uiBase.ui.window(uiBase.hwnds[PanelTop], tabx, 0, w, h0)) {
-			// Scene selector row: [Dropdown] [+] [x]
-			uiBase.ui.row([0.7, 0.15, 0.15]);
-
-			// Scene dropdown
-			sceneTabHandle.position = uiBase.ui.combo(sceneTabHandle, sceneTabs, "", true);
-
-			// Add scene button
-			if (uiBase.ui.button("+")) {
-				sceneCounter++;
-				var newName = "Scene " + sceneCounter;
-				sceneTabs.push(newName);
-				sceneTabHandle.position = sceneTabs.length - 1;
-			}
-
-			// Delete scene button
-			if (uiBase.ui.button("-")) {
-				if (sceneTabs.length > 1) {
-					var currentIndex = sceneTabHandle.position;
-					if (currentIndex > 0) sceneTabHandle.position = currentIndex - 1;
-					sceneTabs.splice(currentIndex, 1);
-					if (sceneTabHandle.position >= sceneTabs.length) {
-						sceneTabHandle.position = sceneTabs.length - 1;
-					}
-				}
-			}
-
-			drawHierarchy();
-		}
-
-		// Bottom panel
-		if (uiBase.ui.window(uiBase.hwnds[PanelBottom], tabx, h0, w, h1)) {
-			uiBase.ui.tab(propertiesTabHandle, "Properties");
-		}
-	}
-
-	function drawHierarchy() {
-		// Draw AnchorPane as root with its children
-		drawHierarchyNode("AnchorPane", anchorPane, 0);
-	}
-
-	function drawHierarchyNode(name: String, element: Element, level: Int) {
-		var ui = uiBase.ui;
-		var step = ui.t.ELEMENT_H;
-		var isSelected = (selectedElement == element);
-
-		@:privateAccess var listW = ui._w;
-
-		// Check if element has children
-		var hasChildren = getChildElements(element).length > 0;
-
-		// Get or initialize expanded state (default to true)
-		if (!elementExpanded.exists(element)) {
-			elementExpanded.set(element, true);
-		}
-		var isExpanded = elementExpanded.get(element);
-
-		// Indent based on hierarchy level
-		var indent = level * 15;
-		if (indent > 0) {
-			@:privateAccess ui._x += indent * ui.SCALE();
-		}
-
-		// Draw highlight behind element
-		if (isSelected) {
-			@:privateAccess ui.fill(0, 0, listW / ui.SCALE(), step, ui.t.HIGHLIGHT_COL);
-		}
-
-		// Setup row layout based on whether element has children
-		if (hasChildren) {
-			ui.row([8 / 100, 92 / 100]);
-
-			// Expand/collapse button
-			var expandIcon = isExpanded ? "-" : "+";
-			if (ui.button(expandIcon)) {
-				elementExpanded.set(element, !isExpanded);
-			}
-
-			// Element name
-			var state = ui.text(name, Align.Left);
-
-			// Handle selection
-			if (state == Released) {
-				selectedElement = element;
-			}
-		} else {
-			// No children, just draw the name
-			var state = ui.text(name, Align.Left);
-
-			// Handle selection
-			if (state == Released) {
-				selectedElement = element;
-			}
-		}
-
-		// Draw hover highlight
-		if (!isSelected && ui.isHovered) {
-			@:privateAccess ui.fill(0, -step, listW / ui.SCALE(), step, ui.t.HIGHLIGHT_COL - 0x88000000);
-		}
-
-		// Restore indentation
-		if (indent > 0) {
-			@:privateAccess ui._x -= indent * ui.SCALE();
-		}
-
-		// Draw child elements if expanded and has children
-		if (hasChildren && isExpanded) {
-			var children = getChildElements(element);
-			for (child in children) {
-				drawHierarchyNode(child.name, child.element, level + 1);
-			}
-		}
-	}
-
-	function getChildElements(parent: Element): Array<{name: String, element: Element}> {
-		var children: Array<{name: String, element: Element}> = [];
-
-		// If parent is anchorPane, return all root elements
-		if (parent == anchorPane) {
-			for (item in elements) {
-				if (item.element.parent == anchorPane) {
-					children.push(item);
-				}
-			}
-		} else {
-			// Otherwise find direct children of this element
-			for (item in elements) {
-				if (item.element.parent == parent) {
-					children.push(item);
-				}
-			}
-		}
-
-		return children;
-	}
-
-	function drawBottomPanel() {
-		var bottomH: Int = uiBase.getBottomH();
-
-		// Skip drawing if panel is too small
-		if (bottomH < UIBase.MIN_PANEL_SIZE) return;
-
-		var panelX: Int = 0;
-		var panelY: Int = App.h() - bottomH;
-		var panelW: Int = uiBase.getTabX();
-
-		if (uiBase.ui.window(uiBase.hwnds[PanelCenter], panelX, panelY, panelW, bottomH)) {
-			uiBase.ui.tab(themeTabHandle, "Theme");
-			uiBase.ui.row([0.075, 0.075, 0.075, 0.075]);
-			if (uiBase.ui.button("Load")) {
-				trace("Load");
-			}
-			if (uiBase.ui.button("Save")) {
-				trace("Save");
-			}
-			if (uiBase.ui.button("Save As")) {
-				trace("Save As");
-			}
-			if (uiBase.ui.button("Clear")) {
-				trace("Clear");
-			}
-
-			uiBase.ui.row([1]);
-			if (themeTabHandle.position == 0) {
-				zui.Ext.textAreaLineNumbers = true;
-				zui.Ext.textAreaScrollPastEnd = true;
-				zui.Ext.textArea(uiBase.ui, themeTextHandle);
-				zui.Ext.textAreaLineNumbers = false;
-				zui.Ext.textAreaScrollPastEnd = false;
-			}
-		}
+		hierarchyPanel.draw(uiBase, {tabx: tabx, w: w, h0: h0});
+		propertiesPanel.draw(uiBase, {tabx: tabx, h0: h0, w: w, h1: h1});
 	}
 
 	function drawAnchorPane(g2: Graphics) {
@@ -442,9 +183,10 @@ class KouiEditor extends iron.Trait {
 		g2.end();
 
 		uiBase.ui.begin(g2);
-		drawElementsPanel();
+		uiBase.adjustHeightsToWindow();
+		elementsPanel.draw(uiBase, anchorPane);
 		drawRightPanels();
-		drawBottomPanel();
+		bottomPanel.draw(uiBase);
 		uiBase.ui.end();
 
 		g2.begin(false);
