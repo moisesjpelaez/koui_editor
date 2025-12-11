@@ -27,23 +27,20 @@ class KouiEditor extends iron.Trait {
 	var sceneTabHandle: Handle;
 	var propertiesTabHandle: Handle;
 	var themeTabHandle: Handle;
-
-	// Main editing AnchorPane
-	var anchorPane: AnchorPane;
-	var button: Button;
-
-	// Dynamic scene tabs
-	var sceneTabs: Array<String> = ["Scene"];
-	var sceneCounter: Int = 1;
-
 	var sizeInit: Bool = false;
 
+	// Created elements
 	var buttons: Map<String, Button> = new Map();
 	var buttonsCount: Int = 0;
 	var labels: Map<String, Label> = new Map();
 	var labelsCount: Int = 0;
 
-	// Drag and drop state
+	// Dynamic scene tabs
+	var sceneTabs: Array<String> = ["Scene"];
+	var sceneCounter: Int = 1;
+
+	// Selection and dragging
+	var selectedElement: Element = null;
 	var draggedElement: Element = null;
 	var dragOffsetX: Int = 0; // offset from element's posX to mouse position (in unscaled layout coords)
 	var dragOffsetY: Int = 0;
@@ -68,10 +65,8 @@ class KouiEditor extends iron.Trait {
 
 			Koui.init(function() {
 				Koui.setPadding(100, 100, 75, 75);
-
-				anchorPane = new AnchorPane(0, 0, Std.int(App.w() * 0.85), Std.int(App.h() * 0.85));
+				var anchorPane: AnchorPane = new AnchorPane(0, 0, Std.int(App.w() * 0.85), Std.int(App.h() * 0.85));
 				anchorPane.setTID("fixed_anchorpane");
-
 				Koui.add(anchorPane, Anchor.MiddleCenter);
 			});
 
@@ -86,6 +81,29 @@ class KouiEditor extends iron.Trait {
 		if (uiBase == null) return;
 		uiBase.update();
 		updateDragAndDrop();
+
+		var keyboard: Keyboard = Input.getKeyboard();
+		if (keyboard.started("delete")) {
+			anchorPane.remove(selectedElement);
+
+			if (selectedElement is Button) {
+				for (key in buttons.keys()) {
+					if (buttons.get(key) == selectedElement) {
+						buttons.remove(key);
+						break;
+					}
+				}
+			} else if (selectedElement is Label) {
+				for (key in labels.keys()) {
+					if (labels.get(key) == selectedElement) {
+						labels.remove(key);
+						break;
+					}
+				}
+			}
+
+			selectedElement = null;
+		}
 	}
 
 	function updateDragAndDrop() {
@@ -94,10 +112,14 @@ class KouiEditor extends iron.Trait {
 		if (mouse.started()) {
 			var element: Element = Koui.getElementAtPosition(Std.int(mouse.x), Std.int(mouse.y));
 			if (element != null && element != anchorPane) {
-				if (element.parent is Button) draggedElement = element.parent;
-				else draggedElement = element;
+				if (element.parent is Button) selectedElement = element.parent;
+				else selectedElement = element;
+				draggedElement = selectedElement;
 				dragOffsetX = Std.int(mouse.x - draggedElement.posX * Koui.uiScale);
 				dragOffsetY = Std.int(mouse.y - draggedElement.posY * Koui.uiScale);
+			} else {
+				selectedElement = null;
+				draggedElement = null;
 			}
 		} else if (mouse.down() && draggedElement != null) {
 			draggedElement.setPosition(Std.int(mouse.x) - dragOffsetX, Std.int(mouse.y) - dragOffsetY);
@@ -290,6 +312,23 @@ class KouiEditor extends iron.Trait {
 		}
 	}
 
+	function drawSelectedElement(g2: Graphics) {
+		if (selectedElement != null) {
+			var thickness: Int = 2;
+			g2.color = 0xff469cff;
+
+			var x: Int = draggedElement != selectedElement ? @:privateAccess selectedElement.drawX + @:privateAccess anchorPane.drawX : Std.int(@:privateAccess selectedElement.drawX / Koui.uiScale) + @:privateAccess anchorPane.drawX;
+			var y: Int = draggedElement != selectedElement ? @:privateAccess selectedElement.drawY + @:privateAccess anchorPane.drawY : Std.int(@:privateAccess selectedElement.drawY / Koui.uiScale) + @:privateAccess anchorPane.drawY;
+			var w: Int = @:privateAccess selectedElement.drawWidth;
+			var h: Int = @:privateAccess selectedElement.drawHeight;
+
+			g2.fillRect(x, y, w, thickness);
+			g2.fillRect(x, y + h - thickness, w, thickness);
+			g2.fillRect(x, y + thickness, thickness, h - thickness * 2);
+			g2.fillRect(x + w - thickness, y + thickness, thickness, h - thickness * 2);
+		}
+	}
+
 	function render2D(g2: Graphics) {
 		if (uiBase == null) return;
 		g2.end();
@@ -297,6 +336,7 @@ class KouiEditor extends iron.Trait {
 		Koui.render(g2);
 		g2.begin(false);
 		drawAnchorPane(g2);
+		drawSelectedElement(g2);
 		g2.end();
 
 		uiBase.ui.begin(g2);
