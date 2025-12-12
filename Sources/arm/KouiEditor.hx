@@ -119,6 +119,7 @@ class KouiEditor extends iron.Trait {
 			} else {
 				selectedElement = null;
 				draggedElement = null;
+				hierarchyPanel.selectElement(null);
 			}
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 		} else if (mouse.down() && draggedElement != null) {

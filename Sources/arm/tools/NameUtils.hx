@@ -3,23 +3,15 @@ package arm.tools;
 import arm.ElementsData;
 import koui.elements.Element;
 
-/**
- * Utilities for generating and validating element names in the hierarchy.
- */
 class NameUtils {
-
-	/**
-	 * Generate a unique name for an element based on its type and parent's children.
-	 * Counts same-type siblings to create name like "Button_1", "Button_2", etc.
-	 */
 	public static function generateName(element: Element, parent: Element): String {
 		var baseName: String = Type.getClassName(Type.getClass(element)).split(".").pop();
 		var siblings: Array<Element> = HierarchyUtils.getChildren(parent);
 
-		// Count same-type siblings
+		// Count same-type siblings (excluding the element itself)
 		var sameTypeCount: Int = 0;
 		for (sibling in siblings) {
-			if (Type.getClass(sibling) == Type.getClass(element)) {
+			if (sibling != element && Type.getClass(sibling) == Type.getClass(element)) {
 				sameTypeCount++;
 			}
 		}
@@ -27,10 +19,6 @@ class NameUtils {
 		return baseName + "_" + (sameTypeCount + 1);
 	}
 
-	/**
-	 * Ensure a name is unique among siblings. If conflict exists, increment suffix.
-	 * Used when reparenting to avoid duplicate names in the new parent.
-	 */
 	public static function ensureUniqueName(proposedName: String, element: Element, parent: Element): String {
 		var siblings: Array<Element> = HierarchyUtils.getChildren(parent);
 		var existingNames: Array<String> = [];

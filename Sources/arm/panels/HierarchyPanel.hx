@@ -307,6 +307,7 @@ class HierarchyPanel {
 
     public function selectElement(element: Element): Void {
         selectedElement = element;
+		if (selectedElement == null) draggedItem = null;
     }
 
     public function onElementAdded(entry: HierarchyEntry): Void {

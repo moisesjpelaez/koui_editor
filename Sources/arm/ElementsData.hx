@@ -20,9 +20,6 @@ class ElementsData {
         elements.push({ key: entry.key, element: entry.element });
     }
 
-    /**
-     * Update the key for an existing element in the hierarchy.
-     */
     public function updateElementKey(element: Element, newKey: String): Void {
         for (entry in elements) {
             if (entry.element == element) {
