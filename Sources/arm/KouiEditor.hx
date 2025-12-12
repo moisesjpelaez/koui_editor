@@ -219,6 +219,10 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function onElementDropped(element: Element, target: Element, zone: DropZone): Void {
+		trace(element);
+		trace(target);
+		trace(zone);
+
 		if (element == null || target == null) return;
 		if (element == target) return;
 
@@ -237,7 +241,8 @@ class KouiEditor extends iron.Trait {
 		var currentParent: Element = HierarchyUtils.getParentElement(element);
 		var droppingAsSiblingToRoot: Bool = (zone == BeforeSibling || zone == AfterSibling) && target == anchorPane;
 		if (droppingAsSiblingToRoot) {
-			HierarchyUtils.moveRelativeToTarget(element, @:privateAccess cast(target, AnchorPane).elements[0], true);
+			var rootFirstElement: Element = @:privateAccess cast(target, AnchorPane).elements[0];
+			if (rootFirstElement != element) HierarchyUtils.moveRelativeToTarget(element, rootFirstElement, true);
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 			return;
 		}
