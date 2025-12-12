@@ -2,12 +2,10 @@ package arm.panels;
 
 import arm.Enums;
 import arm.UIBase;
-import arm.KouiEditor;
 import arm.ElementsData;
 import armory.system.Signal;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.Layout;
 import zui.Zui;
 import zui.Zui.Align;
 import zui.Zui.Handle;
@@ -279,19 +277,14 @@ class HierarchyPanel {
 		if (draggedItem == null || dropTargetElement == null || dropZone == None) return;
 		if (draggedItem.element == dropTargetElement) return;
 
-		switch (dropZone) {
-			case AsChild:
-				expanded.set(dropTargetElement, true);
-                elementDropped.emit(draggedItem.element, dropTargetElement);
-			case BeforeSibling, AfterSibling:
-			case None:
-		}
+		elementDropped.emit(draggedItem.element, dropTargetElement);
 	}
 
 	// Get the parent element (handles Layout vs Element)
 	function getParentElement(element: Element): Element {
-		if (element is AnchorPane) {
-			return cast(element, AnchorPane).parent;
+		// Elements added to AnchorPane have layout set, not parent
+		if (element.layout != null) {
+			return cast(element.layout, Element);
 		}
 		return element.parent;
 	}

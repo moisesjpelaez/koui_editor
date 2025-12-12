@@ -6,20 +6,11 @@ import iron.App;
 import iron.Scene;
 import kha.Assets;
 import kha.graphics2.Graphics;
-import kha.Color;
-import zui.Id;
-import zui.Zui;
-import zui.Zui.Align;
-import zui.Zui.Handle;
 
 import koui.Koui;
 import koui.elements.Element;
 import koui.elements.Button;
-import koui.elements.Label;
-import koui.elements.Panel;
 import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.Layout.Anchor;
-import koui.utils.SceneManager;
 import iron.system.Input;
 
 import arm.panels.BottomPanel;
