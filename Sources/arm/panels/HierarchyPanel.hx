@@ -208,8 +208,8 @@ class HierarchyPanel {
 	}
 
 	function handleItemInteraction(uiBase:UIBase, ui:zui.Zui, itemIndex:Int) {
-		// Selection on click
-		if (ui.isReleased) {
+		// Selection on click start
+		if (ui.isPushed) {
 			KouiEditor.selectedElement = KouiEditor.elements[itemIndex].element;
 
 			// Only allow dragging non-root elements
@@ -222,7 +222,7 @@ class HierarchyPanel {
 		}
 
 		// Start drag after threshold
-		if (draggedIndex == itemIndex && ui.inputDown && !isDragging) {
+		if (draggedIndex == itemIndex && ui.inputDown && !isDragging && KouiEditor.selectedElement != null) {
 			var dx = ui.inputX - dragStartX;
 			var dy = ui.inputY - dragStartY;
 			if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
