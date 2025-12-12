@@ -25,11 +25,11 @@ import arm.panels.BottomPanel;
 import arm.panels.HierarchyPanel;
 import arm.panels.PropertiesPanel;
 import arm.panels.ElementsPanel;
+import koui.elements.layouts.Layout;
 
 typedef HierarchyEntry = {
-	var name:String;
-	var element:Element;
-	var children:Array<Int>;
+	var key: String;
+	var element: Element;
 }
 
 class KouiEditor extends iron.Trait {
@@ -38,14 +38,12 @@ class KouiEditor extends iron.Trait {
 	var anchorPane: AnchorPane;
 	var sizeInit: Bool = false;
 
-	// Created elements - single source of truth for hierarchy
-	public static var elements:Array<HierarchyEntry> = [];
-	public static var buttonsCount:Int = 0;
-	public static var labelsCount:Int = 0;
+	// Created elements
+	var elements: Array<HierarchyEntry> = [];
 
 	// Drag and drop state
-	public static var selectedElement: Element = null;
-	public static var draggedElement: Element = null;
+	var selectedElement: Element = null;
+	var draggedElement: Element = null;
 	var dragOffsetX: Int = 0;
 	var dragOffsetY: Int = 0;
 
@@ -72,10 +70,15 @@ class KouiEditor extends iron.Trait {
 				anchorPane = new AnchorPane(0, 0, Std.int(App.w() * 0.85), Std.int(App.h() * 0.85));
 				anchorPane.setTID("fixed_anchorpane");
 				Koui.add(anchorPane, Anchor.MiddleCenter);
-				elements.push({name: "AnchorPane", element: anchorPane, children: []});
+				elements.push({ key: "AnchorPane", element: anchorPane });
+				hierarchyPanel.onElementAdded(elements[0]);
 			});
 
 			App.onResize = onResized;
+			elementsPanel.elementAdded.connect(onElementAdded);
+			elementsPanel.elementAdded.connect(hierarchyPanel.onElementAdded);
+			hierarchyPanel.elementSelected.connect(onElementSelected);
+			hierarchyPanel.elementDropped.connect(onElementDropped);
 		});
 
 		notifyOnUpdate(update);
@@ -89,13 +92,15 @@ class KouiEditor extends iron.Trait {
 
 		var keyboard: Keyboard = Input.getKeyboard();
 		if (keyboard.started("delete") && selectedElement != null && selectedElement != anchorPane) {
-			var idx = findIndex(selectedElement);
-			if (idx > 0) {
-				anchorPane.remove(selectedElement);
-				removeElement(idx);
-				selectedElement = null;
-				uiBase.hwnds[PanelHierarchy].redraws = 2;
+			anchorPane.remove(selectedElement);
+			for (i in 0...elements.length) {
+				if (elements[i].element == selectedElement) {
+					elements.splice(i, 1);
+					break;
+				}
 			}
+			selectedElement = null;
+			uiBase.hwnds[PanelHierarchy].redraws = 2;
 		}
 	}
 
@@ -107,6 +112,7 @@ class KouiEditor extends iron.Trait {
 			if (element != null && element != anchorPane) {
 				if (element.parent is Button) selectedElement = element.parent;
 				else selectedElement = element;
+				hierarchyPanel.selectElement(selectedElement);
 				draggedElement = selectedElement;
 				dragOffsetX = Std.int(mouse.x - draggedElement.posX * Koui.uiScale);
 				dragOffsetY = Std.int(mouse.y - draggedElement.posY * Koui.uiScale);
@@ -186,7 +192,7 @@ class KouiEditor extends iron.Trait {
 
 		uiBase.ui.begin(g2);
 		uiBase.adjustHeightsToWindow();
-		elementsPanel.draw(uiBase, anchorPane);
+		elementsPanel.draw(uiBase);
 		drawRightPanels();
 		bottomPanel.draw(uiBase);
 		uiBase.ui.end();
@@ -207,70 +213,33 @@ class KouiEditor extends iron.Trait {
 		}
 	}
 
-	// Helper functions for hierarchy management
-	public static function addElement(name:String, element:Element, parentIndex:Int):Int {
-		var newIndex = elements.length;
-		elements.push({name: name, element: element, children: []});
-		if (parentIndex >= 0 && parentIndex < elements.length) {
-			elements[parentIndex].children.push(newIndex);
-		}
-		return newIndex;
+	function onElementSelected(element: Element): Void {
+		selectedElement = element;
 	}
 
-	public static function removeElement(index:Int):Void {
-		if (index <= 0 || index >= elements.length) return;
+	function onElementDropped(element: Element, target: Element): Void {
+		// // Remove from current parent
+		// if (element.parent != null) {
+		// 	element.parent.remove(element);
+		// }
 
-		// Find parent and remove from its children
-		for (i in 0...elements.length) {
-			var children = elements[i].children;
-			var pos = children.indexOf(index);
-			if (pos != -1) {
-				children.splice(pos, 1);
-				break;
-			}
-		}
+		// // Add to new parent
+		// if (target is Layout) {
+		// 	cast(target, Layout).add(element);
+		// } else if (target.parent != null && target.parent is Layout) {
+		// 	cast(target.parent, Layout).add(element);
+		// } else {
+		// 	anchorPane.add(element, Anchor.TopLeft);
+		// }
 
-		// Recursively remove all descendants
-		var toRemove = [index];
-		var i = 0;
-		while (i < toRemove.length) {
-			var idx = toRemove[i];
-			for (childIdx in elements[idx].children) {
-				toRemove.push(childIdx);
-			}
-			i++;
-		}
-
-		// Sort descending to remove from end first (preserves indices)
-		toRemove.sort(function(a, b) return b - a);
-		for (idx in toRemove) {
-			elements.splice(idx, 1);
-			// Update all children indices that are greater than removed index
-			for (entry in elements) {
-				for (j in 0...entry.children.length) {
-					if (entry.children[j] > idx) {
-						entry.children[j]--;
-					}
-				}
-			}
-		}
+		// uiBase.hwnds[PanelHierarchy].redraws = 2;
 	}
 
-	public static function findParent(childIndex:Int):Int {
-		for (i in 0...elements.length) {
-			if (elements[i].children.indexOf(childIndex) != -1) {
-				return i;
-			}
-		}
-		return -1;
-	}
-
-	public static function findIndex(element:Element):Int {
-		for (i in 0...elements.length) {
-			if (elements[i].element == element) {
-				return i;
-			}
-		}
-		return -1;
+	function onElementAdded(entry: HierarchyEntry): Void {
+		elements.push({ key: entry.key, element: entry.element });
+		anchorPane.add(entry.element, Anchor.TopLeft);
+		selectedElement = entry.element;
+		hierarchyPanel.selectElement(entry.element);
+		uiBase.hwnds[PanelHierarchy].redraws = 2;
 	}
 }

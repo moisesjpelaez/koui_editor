@@ -1,22 +1,20 @@
 package arm.panels;
 
-import arm.Enums;
-import arm.KouiEditor;
 import arm.UIBase;
+import armory.system.Signal;
 import iron.App;
 import koui.elements.Button;
 import koui.elements.Label;
-import koui.elements.Panel;
-import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.Layout.Anchor;
 import zui.Id;
 
 class ElementsPanel {
+    public var elementAdded: Signal = new Signal(); // args: (key: String, element: Element)
+
     public function new() {
 
     }
 
-    public function draw(uiBase: UIBase, anchorPane: AnchorPane): Void {
+    public function draw(uiBase: UIBase): Void {
 		uiBase.ui.t.FILL_WINDOW_BG = false;
 
 		if (uiBase.ui.window(Id.handle(), 10, 10, 100, App.h() - uiBase.getBottomH() - 20, false)) {
@@ -24,13 +22,9 @@ class ElementsPanel {
 				uiBase.ui.indent();
 
 				if (uiBase.ui.button("Label")) {
-					var key:String = "label_" + Std.string(KouiEditor.labelsCount);
-					var label:Label = new Label("New Label");
-					var newIndex = KouiEditor.addElement(key, label, 0); // Parent to AnchorPane (index 0)
-					anchorPane.add(label, Anchor.TopLeft);
-					KouiEditor.labelsCount++;
-					KouiEditor.selectedElement = label;
-					uiBase.hwnds[PanelHierarchy].redraws = 2;
+					var key: String = "Label";
+					var label: Label = new Label("New Label");
+                    elementAdded.emit({ key: key, element: label });
 				}
 
 				if (uiBase.ui.button("Image Panel")) {
@@ -48,13 +42,9 @@ class ElementsPanel {
 				uiBase.ui.indent();
 
 				if (uiBase.ui.button("Button")) {
-					var key:String = "button_" + Std.string(KouiEditor.buttonsCount);
-					var button:Button = new Button("New Button");
-					var newIndex = KouiEditor.addElement(key, button, 0); // Parent to AnchorPane (index 0)
-					anchorPane.add(button, Anchor.TopLeft);
-					KouiEditor.buttonsCount++;
-					KouiEditor.selectedElement = button;
-					uiBase.hwnds[PanelHierarchy].redraws = 2;
+					var key: String = "Button";
+					var button: Button = new Button("New Button");
+					elementAdded.emit({ key: key, element: button });
 				}
 
 				if (uiBase.ui.button("Checkbox")) {
@@ -70,10 +60,6 @@ class ElementsPanel {
 
 			if (uiBase.ui.panel(Id.handle({selected: true}), "Layout")) {
 				uiBase.ui.indent();
-
-				if (uiBase.ui.button("AnchorPane")) {
-					trace("AnchorPane");
-				}
 
 				if (uiBase.ui.button("GridLayout")) {
 					trace("GridLayout");
