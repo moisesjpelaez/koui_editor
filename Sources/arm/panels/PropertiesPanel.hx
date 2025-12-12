@@ -1,7 +1,7 @@
 package arm.panels;
 
-import arm.Enums;
-import arm.UIBase;
+import arm.types.Enums;
+import arm.base.UIBase;
 import zui.Zui.Handle;
 
 class PropertiesPanel {

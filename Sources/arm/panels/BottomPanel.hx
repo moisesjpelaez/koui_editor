@@ -1,7 +1,7 @@
 package arm.panels;
 
-import arm.Enums;
-import arm.UIBase;
+import arm.types.Enums;
+import arm.base.UIBase;
 import iron.App;
 import zui.Zui.Handle;
 

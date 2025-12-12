@@ -1,7 +1,8 @@
 package arm.panels;
 
-import arm.Enums;
-import arm.UIBase;
+import arm.types.Enums;
+import arm.tools.HierarchyUtils;
+import arm.base.UIBase;
 import arm.ElementsData;
 import armory.system.Signal;
 import koui.elements.Element;
@@ -11,17 +12,10 @@ import zui.Zui.Align;
 import zui.Zui.Handle;
 import haxe.ds.ObjectMap;
 
-enum DropZone {
-	None;
-	BeforeSibling;
-	AsChild;
-	AfterSibling;
-}
-
 class HierarchyPanel {
     public var elementAdded: Signal = new Signal(); // args: (key: String, element: Element)
     public var elementSelected: Signal = new Signal(); // args: (element: Element)
-    public var elementDropped: Signal = new Signal(); // args: (element: Element, target: Element)
+	public var elementDropped: Signal = new Signal(); // args: (element: Element, target: Element, zone: DropZone)
 
 	// Layout constants
 	static inline var INDENT_PER_DEPTH: Int = 15;
@@ -93,8 +87,19 @@ class HierarchyPanel {
 		if (entry == null) return;
 
 		var name: String = entry.key;
-		var children: Array<Element> = entry.element is AnchorPane ? @:privateAccess cast(entry.element, AnchorPane).elements : @:privateAccess entry.element.children;
-		var hasChildren: Bool = children != null && children.length > 0;
+		// Only show children that are user-facing containers (not internal elements like Button's _label)
+		var allChildren: Array<Element> = HierarchyUtils.getChildren(entry.element);
+		var children: Array<Element> = [];
+		for (child in allChildren) {
+			// Include containers and elements that are in our elements list
+			for (e in elements) {
+				if (e.element == child) {
+					children.push(child);
+					break;
+				}
+			}
+		}
+		var hasChildren: Bool = children.length > 0;
 		var isExpanded: Bool = expanded.exists(entry.element) ? expanded.get(entry.element) : true;
 
 		// Cache window coordinates
@@ -257,7 +262,7 @@ class HierarchyPanel {
 
 		var inBounds: Bool = uiBase.ui.inputX >= absX && uiBase.ui.inputX <= absX + winW && uiBase.ui.inputY >= absY && uiBase.ui.inputY <= absY + rowH;
 
-		if (!inBounds || isDescendant(item, draggedItem.element)) return;
+		if (!inBounds || HierarchyUtils.isDescendant(item.element, draggedItem.element)) return;
 
 		dropTargetElement = item.element;
 
@@ -267,7 +272,13 @@ class HierarchyPanel {
 		} else if (ratio > DROP_ZONE_BOTTOM) {
 			dropZone = AfterSibling;
 		} else {
-			dropZone = AsChild;
+			// Only allow AsChild if target can accept children
+			if (HierarchyUtils.canAcceptChild(item.element)) {
+				dropZone = AsChild;
+			} else {
+				// Fall back to AfterSibling for non-containers
+				dropZone = AfterSibling;
+			}
 		}
 
 		uiBase.hwnds[PanelHierarchy].redraws = 2;
@@ -276,32 +287,11 @@ class HierarchyPanel {
 	function performDrop() {
 		if (draggedItem == null || dropTargetElement == null || dropZone == None) return;
 		if (draggedItem.element == dropTargetElement) return;
-
-		elementDropped.emit(draggedItem.element, dropTargetElement);
-	}
-
-	// Get the parent element (handles Layout vs Element)
-	function getParentElement(element: Element): Element {
-		// Elements added to AnchorPane have layout set, not parent
-		if (element.layout != null) {
-			return cast(element.layout, Element);
-		}
-		return element.parent;
-	}
-
-	function isDescendant(target: HierarchyEntry, ancestor: Element):Bool {
-		var current: Element = getParentElement(target.element);
-		while (current != null) {
-			if (current == ancestor) return true;
-			current = getParentElement(current);
-		}
-		return false;
+		elementDropped.emit(draggedItem.element, dropTargetElement, dropZone);
 	}
 
     function registerChildren(parent: Element): Void {
-        var children: Array<Element> = parent is AnchorPane
-            ? @:privateAccess cast(parent, AnchorPane).elements
-            : @:privateAccess parent.children;
+        var children: Array<Element> = HierarchyUtils.getChildren(parent);
 
         if (children != null &&children.length > 0) {
             expanded.set(parent, false);

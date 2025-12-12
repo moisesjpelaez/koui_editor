@@ -1,6 +1,6 @@
-package arm;
+package arm.base;
 
-import arm.Enums;
+import arm.types.Enums;
 
 class Config {
 	public static var raw: TConfig = null;

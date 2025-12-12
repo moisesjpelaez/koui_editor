@@ -1,23 +1,28 @@
 package arm;
 
 import arm.ElementsData;
-import arm.Enums;
+import arm.base.Base;
+import arm.base.UIBase;
+import arm.panels.BottomPanel;
+import arm.panels.HierarchyPanel;
+import arm.panels.PropertiesPanel;
+import arm.panels.ElementsPanel;
+import arm.tools.HierarchyUtils;
+import arm.tools.NameUtils;
+import arm.types.Enums;
+
 import iron.App;
+import iron.system.Input;
 import iron.Scene;
 import kha.Assets;
 import kha.graphics2.Graphics;
 
 import koui.Koui;
-import koui.elements.Element;
 import koui.elements.Button;
+import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
-import iron.system.Input;
-
-import arm.panels.BottomPanel;
-import arm.panels.HierarchyPanel;
-import arm.panels.PropertiesPanel;
-import arm.panels.ElementsPanel;
 import koui.elements.layouts.Layout;
+
 
 class KouiEditor extends iron.Trait {
 	var uiBase: UIBase;
@@ -212,26 +217,73 @@ class KouiEditor extends iron.Trait {
 		selectedElement = element;
 	}
 
-	function onElementDropped(element: Element, target: Element): Void {
-		// // Remove from current parent
-		// if (element.parent != null) {
-		// 	element.parent.remove(element);
-		// }
+	function onElementDropped(element: Element, target: Element, zone: DropZone): Void {
+		if (element == null || target == null) return;
+		if (element == target) return;
 
-		// // Add to new parent
-		// if (target is Layout) {
-		// 	cast(target, Layout).add(element);
-		// } else if (target.parent != null && target.parent is Layout) {
-		// 	cast(target.parent, Layout).add(element);
-		// } else {
-		// 	anchorPane.add(element, Anchor.TopLeft);
-		// }
+		// Determine new parent before mutation
+		var newParent: Element = null;
+		switch (zone) {
+			case AsChild:
+				newParent = target;
+			case BeforeSibling | AfterSibling:
+				newParent = HierarchyUtils.getParentElement(target);
+			case None:
+				return;
+		}
 
-		// uiBase.hwnds[PanelHierarchy].redraws = 2;
+		// Check if dropping as sibling to root AnchorPane (which has no parent)
+		var currentParent: Element = HierarchyUtils.getParentElement(element);
+		var droppingAsSiblingToRoot: Bool = (zone == BeforeSibling || zone == AfterSibling) && target == anchorPane;
+		if (droppingAsSiblingToRoot) {
+			HierarchyUtils.moveRelativeToTarget(element, @:privateAccess cast(target, AnchorPane).elements[0], true);
+			uiBase.hwnds[PanelHierarchy].redraws = 2;
+			return;
+		}
+
+		// Validate newParent can accept children
+		if (newParent != null && !HierarchyUtils.canAcceptChild(newParent)) {
+			uiBase.hwnds[PanelHierarchy].redraws = 2;
+			return;
+		}
+
+		// Get current name and ensure it's unique in new parent
+		var currentName: String = "";
+		for (entry in elementsData.elements) {
+			if (entry.element == element) {
+				currentName = entry.key;
+				break;
+			}
+		}
+		var uniqueName: String = NameUtils.ensureUniqueName(currentName, element, newParent);
+
+		// Perform the mutation
+		switch (zone) {
+			case AsChild:
+				HierarchyUtils.moveAsChild(element, target, anchorPane);
+			case BeforeSibling:
+				HierarchyUtils.moveRelativeToTarget(element, target, true);
+			case AfterSibling:
+				HierarchyUtils.moveRelativeToTarget(element, target, false);
+			case None:
+		}
+
+		// Update name if it changed due to conflict
+		if (uniqueName != currentName) {
+			elementsData.updateElementKey(element, uniqueName);
+		}
+
+		uiBase.hwnds[PanelHierarchy].redraws = 2;
 	}
 
 	function onElementAdded(entry: HierarchyEntry): Void {
 		anchorPane.add(entry.element, Anchor.TopLeft);
+
+		// Generate unique name based on parent's children
+		var uniqueName: String = NameUtils.generateName(entry.element, anchorPane);
+		entry.key = uniqueName;
+		elementsData.updateElementKey(entry.element, uniqueName);
+
 		selectedElement = entry.element;
 		uiBase.hwnds[PanelHierarchy].redraws = 2;
 	}

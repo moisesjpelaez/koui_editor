@@ -1,10 +1,10 @@
-package arm;
+package arm.base;
 
 import zui.Zui;
 import zui.Zui.Handle;
 import iron.App;
 import iron.system.Input;
-import arm.Enums;
+import arm.types.Enums;
 
 class UIBase {
 	public static var inst: UIBase;

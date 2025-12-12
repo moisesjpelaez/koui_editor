@@ -1,6 +1,6 @@
 package arm.panels;
 
-import arm.UIBase;
+import arm.base.UIBase;
 import armory.system.Signal;
 import iron.App;
 import koui.elements.Button;
