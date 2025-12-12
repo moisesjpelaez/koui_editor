@@ -1,5 +1,6 @@
 package arm;
 
+import arm.ElementsData;
 import arm.Enums;
 import iron.App;
 import iron.Scene;
@@ -27,11 +28,6 @@ import arm.panels.PropertiesPanel;
 import arm.panels.ElementsPanel;
 import koui.elements.layouts.Layout;
 
-typedef HierarchyEntry = {
-	var key: String;
-	var element: Element;
-}
-
 class KouiEditor extends iron.Trait {
 	var uiBase: UIBase;
 
@@ -39,6 +35,7 @@ class KouiEditor extends iron.Trait {
 	var sizeInit: Bool = false;
 
 	// Created elements
+	var elementsData: ElementsData;
 	var elements: Array<HierarchyEntry> = [];
 
 	// Drag and drop state
@@ -57,6 +54,9 @@ class KouiEditor extends iron.Trait {
 		super();
 
 		Assets.loadEverything(function() {
+			elementsData = ElementsData.data;
+			elements = elementsData.elements;
+
 			// Initialize framework
 			Base.font = Assets.fonts.font_default;
 			Base.init();
@@ -75,8 +75,12 @@ class KouiEditor extends iron.Trait {
 			});
 
 			App.onResize = onResized;
+
 			elementsPanel.elementAdded.connect(onElementAdded);
+			elementsPanel.elementAdded.connect(elementsData.onElementAdded);
 			elementsPanel.elementAdded.connect(hierarchyPanel.onElementAdded);
+
+			hierarchyPanel.elementAdded.connect(elementsData.onElementAdded);
 			hierarchyPanel.elementSelected.connect(onElementSelected);
 			hierarchyPanel.elementDropped.connect(onElementDropped);
 		});
@@ -236,10 +240,8 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function onElementAdded(entry: HierarchyEntry): Void {
-		elements.push({ key: entry.key, element: entry.element });
 		anchorPane.add(entry.element, Anchor.TopLeft);
 		selectedElement = entry.element;
-		hierarchyPanel.selectElement(entry.element);
 		uiBase.hwnds[PanelHierarchy].redraws = 2;
 	}
 }

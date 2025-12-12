@@ -3,6 +3,7 @@ package arm.panels;
 import arm.Enums;
 import arm.UIBase;
 import arm.KouiEditor;
+import arm.ElementsData;
 import armory.system.Signal;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
@@ -20,6 +21,7 @@ enum DropZone {
 }
 
 class HierarchyPanel {
+    public var elementAdded: Signal = new Signal(); // args: (key: String, element: Element)
     public var elementSelected: Signal = new Signal(); // args: (element: Element)
     public var elementDropped: Signal = new Signal(); // args: (element: Element, target: Element)
 
@@ -44,7 +46,7 @@ class HierarchyPanel {
 
 	// Drag-drop state - use Element references instead of indices
     var selectedElement: Element = null;
-	var draggedElement: HierarchyEntry = null;
+	var draggedItem: HierarchyEntry = null;
 	var dropTargetElement: Element = null;
 	var dropZone: DropZone = None;
 	var isDragging: Bool = false;
@@ -52,6 +54,7 @@ class HierarchyPanel {
 	var dragStartY: Float = 0;
 
 	public function new() {
+        elements = ElementsData.data.elements;
 		sceneTabHandle = new Handle();
 	}
 
@@ -88,44 +91,6 @@ class HierarchyPanel {
 		}
 	}
 
-	function drawDragGhost(uiBase: UIBase) {
-		if (!isDragging || draggedElement == null) return;
-
-		var winX: Float = @:privateAccess uiBase.ui._windowX;
-		var winY: Float = @:privateAccess uiBase.ui._windowY;
-
-		var ghostX: Float = uiBase.ui.inputX - winX - GHOST_OFFSET;
-		var ghostY: Float = uiBase.ui.inputY - winY - GHOST_OFFSET;
-		var ghostH: Int = uiBase.ui.t.ELEMENT_H;
-
-		uiBase.ui.g.color = 0xDD222222;
-		uiBase.ui.g.fillRect(ghostX, ghostY, GHOST_WIDTH, ghostH);
-
-		uiBase.ui.g.color = 0xFF469CFF;
-		uiBase.ui.g.drawRect(ghostX, ghostY, GHOST_WIDTH, ghostH, 2);
-
-		uiBase.ui.g.color = 0xFFFFFFFF;
-		uiBase.ui.g.font = uiBase.ui.ops.font;
-		uiBase.ui.g.drawString(draggedElement.key, ghostX + 8, ghostY + 4);
-
-		uiBase.hwnds[PanelHierarchy].redraws = 2;
-	}
-
-	function handleDragEnd(uiBase:UIBase) {
-		if (!uiBase.ui.inputReleased || !isDragging) return;
-
-		if (dropTargetElement != null && dropZone != None) {
-			// performDrop();
-		}
-
-		isDragging = false;
-		draggedElement = null;
-		dropTargetElement = null;
-		dropZone = None;
-
-		uiBase.hwnds[PanelHierarchy].redraws = 3;
-	}
-
 	function drawItem(uiBase: UIBase, entry: HierarchyEntry, depth: Int) {
 		if (entry == null) return;
 
@@ -144,7 +109,7 @@ class HierarchyPanel {
 		var indentWidth: Int = depth * INDENT_PER_DEPTH;
 
 		// Draw drop zone indicator
-		// drawDropIndicator(ui, element, localX, localY, winW, rowH, indentWidth);
+		drawDropIndicator(uiBase.ui, entry.element, localX, localY, winW, rowH, indentWidth);
 
 		// Row layout
 		if (hasChildren) {
@@ -165,7 +130,7 @@ class HierarchyPanel {
 
 		// Handle interactions
 		handleItemInteraction(uiBase, entry);
-		// handleDropDetection(ui, uiBase, element, winX, winY, localX, localY, winW, rowH);
+		handleDropDetection(uiBase, entry, winX, winY, localX, localY, winW, rowH);
 
 		// Recursively draw children
 		if (hasChildren && isExpanded) {
@@ -180,23 +145,7 @@ class HierarchyPanel {
 		}
 	}
 
-	// function drawDropIndicator(ui:zui.Zui, element:Element, x:Float, y:Float, w:Float, h:Float, indent:Float) {
-	// 	if (!isDragging || dropTargetElement != element || dropZone == None) return;
-
-	// 	ui.g.color = 0xFF469CFF;
-	// 	switch (dropZone) {
-	// 		case BeforeSibling:
-	// 			ui.g.fillRect(x + indent, y, w - indent, 2);
-	// 		case AfterSibling:
-	// 			ui.g.fillRect(x + indent, y + h - 2, w - indent, 2);
-	// 		case AsChild:
-	// 			ui.g.drawRect(x + indent, y, w - indent, h, 2);
-	// 		case None:
-	// 	}
-	// 	ui.g.color = 0xFFFFFFFF;
-	// }
-
-	function drawItemButton(ui: Zui, name: String, element: Element) {
+    function drawItemButton(ui: Zui, name: String, element: Element) {
 		var isSelected: Bool = selectedElement == element;
 
 		// Save theme colors
@@ -228,7 +177,7 @@ class HierarchyPanel {
 
 			// Only allow dragging non-root elements
 			if (!isRoot) {
-				draggedElement = entry;
+				draggedItem = entry;
 				dragStartX = uiBase.ui.inputX;
 				dragStartY = uiBase.ui.inputY;
 			}
@@ -237,7 +186,7 @@ class HierarchyPanel {
 		}
 
 		// Start drag after threshold
-		if (entry != null &&draggedElement == entry && uiBase.ui.inputDown && !isDragging) {
+		if (entry != null &&draggedItem == entry && uiBase.ui.inputDown && !isDragging) {
 			var dx: Float = uiBase.ui.inputX - dragStartX;
 			var dy: Float = uiBase.ui.inputY - dragStartY;
 
@@ -248,71 +197,113 @@ class HierarchyPanel {
 		}
 	}
 
-	// function handleDropDetection(ui:zui.Zui, uiBase:UIBase, element:Element, winX:Float, winY:Float, localX:Float, localY:Float, winW:Float, rowH:Float) {
-	// 	if (!isDragging || draggedElement == null || draggedElement == element) return;
+    function drawDragGhost(uiBase: UIBase) {
+		if (!isDragging || draggedItem == null) return;
 
-	// 	var absX = winX + localX;
-	// 	var absY = winY + localY;
+		var winX: Float = @:privateAccess uiBase.ui._windowX;
+		var winY: Float = @:privateAccess uiBase.ui._windowY;
 
-	// 	var inBounds = ui.inputX >= absX && ui.inputX <= absX + winW && ui.inputY >= absY && ui.inputY <= absY + rowH;
+		var ghostX: Float = uiBase.ui.inputX - winX - GHOST_OFFSET;
+		var ghostY: Float = uiBase.ui.inputY - winY - GHOST_OFFSET;
+		var ghostH: Int = uiBase.ui.t.ELEMENT_H;
 
-	// 	if (!inBounds || isDescendant(element, draggedElement)) return;
+		uiBase.ui.g.color = 0xDD222222;
+		uiBase.ui.g.fillRect(ghostX, ghostY, GHOST_WIDTH, ghostH);
 
-	// 	dropTargetElement = element;
+		uiBase.ui.g.color = 0xFF469CFF;
+		uiBase.ui.g.drawRect(ghostX, ghostY, GHOST_WIDTH, ghostH, 2);
 
-	// 	var ratio = (ui.inputY - absY) / rowH;
-	// 	if (ratio < DROP_ZONE_TOP) {
-	// 		dropZone = BeforeSibling;
-	// 	} else if (ratio > DROP_ZONE_BOTTOM) {
-	// 		dropZone = AfterSibling;
-	// 	} else {
-	// 		dropZone = AsChild;
-	// 	}
+		uiBase.ui.g.color = 0xFFFFFFFF;
+		uiBase.ui.g.font = uiBase.ui.ops.font;
+		uiBase.ui.g.drawString(draggedItem.key, ghostX + 8, ghostY + 4);
 
-	// 	uiBase.hwnds[PanelHierarchy].redraws = 2;
-	// }
+		uiBase.hwnds[PanelHierarchy].redraws = 2;
+	}
 
-	// function performDrop() {
-	// 	if (draggedElement == null || dropTargetElement == null || dropZone == None) return;
-	// 	if (draggedElement == dropTargetElement) return;
+	function handleDragEnd(uiBase:UIBase) {
+		if (!uiBase.ui.inputReleased || !isDragging) return;
 
-	// 	// Remove from current parent
-	// 	KouiEditor.removeFromParent(draggedElement);
+		if (dropTargetElement != null && dropZone != None) {
+			performDrop();
+		}
 
-	// 	switch (dropZone) {
-	// 		case AsChild:
-	// 			// Add as child of drop target
-	// 			KouiEditor.addToParent(draggedElement, dropTargetElement);
-	// 			expanded.set(dropTargetElement, true);
+		isDragging = false;
+		draggedItem = null;
+		dropTargetElement = null;
+		dropZone = None;
 
-	// 		case BeforeSibling, AfterSibling:
-	// 			// Get parent of drop target and insert as sibling
-	// 			var parent = getParentElement(dropTargetElement);
-	// 			if (parent != null) {
-	// 				// For now, just add to parent (sibling ordering requires more work)
-	// 				KouiEditor.addToParent(draggedElement, parent);
-	// 			}
+		uiBase.hwnds[PanelHierarchy].redraws = 3;
+	}
 
-	// 		case None:
-	// 	}
-	// }
+	function drawDropIndicator(ui: Zui, element: Element, x: Float, y: Float, w: Float, h: Float, indent: Float) {
+		if (!isDragging || dropTargetElement != element || dropZone == None) return;
 
-	// // Get the parent element (handles Layout vs Element)
-	// function getParentElement(element:Element):Element {
-	// 	if (element.layout != null) {
-	// 		return element.layout;
-	// 	}
-	// 	return element.parent;
-	// }
+		ui.g.color = 0xFF469CFF;
+		switch (dropZone) {
+			case BeforeSibling:
+				ui.g.fillRect(x + indent, y, w - indent, 2);
+			case AfterSibling:
+				ui.g.fillRect(x + indent, y + h - 2, w - indent, 2);
+			case AsChild:
+				ui.g.drawRect(x + indent, y, w - indent, h, 2);
+			case None:
+		}
+		ui.g.color = 0xFFFFFFFF;
+	}
 
-	// function isDescendant(target:Element, ancestor:Element):Bool {
-	// 	var current = getParentElement(target);
-	// 	while (current != null) {
-	// 		if (current == ancestor) return true;
-	// 		current = getParentElement(current);
-	// 	}
-	// 	return false;
-	// }
+	function handleDropDetection(uiBase: UIBase, item: HierarchyEntry, winX: Float, winY: Float, localX: Float, localY: Float, winW: Float, rowH: Float) {
+		if (!isDragging || draggedItem == null || draggedItem.element == item.element) return;
+
+		var absX: Float = winX + localX;
+		var absY: Float = winY + localY;
+
+		var inBounds: Bool = uiBase.ui.inputX >= absX && uiBase.ui.inputX <= absX + winW && uiBase.ui.inputY >= absY && uiBase.ui.inputY <= absY + rowH;
+
+		if (!inBounds || isDescendant(item, draggedItem.element)) return;
+
+		dropTargetElement = item.element;
+
+		var ratio = (uiBase.ui.inputY - absY) / rowH;
+		if (ratio < DROP_ZONE_TOP) {
+			dropZone = BeforeSibling;
+		} else if (ratio > DROP_ZONE_BOTTOM) {
+			dropZone = AfterSibling;
+		} else {
+			dropZone = AsChild;
+		}
+
+		uiBase.hwnds[PanelHierarchy].redraws = 2;
+	}
+
+	function performDrop() {
+		if (draggedItem == null || dropTargetElement == null || dropZone == None) return;
+		if (draggedItem.element == dropTargetElement) return;
+
+		switch (dropZone) {
+			case AsChild:
+				expanded.set(dropTargetElement, true);
+                elementDropped.emit(draggedItem.element, dropTargetElement);
+			case BeforeSibling, AfterSibling:
+			case None:
+		}
+	}
+
+	// Get the parent element (handles Layout vs Element)
+	function getParentElement(element: Element): Element {
+		if (element is AnchorPane) {
+			return cast(element, AnchorPane).parent;
+		}
+		return element.parent;
+	}
+
+	function isDescendant(target: HierarchyEntry, ancestor: Element):Bool {
+		var current: Element = getParentElement(target.element);
+		while (current != null) {
+			if (current == ancestor) return true;
+			current = getParentElement(current);
+		}
+		return false;
+	}
 
     function registerChildren(parent: Element): Void {
         var children: Array<Element> = parent is AnchorPane
@@ -324,9 +315,9 @@ class HierarchyPanel {
         }
 
         for (child in children) {
-            // Generate a key for the child (TODO: change naming strategy)
+            // Generate a key based on the class name, then add via centralized data
             var childKey: String = Type.getClassName(Type.getClass(child)).split(".").pop();
-            elements.push({ key: childKey, element: child });
+            elementAdded.emit({ key: childKey, element: child });
             registerChildren(child);
         }
     }
@@ -336,7 +327,7 @@ class HierarchyPanel {
     }
 
     public function onElementAdded(entry: HierarchyEntry): Void {
-        elements.push({ key: entry.key, element: entry.element });
+        selectElement(entry.element);
         registerChildren(entry.element);
     }
 }
