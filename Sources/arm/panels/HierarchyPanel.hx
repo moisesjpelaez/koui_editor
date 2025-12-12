@@ -38,8 +38,6 @@ class HierarchyPanel {
 	var isDragging: Bool = false;
 	var dragStartX: Float = 0;
 	var dragStartY: Float = 0;
-	var dragOffsetX: Float = 0;
-	var dragOffsetY: Float = 0;
 
     public function new() {
         sceneTabHandle = new Handle();
@@ -104,33 +102,34 @@ class HierarchyPanel {
 
 			// Draw hierarchy tree starting from root (AnchorPane at index 0)
 			drawItem(uiBase, 0, 0);
-
-			// Draw dragged item ghost (floating rect)
-			if (isDragging && draggedItemIndex != -1) {
-				var draggedItem = items[draggedItemIndex];
-				var ghostX = uiBase.ui.inputX + dragOffsetX;
-				var ghostY = uiBase.ui.inputY + dragOffsetY;
-				var ghostW = 200;
-				var ghostH = uiBase.ui.t.ELEMENT_H;
-
-				// Semi-transparent background
-				uiBase.ui.g.color = 0xAA1B1B1B;
-				uiBase.ui.g.fillRect(ghostX, ghostY, ghostW, ghostH);
-
-				// Border
-				uiBase.ui.g.color = 0xFF469CFF;
-				uiBase.ui.g.drawRect(ghostX, ghostY, ghostW, ghostH, 1);
-
-				// Text
-				uiBase.ui.g.color = 0xFFFFFFFF;
-				uiBase.ui.g.font = uiBase.ui.ops.font;
-				uiBase.ui.g.drawString(draggedItem.name, ghostX + 5, ghostY + 5);
-
-				uiBase.hwnds[PanelTop].redraws = 2;
-			}
 		}
 
-		// Handle drop when mouse released (outside window block to catch all releases)
+		// Draw dragged item ghost OUTSIDE window block (uses window-relative coordinates)
+		if (isDragging && draggedItemIndex != -1 && draggedItemIndex < items.length) {
+			var draggedItem = items[draggedItemIndex];
+			// Convert absolute input coordinates to window-relative coordinates
+			var ghostX = uiBase.ui.inputX - @:privateAccess uiBase.ui._windowX - 10;
+			var ghostY = uiBase.ui.inputY - @:privateAccess uiBase.ui._windowY - 10;
+			var ghostW:Float = 150;
+			var ghostH = uiBase.ui.t.ELEMENT_H;
+
+			// Semi-transparent background
+			uiBase.ui.g.color = 0xDD222222;
+			uiBase.ui.g.fillRect(ghostX, ghostY, ghostW, ghostH);
+
+			// Border
+			uiBase.ui.g.color = 0xFF469CFF;
+			uiBase.ui.g.drawRect(ghostX, ghostY, ghostW, ghostH, 2);
+
+			// Text
+			uiBase.ui.g.color = 0xFFFFFFFF;
+			uiBase.ui.g.font = uiBase.ui.ops.font;
+			uiBase.ui.g.drawString(draggedItem.name, ghostX + 8, ghostY + 4);
+
+			uiBase.hwnds[PanelTop].redraws = 2;
+		}
+
+		// Handle drop when mouse released
 		if (uiBase.ui.inputReleased && isDragging) {
 			if (dropTargetIndex != -1 && dropZone != None) {
 				performDrop();
@@ -149,8 +148,8 @@ class HierarchyPanel {
 		var hasChildren = item.children.length > 0;
 		var isExpanded = expanded.get(item.id);
 
-		// Calculate row position for drag-drop detection
-		var rowY = @:privateAccess ui._y;
+		// IMPORTANT: Capture row Y position BEFORE any UI elements are drawn
+		var rowStartY = @:privateAccess ui._y;
 		var rowH = ui.t.ELEMENT_H;
 		var indentWidth = depth * 15;
 
@@ -159,14 +158,11 @@ class HierarchyPanel {
 			ui.g.color = 0xFF469CFF;
 			switch (dropZone) {
 				case BeforeSibling:
-					// Blue line at top
-					ui.g.fillRect(@:privateAccess ui._x + indentWidth, rowY, @:privateAccess ui._windowW - indentWidth, 2);
+					ui.g.fillRect(@:privateAccess ui._x + indentWidth, rowStartY, @:privateAccess ui._windowW - indentWidth, 2);
 				case AfterSibling:
-					// Blue line at bottom
-					ui.g.fillRect(@:privateAccess ui._x + indentWidth, rowY + rowH - 2, @:privateAccess ui._windowW - indentWidth, 2);
+					ui.g.fillRect(@:privateAccess ui._x + indentWidth, rowStartY + rowH - 2, @:privateAccess ui._windowW - indentWidth, 2);
 				case AsChild:
-					// Blue box outline indicating it will become a child
-					ui.g.drawRect(@:privateAccess ui._x + indentWidth, rowY, @:privateAccess ui._windowW - indentWidth - 10, rowH, 2);
+					ui.g.drawRect(@:privateAccess ui._x + indentWidth, rowStartY, @:privateAccess ui._windowW - indentWidth - 10, rowH, 2);
 				case None:
 			}
 			ui.g.color = 0xFFFFFFFF;
@@ -179,7 +175,7 @@ class HierarchyPanel {
 			ui.row([indentWidth / @:privateAccess ui._windowW, 1]);
 		}
 
-		// Indent spacer - always consume the indent column
+		// Indent spacer
 		ui.text("");
 
 		// Expand/collapse button
@@ -213,11 +209,6 @@ class HierarchyPanel {
 			draggedItemIndex = itemIndex;
 			dragStartX = ui.inputX;
 			dragStartY = ui.inputY;
-			// Calculate offset: where the element's top-left is relative to cursor
-			var elementAbsX = @:privateAccess ui._windowX + @:privateAccess ui._x;
-			var elementAbsY = @:privateAccess ui._windowY + rowY;
-			dragOffsetX = elementAbsX - ui.inputX;
-			dragOffsetY = elementAbsY - ui.inputY;
 			uiBase.hwnds[PanelTop].redraws = 2;
 		}
 
@@ -226,26 +217,25 @@ class HierarchyPanel {
 			var dx = ui.inputX - dragStartX;
 			var dy = ui.inputY - dragStartY;
 			var distance = Math.sqrt(dx * dx + dy * dy);
-			if (distance > 3) {
+			if (distance > 5) {
 				isDragging = true;
 				uiBase.hwnds[PanelTop].redraws = 2;
 			}
 		}
 
-		// Detect drop target while dragging over items
+		// Detect drop target while dragging over items (use absolute coordinates)
 		if (isDragging && draggedItemIndex != -1 && draggedItemIndex != itemIndex) {
-			var winX = @:privateAccess ui._windowX + @:privateAccess ui._x;
-			var winY = @:privateAccess ui._windowY + rowY;
-			var winW = @:privateAccess ui._windowW;
+			var absRowX = @:privateAccess ui._windowX + @:privateAccess ui._x;
+			var absRowY = @:privateAccess ui._windowY + rowStartY;
+			var rowW = @:privateAccess ui._windowW;
 
-			if (ui.inputX > winX && ui.inputX < winX + winW &&
-			    ui.inputY > winY && ui.inputY < winY + rowH) {
+			if (ui.inputX >= absRowX && ui.inputX <= absRowX + rowW &&
+			    ui.inputY >= absRowY && ui.inputY <= absRowY + rowH) {
 
 				if (!isDescendant(itemIndex, draggedItemIndex)) {
 					dropTargetIndex = itemIndex;
 
-					// Determine drop zone based on Y position within row
-					var relY = ui.inputY - winY;
+					var relY = ui.inputY - absRowY;
 					var ratio = relY / rowH;
 
 					if (ratio < 0.25) {
