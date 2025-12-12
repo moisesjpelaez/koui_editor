@@ -71,7 +71,7 @@ class UIBase {
 			if (borderStarted == SideBottom || borderStarted == SideTop) {
 				var my = Std.int(mouse.movementY);
 				// Check if resizing sidebar panels or bottom center panel
-				if (borderHandle == hwnds[PanelCenter]) {
+				if (borderHandle == hwnds[PanelBottom]) {
 					// Bottom center panel - resize by top border
 					Config.raw.layout[LayoutBottomH] -= my;
 					// Clamp
@@ -116,16 +116,16 @@ class UIBase {
 		if (!Base.uiEnabled) return;
 
 		// Only handle our panels
-		if (handle != hwnds[PanelTop] && handle != hwnds[PanelBottom] && handle != hwnds[PanelCenter]) return;
+		if (handle != hwnds[PanelHierarchy] && handle != hwnds[PanelProperties] && handle != hwnds[PanelBottom]) return;
 
 		// Top panel: respond to left and bottom borders
-		if (handle == hwnds[PanelTop] && side != SideLeft && side != SideBottom) return;
+		if (handle == hwnds[PanelHierarchy] && side != SideLeft && side != SideBottom) return;
 
 		// Bottom panel: respond to left and top borders
-		if (handle == hwnds[PanelBottom] && side != SideLeft && side != SideTop) return;
+		if (handle == hwnds[PanelProperties] && side != SideLeft && side != SideTop) return;
 
 		// Center panel: respond to top border only
-		if (handle == hwnds[PanelCenter] && side != SideTop) return;
+		if (handle == hwnds[PanelBottom] && side != SideTop) return;
 
 		// Set cursor based on resize direction
 		if (side == SideLeft || side == SideRight) {

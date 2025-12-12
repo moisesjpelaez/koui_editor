@@ -2,13 +2,8 @@ package arm.panels;
 
 import arm.Enums;
 import arm.UIBase;
+import arm.KouiEditor;
 import zui.Zui.Handle;
-
-typedef HierarchyItem = {
-	var id: String;
-	var name: String;
-	var children: Array<Int>; // Indices to other items in the array
-}
 
 enum DropZone {
 	None;
@@ -32,15 +27,11 @@ class HierarchyPanel {
 	var sceneTabs:Array<String> = ["Scene"];
 	var sceneCounter:Int = 1;
 
-	// Hierarchy data
-	var items:Array<HierarchyItem> = [];
-	var expanded:Map<String, Bool> = new Map();
-
-	// Selection state
-	var selectedItemIndex:Int = -1;
+	// Expand/collapse state
+	var expanded:Map<Int, Bool> = new Map();
 
 	// Drag-drop state
-	var draggedItemIndex:Int = -1;
+	var draggedIndex:Int = -1;
 	var dropTargetIndex:Int = -1;
 	var dropZone:DropZone = None;
 	var isDragging:Bool = false;
@@ -49,32 +40,17 @@ class HierarchyPanel {
 
 	public function new() {
 		sceneTabHandle = new Handle();
-		initializeTestData();
-	}
-
-	function initializeTestData() {
-		items = [
-			{id: "anchorPane", name: "AnchorPane (Root)", children: [1, 4, 6]},
-			{id: "panelA", name: "Panel A", children: [2, 3]},
-			{id: "button1", name: "Button 1", children: []},
-			{id: "button2", name: "Button 2", children: []},
-			{id: "panelB", name: "Panel B", children: [5]},
-			{id: "label1", name: "Label 1", children: []},
-			{id: "label2", name: "Label 2", children: []}
-		];
-
-		for (item in items) {
-			expanded.set(item.id, true);
-		}
 	}
 
 	public function draw(uiBase:UIBase, params:Dynamic):Void {
 		var ui = uiBase.ui;
 
-		if (ui.window(uiBase.hwnds[PanelTop], params.tabx, 0, params.w, params.h0)) {
+		if (ui.window(uiBase.hwnds[PanelHierarchy], params.tabx, 0, params.w, params.h0)) {
 			drawSceneSelector(uiBase);
 			ui.separator();
-			drawItem(uiBase, 0, 0);
+			if (KouiEditor.elements.length > 0) {
+				drawItem(uiBase, 0, 0);
+			}
 		}
 
 		drawDragGhost(uiBase);
@@ -103,10 +79,9 @@ class HierarchyPanel {
 	}
 
 	function drawDragGhost(uiBase:UIBase) {
-		if (!isDragging || draggedItemIndex < 0 || draggedItemIndex >= items.length) return;
+		if (!isDragging || draggedIndex < 0 || draggedIndex >= KouiEditor.elements.length) return;
 
 		var ui = uiBase.ui;
-		var draggedItem = items[draggedItemIndex];
 		var winX = @:privateAccess ui._windowX;
 		var winY = @:privateAccess ui._windowY;
 
@@ -122,9 +97,9 @@ class HierarchyPanel {
 
 		ui.g.color = 0xFFFFFFFF;
 		ui.g.font = ui.ops.font;
-		ui.g.drawString(draggedItem.name, ghostX + 8, ghostY + 4);
+		ui.g.drawString(KouiEditor.elements[draggedIndex].name, ghostX + 8, ghostY + 4);
 
-		uiBase.hwnds[PanelTop].redraws = 2;
+		uiBase.hwnds[PanelHierarchy].redraws = 2;
 	}
 
 	function handleDragEnd(uiBase:UIBase) {
@@ -135,23 +110,25 @@ class HierarchyPanel {
 		}
 
 		resetDragState();
-		uiBase.hwnds[PanelTop].redraws = 3;
+		uiBase.hwnds[PanelHierarchy].redraws = 3;
 	}
 
 	function resetDragState() {
 		isDragging = false;
-		draggedItemIndex = -1;
+		draggedIndex = -1;
 		dropTargetIndex = -1;
 		dropZone = None;
 	}
 
 	function drawItem(uiBase:UIBase, itemIndex:Int, depth:Int) {
-		var ui = uiBase.ui;
-		var item = items[itemIndex];
-		var hasChildren = item.children.length > 0;
-		var isExpanded = expanded.get(item.id);
+		if (itemIndex < 0 || itemIndex >= KouiEditor.elements.length) return;
 
-		// Cache window coordinates once
+		var ui = uiBase.ui;
+		var entry = KouiEditor.elements[itemIndex];
+		var hasChildren = entry.children.length > 0;
+		var isExpanded = expanded.exists(itemIndex) ? expanded.get(itemIndex) : true;
+
+		// Cache window coordinates
 		var winX = @:privateAccess ui._windowX;
 		var winY = @:privateAccess ui._windowY;
 		var winW = @:privateAccess ui._windowW;
@@ -174,19 +151,19 @@ class HierarchyPanel {
 
 		// Expand/collapse button
 		if (hasChildren && ui.button(isExpanded ? "v" : ">")) {
-			expanded.set(item.id, !isExpanded);
+			expanded.set(itemIndex, !isExpanded);
 		}
 
 		// Item button with selection highlighting
-		drawItemButton(ui, item, itemIndex);
+		drawItemButton(ui, entry.name, itemIndex);
 
 		// Handle interactions
-		handleItemInteraction(uiBase, ui, itemIndex, localY);
+		handleItemInteraction(uiBase, ui, itemIndex);
 		handleDropDetection(ui, uiBase, itemIndex, winX, winY, localX, localY, winW, rowH);
 
 		// Recursively draw children
 		if (hasChildren && isExpanded) {
-			for (childIndex in item.children) {
+			for (childIndex in entry.children) {
 				drawItem(uiBase, childIndex, depth + 1);
 			}
 		}
@@ -208,8 +185,8 @@ class HierarchyPanel {
 		ui.g.color = 0xFFFFFFFF;
 	}
 
-	function drawItemButton(ui:zui.Zui, item:HierarchyItem, itemIndex:Int) {
-		var isSelected = selectedItemIndex == itemIndex;
+	function drawItemButton(ui:zui.Zui, name:String, itemIndex:Int) {
+		var isSelected = KouiEditor.selectedElement == KouiEditor.elements[itemIndex].element;
 
 		// Save theme colors
 		var savedCol = ui.t.BUTTON_COL;
@@ -222,7 +199,7 @@ class HierarchyPanel {
 			ui.t.BUTTON_PRESSED_COL = ui.t.HIGHLIGHT_COL;
 		}
 
-		ui.button(item.name, Left);
+		ui.button(name, Left);
 
 		// Restore theme colors
 		ui.t.BUTTON_COL = savedCol;
@@ -230,40 +207,40 @@ class HierarchyPanel {
 		ui.t.BUTTON_PRESSED_COL = savedPressed;
 	}
 
-	function handleItemInteraction(uiBase:UIBase, ui:zui.Zui, itemIndex:Int, rowY:Float) {
+	function handleItemInteraction(uiBase:UIBase, ui:zui.Zui, itemIndex:Int) {
 		// Selection on click
 		if (ui.isReleased) {
-			selectedItemIndex = itemIndex;
+			KouiEditor.selectedElement = KouiEditor.elements[itemIndex].element;
 
-			// Only allow dragging non-root items
+			// Only allow dragging non-root elements
 			if (itemIndex != 0) {
-				draggedItemIndex = itemIndex;
+				draggedIndex = itemIndex;
 				dragStartX = ui.inputX;
 				dragStartY = ui.inputY;
 			}
-			uiBase.hwnds[PanelTop].redraws = 2;
+			uiBase.hwnds[PanelHierarchy].redraws = 2;
 		}
 
 		// Start drag after threshold
-		if (draggedItemIndex == itemIndex && ui.inputDown && !isDragging) {
+		if (draggedIndex == itemIndex && ui.inputDown && !isDragging) {
 			var dx = ui.inputX - dragStartX;
 			var dy = ui.inputY - dragStartY;
 			if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
 				isDragging = true;
-				uiBase.hwnds[PanelTop].redraws = 2;
+				uiBase.hwnds[PanelHierarchy].redraws = 2;
 			}
 		}
 	}
 
 	function handleDropDetection(ui:zui.Zui, uiBase:UIBase, itemIndex:Int, winX:Float, winY:Float, localX:Float, localY:Float, winW:Float, rowH:Float) {
-		if (!isDragging || draggedItemIndex == -1 || draggedItemIndex == itemIndex) return;
+		if (!isDragging || draggedIndex == -1 || draggedIndex == itemIndex) return;
 
 		var absX = winX + localX;
 		var absY = winY + localY;
 
 		var inBounds = ui.inputX >= absX && ui.inputX <= absX + winW && ui.inputY >= absY && ui.inputY <= absY + rowH;
 
-		if (!inBounds || isDescendant(itemIndex, draggedItemIndex)) return;
+		if (!inBounds || isDescendant(itemIndex, draggedIndex)) return;
 
 		dropTargetIndex = itemIndex;
 
@@ -276,69 +253,59 @@ class HierarchyPanel {
 			dropZone = AsChild;
 		}
 
-		uiBase.hwnds[PanelTop].redraws = 2;
+		uiBase.hwnds[PanelHierarchy].redraws = 2;
 	}
 
 	function performDrop() {
-		if (draggedItemIndex == -1 || dropTargetIndex == -1 || dropZone == None) return;
-		if (draggedItemIndex == dropTargetIndex) return;
+		if (draggedIndex == -1 || dropTargetIndex == -1 || dropZone == None) return;
+		if (draggedIndex == dropTargetIndex) return;
 
-		var targetItem = items[dropTargetIndex];
+		// Find current parent of dragged item
+		var oldParentIndex = KouiEditor.findParent(draggedIndex);
+		var targetParentIndex = KouiEditor.findParent(dropTargetIndex);
 
-		// Find target's parent BEFORE any modifications
-		var targetParentIndex = findParent(dropTargetIndex);
-
-		// Remove dragged item from its current parent
-		var oldParentIndex = findParent(draggedItemIndex);
+		// Remove from old parent
 		if (oldParentIndex != -1) {
-			items[oldParentIndex].children.remove(draggedItemIndex);
+			KouiEditor.elements[oldParentIndex].children.remove(draggedIndex);
 		}
 
 		switch (dropZone) {
 			case AsChild:
-				targetItem.children.push(draggedItemIndex);
-				expanded.set(targetItem.id, true);
+				KouiEditor.elements[dropTargetIndex].children.push(draggedIndex);
+				expanded.set(dropTargetIndex, true);
 
 			case BeforeSibling:
-				insertAsSibling(targetParentIndex, dropTargetIndex, draggedItemIndex, 0);
+				insertAsSibling(targetParentIndex, dropTargetIndex, draggedIndex, 0);
 
 			case AfterSibling:
-				insertAsSibling(targetParentIndex, dropTargetIndex, draggedItemIndex, 1);
+				insertAsSibling(targetParentIndex, dropTargetIndex, draggedIndex, 1);
 
 			case None:
 		}
 	}
 
-	function insertAsSibling(parentIndex:Int, targetIndex:Int, draggedIndex:Int, offset:Int) {
+	function insertAsSibling(parentIndex:Int, targetIndex:Int, draggedIdx:Int, offset:Int) {
 		if (parentIndex != -1) {
-			var parent = items[parentIndex];
-			var pos = parent.children.indexOf(targetIndex);
+			var children = KouiEditor.elements[parentIndex].children;
+			var pos = children.indexOf(targetIndex);
 			if (pos != -1) {
-				parent.children.insert(pos + offset, draggedIndex);
+				children.insert(pos + offset, draggedIdx);
 			}
 		} else if (targetIndex == 0) {
-			// Can't be sibling of root - add as child instead
+			// Target is root - add as child instead
+			var rootChildren = KouiEditor.elements[0].children;
 			if (offset == 0) {
-				items[0].children.insert(0, draggedIndex);
+				rootChildren.insert(0, draggedIdx);
 			} else {
-				items[0].children.push(draggedIndex);
+				rootChildren.push(draggedIdx);
 			}
 		}
-	}
-
-	function findParent(childIndex:Int):Int {
-		for (i in 0...items.length) {
-			if (items[i].children.indexOf(childIndex) != -1) {
-				return i;
-			}
-		}
-		return -1;
 	}
 
 	function isDescendant(targetIndex:Int, ancestorIndex:Int):Bool {
 		var current = targetIndex;
 		while (current != -1) {
-			current = findParent(current);
+			current = KouiEditor.findParent(current);
 			if (current == ancestorIndex) return true;
 		}
 		return false;

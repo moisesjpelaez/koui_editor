@@ -24,13 +24,13 @@ class ElementsPanel {
 				uiBase.ui.indent();
 
 				if (uiBase.ui.button("Label")) {
-					var key: String = "label_" + Std.string(KouiEditor.labelsCount);
-					var label: Label = new Label("New Label");
-					KouiEditor.elements.push({name: key, element: label});
+					var key:String = "label_" + Std.string(KouiEditor.labelsCount);
+					var label:Label = new Label("New Label");
+					var newIndex = KouiEditor.addElement(key, label, 0); // Parent to AnchorPane (index 0)
 					anchorPane.add(label, Anchor.TopLeft);
 					KouiEditor.labelsCount++;
 					KouiEditor.selectedElement = label;
-					uiBase.hwnds[PanelTop].redraws = 2;
+					uiBase.hwnds[PanelHierarchy].redraws = 2;
 				}
 
 				if (uiBase.ui.button("Image Panel")) {
@@ -48,13 +48,13 @@ class ElementsPanel {
 				uiBase.ui.indent();
 
 				if (uiBase.ui.button("Button")) {
-					var key: String = "button_" + Std.string(KouiEditor.buttonsCount);
-					var button: Button = new Button("New Button");
-					KouiEditor.elements.push({name: key, element: button});
+					var key:String = "button_" + Std.string(KouiEditor.buttonsCount);
+					var button:Button = new Button("New Button");
+					var newIndex = KouiEditor.addElement(key, button, 0); // Parent to AnchorPane (index 0)
 					anchorPane.add(button, Anchor.TopLeft);
 					KouiEditor.buttonsCount++;
 					KouiEditor.selectedElement = button;
-					uiBase.hwnds[PanelTop].redraws = 2;
+					uiBase.hwnds[PanelHierarchy].redraws = 2;
 				}
 
 				if (uiBase.ui.button("Checkbox")) {

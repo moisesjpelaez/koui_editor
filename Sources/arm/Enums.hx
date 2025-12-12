@@ -15,7 +15,7 @@ enum abstract LayoutSize(Int) from Int to Int {
 }
 
 enum abstract PanelHandle(Int) from Int to Int {
-	var PanelTop = 0;
-	var PanelBottom = 1;
-	var PanelCenter = 2;
+	var PanelHierarchy = 0;
+	var PanelProperties = 1;
+	var PanelBottom = 2;
 }

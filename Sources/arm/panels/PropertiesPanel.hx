@@ -12,7 +12,7 @@ class PropertiesPanel {
     }
 
     public function draw(uiBase: UIBase, params: Dynamic): Void {
-        if (uiBase.ui.window(uiBase.hwnds[PanelBottom], params.tabx, params.h0, params.w, params.h1)) {
+        if (uiBase.ui.window(uiBase.hwnds[PanelProperties], params.tabx, params.h0, params.w, params.h1)) {
 			uiBase.ui.tab(propertiesTabHandle, "Properties");
 		}
     }

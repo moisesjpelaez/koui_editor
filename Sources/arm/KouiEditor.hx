@@ -26,16 +26,22 @@ import arm.panels.HierarchyPanel;
 import arm.panels.PropertiesPanel;
 import arm.panels.ElementsPanel;
 
+typedef HierarchyEntry = {
+	var name:String;
+	var element:Element;
+	var children:Array<Int>;
+}
+
 class KouiEditor extends iron.Trait {
 	var uiBase: UIBase;
 
 	var anchorPane: AnchorPane;
 	var sizeInit: Bool = false;
 
-	// Created elements - using arrays to preserve insertion order
-	public static var elements: Array<{name: String, element: Element}> = [];
-	public static var buttonsCount: Int = 0;
-	public static var labelsCount: Int = 0;
+	// Created elements - single source of truth for hierarchy
+	public static var elements:Array<HierarchyEntry> = [];
+	public static var buttonsCount:Int = 0;
+	public static var labelsCount:Int = 0;
 
 	// Drag and drop state
 	public static var selectedElement: Element = null;
@@ -66,6 +72,7 @@ class KouiEditor extends iron.Trait {
 				anchorPane = new AnchorPane(0, 0, Std.int(App.w() * 0.85), Std.int(App.h() * 0.85));
 				anchorPane.setTID("fixed_anchorpane");
 				Koui.add(anchorPane, Anchor.MiddleCenter);
+				elements.push({name: "AnchorPane", element: anchorPane, children: []});
 			});
 
 			App.onResize = onResized;
@@ -81,19 +88,14 @@ class KouiEditor extends iron.Trait {
 		updateDragAndDrop();
 
 		var keyboard: Keyboard = Input.getKeyboard();
-		if (keyboard.started("delete")) {
-			anchorPane.remove(selectedElement);
-
-			// Remove from elements array
-			for (i in 0...elements.length) {
-				if (elements[i].element == selectedElement) {
-					elements.splice(i, 1);
-					break;
-				}
+		if (keyboard.started("delete") && selectedElement != null && selectedElement != anchorPane) {
+			var idx = findIndex(selectedElement);
+			if (idx > 0) {
+				anchorPane.remove(selectedElement);
+				removeElement(idx);
+				selectedElement = null;
+				uiBase.hwnds[PanelHierarchy].redraws = 2;
 			}
-
-			selectedElement = null;
-			uiBase.hwnds[PanelTop].redraws = 2;
 		}
 	}
 
@@ -112,7 +114,7 @@ class KouiEditor extends iron.Trait {
 				selectedElement = null;
 				draggedElement = null;
 			}
-			uiBase.hwnds[PanelTop].redraws = 2;
+			uiBase.hwnds[PanelHierarchy].redraws = 2;
 		} else if (mouse.down() && draggedElement != null) {
 			draggedElement.setPosition(Std.int(mouse.x) - dragOffsetX, Std.int(mouse.y) - dragOffsetY);
 			@:privateAccess draggedElement.invalidateElem();
@@ -122,7 +124,7 @@ class KouiEditor extends iron.Trait {
 				@:privateAccess draggedElement.invalidateElem();
 			}
 			draggedElement = null;
-			uiBase.hwnds[PanelTop].redraws = 2;
+			uiBase.hwnds[PanelHierarchy].redraws = 2;
 		}
 	}
 
@@ -203,5 +205,72 @@ class KouiEditor extends iron.Trait {
 		if (Scene.active != null && Scene.active.camera != null) {
 			Scene.active.camera.buildProjection();
 		}
+	}
+
+	// Helper functions for hierarchy management
+	public static function addElement(name:String, element:Element, parentIndex:Int):Int {
+		var newIndex = elements.length;
+		elements.push({name: name, element: element, children: []});
+		if (parentIndex >= 0 && parentIndex < elements.length) {
+			elements[parentIndex].children.push(newIndex);
+		}
+		return newIndex;
+	}
+
+	public static function removeElement(index:Int):Void {
+		if (index <= 0 || index >= elements.length) return;
+
+		// Find parent and remove from its children
+		for (i in 0...elements.length) {
+			var children = elements[i].children;
+			var pos = children.indexOf(index);
+			if (pos != -1) {
+				children.splice(pos, 1);
+				break;
+			}
+		}
+
+		// Recursively remove all descendants
+		var toRemove = [index];
+		var i = 0;
+		while (i < toRemove.length) {
+			var idx = toRemove[i];
+			for (childIdx in elements[idx].children) {
+				toRemove.push(childIdx);
+			}
+			i++;
+		}
+
+		// Sort descending to remove from end first (preserves indices)
+		toRemove.sort(function(a, b) return b - a);
+		for (idx in toRemove) {
+			elements.splice(idx, 1);
+			// Update all children indices that are greater than removed index
+			for (entry in elements) {
+				for (j in 0...entry.children.length) {
+					if (entry.children[j] > idx) {
+						entry.children[j]--;
+					}
+				}
+			}
+		}
+	}
+
+	public static function findParent(childIndex:Int):Int {
+		for (i in 0...elements.length) {
+			if (elements[i].children.indexOf(childIndex) != -1) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	public static function findIndex(element:Element):Int {
+		for (i in 0...elements.length) {
+			if (elements[i].element == element) {
+				return i;
+			}
+		}
+		return -1;
 	}
 }

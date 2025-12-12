@@ -24,7 +24,7 @@ class BottomPanel {
 		var panelY: Int = App.h() - bottomH;
 		var panelW: Int = uiBase.getTabX();
 
-		if (uiBase.ui.window(uiBase.hwnds[PanelCenter], panelX, panelY, panelW, bottomH)) {
+		if (uiBase.ui.window(uiBase.hwnds[PanelBottom], panelX, panelY, panelW, bottomH)) {
 			uiBase.ui.tab(themeTabHandle, "Theme");
 			uiBase.ui.row([0.075, 0.075, 0.075, 0.075]);
 			if (uiBase.ui.button("Load")) {
