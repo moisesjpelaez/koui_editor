@@ -1,5 +1,6 @@
 package arm.tools;
 
+import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.Panel;
 import koui.elements.layouts.Layout;
@@ -165,4 +166,13 @@ class HierarchyUtils {
 		@:privateAccess element.parent = parent;
 		children.insert(iIdx, element);
 	}
+
+	public static function shouldSkipInternalChild(parent: Element, child: Element): Bool {
+        // Skip Button's internal label
+        if (Std.isOfType(parent, Button)) {
+            // Button's internal _label element
+            return true;
+        }
+        return false;
+    }
 }

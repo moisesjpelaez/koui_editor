@@ -298,6 +298,11 @@ class HierarchyPanel {
         }
 
         for (child in children) {
+            // Skip internal children (e.g., Button's _label)
+            if (HierarchyUtils.shouldSkipInternalChild(parent, child)) {
+                continue;
+            }
+
             // Generate a key based on the class name, then add via centralized data
             var childKey: String = Type.getClassName(Type.getClass(child)).split(".").pop();
             elementAdded.emit({ key: childKey, element: child });

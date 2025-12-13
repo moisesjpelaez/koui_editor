@@ -239,8 +239,7 @@ class KouiEditor extends iron.Trait {
 
 		// Check if dropping as sibling to root AnchorPane (which has no parent)
 		var currentParent: Element = HierarchyUtils.getParentElement(element);
-		var droppingAsSiblingToRoot: Bool = (zone == BeforeSibling || zone == AfterSibling) && target == anchorPane;
-		if (droppingAsSiblingToRoot) {
+		if (target == anchorPane) {
 			var rootFirstElement: Element = @:privateAccess cast(target, AnchorPane).elements[0];
 			if (rootFirstElement != element) HierarchyUtils.moveRelativeToTarget(element, rootFirstElement, true);
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
