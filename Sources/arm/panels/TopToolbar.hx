@@ -6,6 +6,7 @@ import iron.App;
 import kha.graphics2.Graphics;
 import zui.Id;
 import zui.Zui;
+import zui.Zui.Handle;
 
 class TopToolbar {
 	public var saveRequested: Signal = new Signal();
@@ -20,10 +21,10 @@ class TopToolbar {
 	static inline var BUTTON_SIZE: Int = 28;
 	static inline var ICON_SIZE: Int = 16;
 
-	var snapHandle: zui.Zui.Handle;
+	var snapHandle: Handle;
 
 	public function new() {
-		snapHandle = new zui.Zui.Handle();
+		snapHandle = new Handle();
 		snapHandle.value = snapValue;
 	}
 
