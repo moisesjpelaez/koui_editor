@@ -13,8 +13,10 @@ import arm.tools.NameUtils;
 import arm.types.Enums;
 
 import iron.App;
-import iron.system.Input;
 import iron.Scene;
+import iron.math.Vec2;
+import iron.system.Input;
+
 import kha.Assets;
 import kha.graphics2.Graphics;
 
@@ -39,6 +41,18 @@ class KouiEditor extends iron.Trait {
 	var draggedElement: Element = null;
 	var dragOffsetX: Int = 0;
 	var dragOffsetY: Int = 0;
+
+	// Canvas controls
+	var isPanning: Bool = false;
+	var panStartX: Float = 0;
+	var panStartY: Float = 0;
+	var canvasPanX: Float = 100; // Initial left padding
+	var canvasPanY: Float = 75;  // Initial top padding
+	var initialScale: Float = 1.0;
+	var currentScale: Float = 1.0;
+
+	// Constants
+	var borderSize: Int = 8;
 
 	// Panels
 	var topToolbar: TopToolbar = new TopToolbar();
@@ -91,6 +105,7 @@ class KouiEditor extends iron.Trait {
 	function update() {
 		if (uiBase == null) return;
 		uiBase.update();
+		canvasControl();
 		updateDragAndDrop();
 
 		var keyboard: Keyboard = Input.getKeyboard();
@@ -107,11 +122,78 @@ class KouiEditor extends iron.Trait {
 		}
 	}
 
-	function updateDragAndDrop() {
+	function canvasControl() {
 		var mouse: Mouse = Input.getMouse();
+		var keyboard: Keyboard = Input.getKeyboard();
 
+		// Calculate canvas area (exclude UI panels)
+		var canvasArea: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize, App.h() - uiBase.getBottomH() - borderSize);
+		var isInCanvas: Bool = mouse.x < canvasArea.x && mouse.y < canvasArea.y;
+
+		// Handle middle mouse button panning
+		if (mouse.started("middle") && isInCanvas) {
+			isPanning = true;
+			panStartX = mouse.x;
+			panStartY = mouse.y;
+			Krom.setMouseCursor(1); // Hand cursor (grabbing)
+		}
+		else if (mouse.down("middle") && isPanning) {
+			// Calculate delta movement
+			var deltaX: Float = mouse.x - panStartX;
+			var deltaY: Float = mouse.y - panStartY;
+
+			// Update canvas pan via padding
+			canvasPanX += deltaX;
+			canvasPanY += deltaY;
+
+			@:privateAccess anchorPane.posX = Std.int(canvasPanX / Koui.uiScale);
+			@:privateAccess anchorPane.posY = Std.int(canvasPanY / Koui.uiScale);
+			@:privateAccess anchorPane.drawX = Std.int(@:privateAccess anchorPane.posX * Koui.uiScale);
+			@:privateAccess anchorPane.drawY = Std.int(@:privateAccess anchorPane.posY * Koui.uiScale);
+			@:privateAccess Koui.anchorPane.elemUpdated(anchorPane);
+
+			// Update start position for next frame
+			panStartX = mouse.x;
+			panStartY = mouse.y;
+		}
+		else if (!mouse.down("middle") && isPanning) {
+			isPanning = false;
+			Krom.setMouseCursor(0); // Default cursor
+		}
+
+		if (mouse.wheelDelta < 0) {
+			currentScale += 0.1;
+			currentScale = Math.min(3.0, currentScale);
+			Koui.uiScale = currentScale;
+		} else if (mouse.wheelDelta > 0) {
+			currentScale -= 0.1;
+			currentScale = Math.max(0.25, currentScale);
+			Koui.uiScale = currentScale;
+		}
+
+		// Handle '1' key reset
+		if (keyboard.started("1")) {
+			canvasPanX = 0;
+			canvasPanY = 0;
+
+			@:privateAccess anchorPane.posX = Std.int(canvasPanX / Koui.uiScale);
+			@:privateAccess anchorPane.posY = Std.int(canvasPanY / Koui.uiScale);
+			@:privateAccess anchorPane.drawX = Std.int(@:privateAccess anchorPane.posX * Koui.uiScale);
+			@:privateAccess anchorPane.drawY = Std.int(@:privateAccess anchorPane.posY * Koui.uiScale);
+			@:privateAccess Koui.anchorPane.elemUpdated(anchorPane);
+
+			sizeInit = false;
+		}
+	}
+
+	function updateDragAndDrop() {
+		if (isPanning) return;
+
+		var mouse: Mouse = Input.getMouse();
 		if (mouse.started()) {
 			var element: Element = Koui.getElementAtPosition(Std.int(mouse.x), Std.int(mouse.y));
+			var canvasArea: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize, App.h() - uiBase.getBottomH() - borderSize); // TODO: use a better variable name
+			var hierarchyArea: Vec2 = new Vec2(canvasArea.x + 2 * borderSize, App.h() - uiBase.getSidebarH1() - borderSize); // TODO: use a better variable name
 			if (element != null && element != anchorPane) {
 				if (element.parent is Button) selectedElement = element.parent;
 				else selectedElement = element;
@@ -119,14 +201,14 @@ class KouiEditor extends iron.Trait {
 				draggedElement = selectedElement;
 				dragOffsetX = Std.int(mouse.x - draggedElement.posX * Koui.uiScale);
 				dragOffsetY = Std.int(mouse.y - draggedElement.posY * Koui.uiScale);
-			} else {
+			} else if (mouse.x < canvasArea.x && mouse.y < canvasArea.y || mouse.x > hierarchyArea.x && mouse.y < hierarchyArea.y) {
 				selectedElement = null;
 				draggedElement = null;
 				hierarchyPanel.selectElement(null);
 			}
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 		} else if (mouse.down() && draggedElement != null) {
-			draggedElement.setPosition(Std.int(mouse.x) - dragOffsetX, Std.int(mouse.y) - dragOffsetY);
+			draggedElement.setPosition(Std.int(mouse.x - dragOffsetX), Std.int(mouse.y - dragOffsetY));
 			@:privateAccess draggedElement.invalidateElem();
 		} else {
 			if (draggedElement != null) {
@@ -211,7 +293,11 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function onResized() {
-		Koui.uiScale = (App.h() - uiBase.getBottomH()) / 576;
+		if (!sizeInit) {
+			Koui.uiScale = (App.h() - uiBase.getBottomH()) / 576;
+			initialScale = Koui.uiScale;
+			currentScale = initialScale;
+		}
 		@:privateAccess Koui.onResize(App.w() - uiBase.getSidebarW(), App.h() - uiBase.getBottomH());
 		if (Scene.active != null && Scene.active.camera != null) {
 			Scene.active.camera.buildProjection();
