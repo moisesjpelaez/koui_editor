@@ -62,6 +62,11 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
         uiscale = str(arm.utils.get_ui_scale())
         cmd = [krom_path, koui_editor_path, koui_editor_path, canvas_arg, uiscale]
 
+        # Pass render resolution
+        render_settings = context.scene.render
+        cmd.append(str(render_settings.resolution_x))
+        cmd.append(str(render_settings.resolution_y))
+
         if get_os() == 'win':
             cmd.append('--consolepid')
             cmd.append(str(os.getpid()))

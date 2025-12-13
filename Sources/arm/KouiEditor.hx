@@ -78,7 +78,23 @@ class KouiEditor extends iron.Trait {
 
 			Koui.init(function() {
 				Koui.setPadding(100, 100, 75, 75);
-				anchorPane = new AnchorPane(0, 0, Std.int(App.w() * 0.85), Std.int(App.h() * 0.85));
+
+				var canvasWidth: Int = Std.int(App.w() * 0.85);
+				var canvasHeight: Int = Std.int(App.h() * 0.85);
+
+				var argCount = Krom.getArgCount();
+				// Arguments are: [0]=krom_path, [1]=koui_editor_path, [2]=koui_editor_path,
+				//                [3]=canvas_arg, [4]=uiscale, [5]=resolution_x, [6]=resolution_y
+				if (argCount >= 7) {
+					var resX: Int = Std.parseInt(Krom.getArg(5));
+					var resY: Int = Std.parseInt(Krom.getArg(6));
+					if (resX != null && resY != null) {
+						canvasWidth = resX;
+						canvasHeight = resY;
+					}
+				}
+
+				anchorPane = new AnchorPane(0, 0, canvasWidth, canvasHeight);
 				anchorPane.setTID("fixed_anchorpane");
 				Koui.add(anchorPane, Anchor.MiddleCenter);
 				elements.push({ key: "AnchorPane", element: anchorPane });
