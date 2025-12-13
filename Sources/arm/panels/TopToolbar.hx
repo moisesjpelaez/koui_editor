@@ -1,9 +1,9 @@
 package arm.panels;
 
 import arm.base.UIBase;
+import arm.tools.ImageUtils;
 import armory.system.Signal;
 import iron.App;
-import kha.graphics2.Graphics;
 import kha.Image;
 import zui.Id;
 import zui.Zui;
@@ -31,11 +31,6 @@ class TopToolbar {
 		snapHandle.value = snapValue;
 	}
 
-	// Get icon tile rectangle from atlas (50x50 tiles, like ArmorPaint)
-	inline function tile50(x: Int, y: Int): {x: Int, y: Int, w: Int, h: Int} {
-		return { x: x * ICON_SIZE, y: y * ICON_SIZE, w: ICON_SIZE, h: ICON_SIZE };
-	}
-
 	// Draw an icon button and return true if clicked
 	function iconButton(ui: Zui, tileX: Int, tileY: Int, highlight: Bool = false): Bool {
 		if (icons == null) return ui.button("?");
@@ -49,8 +44,8 @@ class TopToolbar {
 			iconAccent = ui.t.HIGHLIGHT_COL;
 		}
 
-		var rect = tile50(tileX, tileY);
-		return ui.image(icons, iconAccent, null, rect.x, rect.y, rect.w, rect.h) == State.Released;
+		var rect = ImageUtils.tile50(tileX, tileY);
+		return ImageUtils.image(ui, icons, iconAccent, null, rect.x, rect.y, rect.w, rect.h) == State.Released;
 	}
 
 	public function draw(uiBase: UIBase): Void {
