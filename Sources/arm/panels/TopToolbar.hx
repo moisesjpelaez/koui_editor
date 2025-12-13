@@ -14,6 +14,7 @@ class TopToolbar {
 	public var saveRequested: Signal = new Signal();
 	public var loadRequested: Signal = new Signal();
 	public var snappingToggled: Signal = new Signal(); // args: (enabled: Bool, snapValue: Float)
+	public var snapValueChanged: Signal = new Signal(); // args: (snapValue: Float)
 
     public var snappingEnabled: Bool = false;
 	public var snapValue: Float = 1.0;
@@ -32,20 +33,45 @@ class TopToolbar {
 	}
 
 	// Draw an icon button and return true if clicked
-	function iconButton(ui: Zui, tileX: Int, tileY: Int, highlight: Bool = false): Bool {
+	function iconButton(ui: Zui, tileX: Int, tileY: Int, tooltip: String, highlight: Bool = false): Bool {
 		if (icons == null) return ui.button("?");
 
 		var col = ui.t.WINDOW_BG_COL;
 		if (col < 0) col += untyped 4294967296;
 		var light = col > 0xff666666 + 4294967296;
+
+		// Base color
 		var iconAccent = light ? 0xff666666 : 0xffaaaaaa;
 
 		if (highlight) {
 			iconAccent = ui.t.HIGHLIGHT_COL;
 		}
 
+		// Store position before drawing
+		@:privateAccess var startX = ui._x;
+		@:privateAccess var startY = ui._y;
+
 		var rect = ImageUtils.tile50(tileX, tileY);
-		return ImageUtils.image(ui, icons, iconAccent, null, rect.x, rect.y, rect.w, rect.h) == State.Released;
+		ui.g.pipeline = ImageUtils.getPipeline();
+		var state = ui.image(icons, iconAccent, null, rect.x, rect.y, rect.w, rect.h);
+		ui.g.pipeline = null;
+
+		// Apply hover and pressed visual feedback on top of the icon
+		@:privateAccess {
+			if (state == State.Down || state == State.Started) {
+				// Pressed - draw darker overlay
+				ui.g.color = 0x55000000;
+				ui.g.fillRect(startX, startY, ui._w, ui.ELEMENT_H());
+			}
+			else if (state == State.Hovered) {
+				// Hovered - draw light overlay
+				ui.g.color = 0x33ffffff;
+				ui.g.fillRect(startX, startY, ui._w, ui.ELEMENT_H());
+			}
+		}
+
+		if (ui.isHovered) ui.tooltip(tooltip);
+		return state == State.Released;
 	}
 
 	public function draw(uiBase: UIBase): Void {
@@ -60,51 +86,30 @@ class TopToolbar {
 		ui.t.FILL_WINDOW_BG = false;
 
 		if (ui.window(Id.handle(), centerX, topY, TOOLBAR_WIDTH, TOOLBAR_HEIGHT, false)) {
-			// Row layout: [- | value | + | snap toggle | save | load]
-			ui.row([BUTTON_SIZE / TOOLBAR_WIDTH, 0.25, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH]);
+			ui.row([0.55, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH]);
 
-			// Decrease snap value
-			if (ui.button("-", Left)) {
-				snapValue = Math.max(0.5, snapValue - 0.5);
-				snapHandle.value = snapValue;
+			// Snap value slider (0.5 to 10, step by 0.5)
+			snapValue = ui.slider(snapHandle, "Snap", 0.5, 10.0, false, 2, true, Align.Right, false);
+			if (ui.isHovered) ui.tooltip("Grid Snap Value");
+			if (snapHandle.changed && snappingEnabled) {
+				snapValueChanged.emit(snapValue);
 			}
-			if (ui.isHovered) ui.tooltip("Decrease Snap Value");
-
-			// Snap value display
-			snapHandle.text = Std.string(snapValue);
-			var newText: String = ui.textInput(snapHandle, "", Center);
-			if (snapHandle.changed) {
-				var parsed: Float = Std.parseFloat(newText);
-				if (!Math.isNaN(parsed) && parsed >= 0.5) {
-					snapValue = parsed;
-				}
-			}
-
-			// Increase snap value
-			if (ui.button("+", Left)) {
-				snapValue += 0.5;
-				snapHandle.value = snapValue;
-			}
-			if (ui.isHovered) ui.tooltip("Increase Snap Value");
 
             // Snap toggle button (using grid icon at position 0,3)
-			if (iconButton(ui, 0, 3, snappingEnabled)) {
+			if (iconButton(ui, 0, 3, "Toggle Snapping", snappingEnabled)) {
 				snappingEnabled = !snappingEnabled;
                 snappingToggled.emit(snappingEnabled, snapValue);
 			}
-			if (ui.isHovered) ui.tooltip("Toggle Snapping");
 
 			// Load button (using import/open icon at position 2,2)
-			if (iconButton(ui, 2, 2, false)) {
+			if (iconButton(ui, 2, 2, "Load Canvas")) {
 				loadRequested.emit();
 			}
-			if (ui.isHovered) ui.tooltip("Load Canvas");
 
 			// Save button (using save/export icon at position 3,2)
-			if (iconButton(ui, 3, 2, false)) {
+			if (iconButton(ui, 3, 2, "Save Canvas")) {
 				saveRequested.emit();
 			}
-			if (ui.isHovered) ui.tooltip("Save Canvas");
 		}
 
 		ui.t.FILL_WINDOW_BG = savedFillBg;
