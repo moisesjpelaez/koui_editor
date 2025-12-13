@@ -80,6 +80,8 @@ class KouiEditor extends iron.Trait {
 			hierarchyPanel.elementAdded.connect(elementsData.onElementAdded);
 			hierarchyPanel.elementSelected.connect(onElementSelected);
 			hierarchyPanel.elementDropped.connect(onElementDropped);
+
+			topToolbar.setIcons(Assets.images.icons);
 		});
 
 		notifyOnUpdate(update);

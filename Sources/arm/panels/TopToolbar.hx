@@ -4,9 +4,11 @@ import arm.base.UIBase;
 import armory.system.Signal;
 import iron.App;
 import kha.graphics2.Graphics;
+import kha.Image;
 import zui.Id;
 import zui.Zui;
 import zui.Zui.Handle;
+import zui.Zui.State;
 
 class TopToolbar {
 	public var saveRequested: Signal = new Signal();
@@ -19,13 +21,36 @@ class TopToolbar {
 	static inline var TOOLBAR_WIDTH: Int = 185;
 	static inline var TOOLBAR_HEIGHT: Int = 36;
 	static inline var BUTTON_SIZE: Int = 28;
-	static inline var ICON_SIZE: Int = 16;
+	static inline var ICON_SIZE: Int = 50; // Icon tile size in atlas
 
 	var snapHandle: Handle;
+	var icons: Image;
 
 	public function new() {
 		snapHandle = new Handle();
 		snapHandle.value = snapValue;
+	}
+
+	// Get icon tile rectangle from atlas (50x50 tiles, like ArmorPaint)
+	inline function tile50(x: Int, y: Int): {x: Int, y: Int, w: Int, h: Int} {
+		return { x: x * ICON_SIZE, y: y * ICON_SIZE, w: ICON_SIZE, h: ICON_SIZE };
+	}
+
+	// Draw an icon button and return true if clicked
+	function iconButton(ui: Zui, tileX: Int, tileY: Int, highlight: Bool = false): Bool {
+		if (icons == null) return ui.button("?");
+
+		var col = ui.t.WINDOW_BG_COL;
+		if (col < 0) col += untyped 4294967296;
+		var light = col > 0xff666666 + 4294967296;
+		var iconAccent = light ? 0xff666666 : 0xffaaaaaa;
+
+		if (highlight) {
+			iconAccent = ui.t.HIGHLIGHT_COL;
+		}
+
+		var rect = tile50(tileX, tileY);
+		return ui.image(icons, iconAccent, null, rect.x, rect.y, rect.w, rect.h) == State.Released;
 	}
 
 	public function draw(uiBase: UIBase): Void {
@@ -40,7 +65,7 @@ class TopToolbar {
 		ui.t.FILL_WINDOW_BG = false;
 
 		if (ui.window(Id.handle(), centerX, topY, TOOLBAR_WIDTH, TOOLBAR_HEIGHT, false)) {
-			// Row layout: [snap toggle | - | value | + | save | load]
+			// Row layout: [- | value | + | snap toggle | save | load]
 			ui.row([BUTTON_SIZE / TOOLBAR_WIDTH, 0.25, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH]);
 
 			// Decrease snap value
@@ -67,31 +92,30 @@ class TopToolbar {
 			}
 			if (ui.isHovered) ui.tooltip("Increase Snap Value");
 
-            // Snap toggle button
-			var savedCol = ui.t.BUTTON_COL;
-			if (snappingEnabled) {
-				ui.t.BUTTON_COL = ui.t.HIGHLIGHT_COL;
-			}
-			if (ui.button("", Left)) {
+            // Snap toggle button (using grid icon at position 0,3)
+			if (iconButton(ui, 0, 3, snappingEnabled)) {
 				snappingEnabled = !snappingEnabled;
                 snappingToggled.emit(snappingEnabled, snapValue);
 			}
 			if (ui.isHovered) ui.tooltip("Toggle Snapping");
-			ui.t.BUTTON_COL = savedCol;
 
-			// Save button - using icon_folder_save or similar
-			if (ui.button("💾", Left)) {
-				saveRequested.emit();
-			}
-			if (ui.isHovered) ui.tooltip("Save Canvas");
-
-			// Load button - using icon_folder_open or similar
-			if (ui.button("📁", Left)) {
+			// Load button (using import/open icon at position 2,2)
+			if (iconButton(ui, 2, 2, false)) {
 				loadRequested.emit();
 			}
 			if (ui.isHovered) ui.tooltip("Load Canvas");
+
+			// Save button (using save/export icon at position 3,2)
+			if (iconButton(ui, 3, 2, false)) {
+				saveRequested.emit();
+			}
+			if (ui.isHovered) ui.tooltip("Save Canvas");
 		}
 
 		ui.t.FILL_WINDOW_BG = savedFillBg;
 	}
+
+    public function setIcons(iconsImage: Image): Void {
+        icons = iconsImage;
+    }
 }
