@@ -3,14 +3,14 @@ package arm.tools;
 import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.Panel;
-import koui.elements.layouts.Layout;
-import koui.elements.layouts.Layout.Anchor;
 import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.ScrollPane;
+import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.Expander;
 import koui.elements.layouts.GridLayout;
+import koui.elements.layouts.Layout;
+import koui.elements.layouts.Layout.Anchor;
+import koui.elements.layouts.ScrollPane;
 import koui.elements.layouts.RowLayout;
-import koui.elements.layouts.ColLayout;
 
 class HierarchyUtils {
 	public static function canAcceptChild(target: Element): Bool {

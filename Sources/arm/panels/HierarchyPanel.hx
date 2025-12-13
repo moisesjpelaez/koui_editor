@@ -1,16 +1,16 @@
 package arm.panels;
 
-import arm.types.Enums;
-import arm.tools.HierarchyUtils;
-import arm.base.UIBase;
 import arm.ElementsData;
+import arm.base.UIBase;
+import arm.tools.HierarchyUtils;
+import arm.types.Enums;
 import armory.system.Signal;
+import haxe.ds.ObjectMap;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
 import zui.Zui;
 import zui.Zui.Align;
 import zui.Zui.Handle;
-import haxe.ds.ObjectMap;
 
 class HierarchyPanel {
     public var elementAdded: Signal = new Signal(); // args: (key: String, element: Element)

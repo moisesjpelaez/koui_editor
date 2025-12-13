@@ -23,7 +23,6 @@ import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.Layout;
 
-
 class KouiEditor extends iron.Trait {
 	var uiBase: UIBase;
 
@@ -219,10 +218,6 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function onElementDropped(element: Element, target: Element, zone: DropZone): Void {
-		trace(element);
-		trace(target);
-		trace(zone);
-
 		if (element == null || target == null) return;
 		if (element == target) return;
 
