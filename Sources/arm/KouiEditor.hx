@@ -7,6 +7,7 @@ import arm.panels.BottomPanel;
 import arm.panels.HierarchyPanel;
 import arm.panels.PropertiesPanel;
 import arm.panels.ElementsPanel;
+import arm.panels.TopToolbar;
 import arm.tools.HierarchyUtils;
 import arm.tools.NameUtils;
 import arm.types.Enums;
@@ -40,6 +41,7 @@ class KouiEditor extends iron.Trait {
 	var dragOffsetY: Int = 0;
 
 	// Panels
+	var topToolbar: TopToolbar = new TopToolbar();
 	var bottomPanel: BottomPanel = new BottomPanel();
 	var hierarchyPanel: HierarchyPanel = new HierarchyPanel();
 	var propertiesPanel: PropertiesPanel = new PropertiesPanel();
@@ -192,6 +194,7 @@ class KouiEditor extends iron.Trait {
 
 		uiBase.ui.begin(g2);
 		uiBase.adjustHeightsToWindow();
+		topToolbar.draw(uiBase);
 		elementsPanel.draw(uiBase);
 		drawRightPanels();
 		bottomPanel.draw(uiBase);
