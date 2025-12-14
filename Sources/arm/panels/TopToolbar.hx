@@ -115,7 +115,15 @@ class TopToolbar {
 					if (error != null) {
 						trace('Theme reload ERROR: ${error}');
 					} else {
-						trace('Theme reloaded successfully from: ${assetsPath}');
+						var buildPath = basePath + "/ui_override.ksn";
+						try {
+						var bytes = haxe.io.Bytes.ofString(themeContent);
+						Krom.fileSaveBytes(buildPath, bytes.getData());
+							trace('Theme reloaded successfully from: ${assetsPath}');
+							trace('Theme copied to build directory: ${buildPath}');
+						} catch (e: Dynamic) {
+							trace('Theme reloaded but failed to copy to build directory: ${e}');
+						}
 					}
 				} else {
 					trace('Theme file not found: ${assetsPath}');
