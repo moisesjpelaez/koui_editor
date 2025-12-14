@@ -11,6 +11,7 @@ import zui.Zui.Handle;
 import zui.Zui.State;
 
 class TopToolbar {
+	public var themeReloadRequested: Signal = new Signal();
 	public var saveRequested: Signal = new Signal();
 	public var loadRequested: Signal = new Signal();
 	public var snappingToggled: Signal = new Signal(); // args: (enabled: Bool, snapValue: Float)
@@ -19,7 +20,7 @@ class TopToolbar {
     public var snappingEnabled: Bool = false;
 	public var snapValue: Float = 1.0;
 
-	static inline var TOOLBAR_WIDTH: Int = 185;
+	static inline var TOOLBAR_WIDTH: Int = 224;
 	static inline var TOOLBAR_HEIGHT: Int = 36;
 	static inline var BUTTON_SIZE: Int = 28;
 	static inline var ICON_SIZE: Int = 50; // Icon tile size in atlas
@@ -86,7 +87,7 @@ class TopToolbar {
 		ui.t.FILL_WINDOW_BG = false;
 
 		if (ui.window(Id.handle(), centerX, topY, TOOLBAR_WIDTH, TOOLBAR_HEIGHT, false)) {
-			ui.row([0.55, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH]);
+			ui.row([0.5, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH]);
 
 			// Snap value slider (0.5 to 10, step by 0.5)
 			snapValue = ui.slider(snapHandle, "Snap", 0.5, 10.0, false, 2, true, Align.Right, false);
@@ -99,6 +100,10 @@ class TopToolbar {
 			if (iconButton(ui, 0, 3, "Toggle Snapping", snappingEnabled)) {
 				snappingEnabled = !snappingEnabled;
                 snappingToggled.emit(snappingEnabled, snapValue);
+			}
+
+			if (iconButton(ui, 5, 0, "Reload Theme")) {
+				themeReloadRequested.emit();
 			}
 
 			// Load button (using import/open icon at position 2,2)
