@@ -99,6 +99,7 @@ class KouiEditor extends iron.Trait {
 				anchorPane.setTID("fixed_anchorpane");
 				Koui.add(anchorPane, Anchor.MiddleCenter);
 				elements.push({ key: "AnchorPane", element: anchorPane });
+				ElementsData.root = anchorPane;
 				hierarchyPanel.onElementAdded(elements[0]); // Manually register the root element in the hierarchy
 			});
 
@@ -132,6 +133,7 @@ class KouiEditor extends iron.Trait {
 			}
 			selectedElement = null;
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
+			uiBase.hwnds[PanelProperties].redraws = 2;
 		}
 	}
 
@@ -174,14 +176,16 @@ class KouiEditor extends iron.Trait {
 			Krom.setMouseCursor(0); // Default cursor
 		}
 
-		if (mouse.wheelDelta < 0) {
-			currentScale += 0.1;
-			currentScale = Math.min(3.0, currentScale);
-			Koui.uiScale = currentScale;
-		} else if (mouse.wheelDelta > 0) {
-			currentScale -= 0.1;
-			currentScale = Math.max(0.25, currentScale);
-			Koui.uiScale = currentScale;
+		if (isInCanvas && !isPanning) {
+			if (mouse.wheelDelta < 0) {
+				currentScale += 0.1;
+				currentScale = Math.min(3.0, currentScale);
+				Koui.uiScale = currentScale;
+			} else if (mouse.wheelDelta > 0) {
+				currentScale -= 0.1;
+				currentScale = Math.max(0.25, currentScale);
+				Koui.uiScale = currentScale;
+			}
 		}
 
 		// Handle '1' key reset
@@ -219,7 +223,6 @@ class KouiEditor extends iron.Trait {
 				draggedElement = null;
 				ElementEvents.elementSelected.emit(null);
 			}
-			uiBase.hwnds[PanelHierarchy].redraws = 2;
 		} else if (mouse.down() && draggedElement != null) {
 			draggedElement.setPosition(Std.int(mouse.x - dragOffsetX), Std.int(mouse.y - dragOffsetY));
 			@:privateAccess draggedElement.invalidateElem();
@@ -230,6 +233,7 @@ class KouiEditor extends iron.Trait {
 			}
 			draggedElement = null;
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
+			uiBase.hwnds[PanelProperties].redraws = 2;
 		}
 	}
 
@@ -319,6 +323,9 @@ class KouiEditor extends iron.Trait {
 
 	function onElementSelected(element: Element): Void {
 		selectedElement = element;
+
+		uiBase.hwnds[PanelHierarchy].redraws = 2;
+		uiBase.hwnds[PanelProperties].redraws = 2;
 	}
 
 	function onElementDropped(element: Element, target: Element, zone: DropZone): Void {
@@ -342,12 +349,14 @@ class KouiEditor extends iron.Trait {
 			var rootFirstElement: Element = @:privateAccess cast(target, AnchorPane).elements[0];
 			if (rootFirstElement != element) HierarchyUtils.moveRelativeToTarget(element, rootFirstElement, true);
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
+			uiBase.hwnds[PanelProperties].redraws = 2;
 			return;
 		}
 
 		// Validate newParent can accept children
 		if (newParent != null && !HierarchyUtils.canAcceptChild(newParent)) {
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
+			uiBase.hwnds[PanelProperties].redraws = 2;
 			return;
 		}
 
@@ -378,6 +387,7 @@ class KouiEditor extends iron.Trait {
 		}
 
 		uiBase.hwnds[PanelHierarchy].redraws = 2;
+		uiBase.hwnds[PanelProperties].redraws = 2;
 	}
 
 	function onElementAdded(entry: HierarchyEntry): Void {
@@ -388,7 +398,6 @@ class KouiEditor extends iron.Trait {
 		entry.key = uniqueName;
 		elementsData.updateElementKey(entry.element, uniqueName);
 
-		selectedElement = entry.element;
-		uiBase.hwnds[PanelHierarchy].redraws = 2;
+		ElementEvents.elementSelected.emit(entry.element);
 	}
 }

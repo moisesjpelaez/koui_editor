@@ -1,5 +1,6 @@
 package arm;
 
+import koui.elements.layouts.AnchorPane;
 import arm.ElementEvents;
 import koui.elements.Element;
 
@@ -10,6 +11,7 @@ typedef HierarchyEntry = {
 
 class ElementsData {
     public static var data: ElementsData = new ElementsData();
+    public static var root: AnchorPane;
     public var elements: Array<HierarchyEntry> = [];
 
     public function new() {

@@ -2,12 +2,12 @@ package arm.panels;
 
 import arm.ElementsData;
 import arm.ElementEvents;
+import arm.KouiEditor;
 import arm.base.UIBase;
 import arm.tools.HierarchyUtils;
 import arm.types.Enums;
 import haxe.ds.ObjectMap;
 import koui.elements.Element;
-import koui.elements.layouts.AnchorPane;
 import zui.Zui;
 import zui.Zui.Align;
 import zui.Zui.Handle;
@@ -174,6 +174,7 @@ class HierarchyPanel {
 
 		// Selection on click start
 		if (uiBase.ui.isPushed) {
+			if (entry.element == ElementsData.root) return;
             selectedElement = entry.element;
 			ElementEvents.elementSelected.emit(entry.element);
 
@@ -185,6 +186,7 @@ class HierarchyPanel {
 			}
 
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
+			uiBase.hwnds[PanelProperties].redraws = 2;
 		}
 
 		// Start drag after threshold
@@ -195,6 +197,7 @@ class HierarchyPanel {
             if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
 				isDragging = true;
 				uiBase.hwnds[PanelHierarchy].redraws = 2;
+				uiBase.hwnds[PanelProperties].redraws = 2;
 			}
 		}
 	}
@@ -220,6 +223,7 @@ class HierarchyPanel {
 		uiBase.ui.g.drawString(draggedItem.key, ghostX + 8, ghostY + 4);
 
 		uiBase.hwnds[PanelHierarchy].redraws = 2;
+		uiBase.hwnds[PanelProperties].redraws = 2;
 	}
 
 	function handleDragEnd(uiBase:UIBase) {
@@ -281,6 +285,7 @@ class HierarchyPanel {
 		}
 
 		uiBase.hwnds[PanelHierarchy].redraws = 2;
+		uiBase.hwnds[PanelProperties].redraws = 2;
 	}
 
 	function performDrop() {
@@ -315,6 +320,7 @@ class HierarchyPanel {
     }
 
     public function onElementAdded(entry: HierarchyEntry): Void {
+		if (entry.element == ElementsData.root) return;
         onElementSelected(entry.element);
         registerChildren(entry.element);
     }
