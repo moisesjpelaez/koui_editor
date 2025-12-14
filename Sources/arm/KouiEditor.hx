@@ -1,6 +1,7 @@
 package arm;
 
 import arm.ElementsData;
+import arm.ElementEvents;
 import arm.base.Base;
 import arm.base.UIBase;
 import arm.panels.BottomPanel;
@@ -98,18 +99,14 @@ class KouiEditor extends iron.Trait {
 				anchorPane.setTID("fixed_anchorpane");
 				Koui.add(anchorPane, Anchor.MiddleCenter);
 				elements.push({ key: "AnchorPane", element: anchorPane });
-				hierarchyPanel.onElementAdded(elements[0]);
+				hierarchyPanel.onElementAdded(elements[0]); // Manually register the root element in the hierarchy
 			});
 
 			App.onResize = onResized;
 
-			elementsPanel.elementAdded.connect(onElementAdded);
-			elementsPanel.elementAdded.connect(elementsData.onElementAdded);
-			elementsPanel.elementAdded.connect(hierarchyPanel.onElementAdded);
-
-			hierarchyPanel.elementAdded.connect(elementsData.onElementAdded);
-			hierarchyPanel.elementSelected.connect(onElementSelected);
-			hierarchyPanel.elementDropped.connect(onElementDropped);
+			ElementEvents.elementAdded.connect(onElementAdded);
+			ElementEvents.elementSelected.connect(onElementSelected);
+			ElementEvents.elementDropped.connect(onElementDropped);
 
 			topToolbar.setIcons(Assets.images.icons);
 		});
@@ -213,14 +210,14 @@ class KouiEditor extends iron.Trait {
 			if (element != null && element != anchorPane) {
 				if (element.parent is Button) selectedElement = element.parent;
 				else selectedElement = element;
-				hierarchyPanel.selectElement(selectedElement);
+				ElementEvents.elementSelected.emit(selectedElement);
 				draggedElement = selectedElement;
 				dragOffsetX = Std.int(mouse.x - draggedElement.posX * Koui.uiScale);
 				dragOffsetY = Std.int(mouse.y - draggedElement.posY * Koui.uiScale);
 			} else if (mouse.x < canvasArea.x && mouse.y < canvasArea.y || mouse.x > hierarchyArea.x && mouse.y < hierarchyArea.y) {
 				selectedElement = null;
 				draggedElement = null;
-				hierarchyPanel.selectElement(null);
+				ElementEvents.elementSelected.emit(null);
 			}
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 		} else if (mouse.down() && draggedElement != null) {

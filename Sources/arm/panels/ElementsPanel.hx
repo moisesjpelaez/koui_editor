@@ -1,15 +1,13 @@
 package arm.panels;
 
+import arm.ElementEvents;
 import arm.base.UIBase;
-import armory.system.Signal;
 import iron.App;
 import koui.elements.Button;
 import koui.elements.Label;
 import zui.Id;
 
 class ElementsPanel {
-    public var elementAdded: Signal = new Signal(); // args: (key: String, element: Element)
-
     public function new() {
 
     }
@@ -24,7 +22,7 @@ class ElementsPanel {
 				if (uiBase.ui.button("Label")) {
 					var key: String = "Label";
 					var label: Label = new Label("New Label");
-                    elementAdded.emit({ key: key, element: label });
+                    ElementEvents.elementAdded.emit({ key: key, element: label });
 				}
 
 				if (uiBase.ui.button("Image Panel")) {
@@ -44,7 +42,7 @@ class ElementsPanel {
 				if (uiBase.ui.button("Button")) {
 					var key: String = "Button";
 					var button: Button = new Button("New Button");
-					elementAdded.emit({ key: key, element: button });
+					ElementEvents.elementAdded.emit({ key: key, element: button });
 				}
 
 				if (uiBase.ui.button("Checkbox")) {

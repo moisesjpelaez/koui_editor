@@ -1,5 +1,6 @@
 package arm;
 
+import arm.ElementEvents;
 import koui.elements.Element;
 
 typedef HierarchyEntry = {
@@ -9,11 +10,10 @@ typedef HierarchyEntry = {
 
 class ElementsData {
     public static var data: ElementsData = new ElementsData();
-
     public var elements: Array<HierarchyEntry> = [];
 
     public function new() {
-
+        ElementEvents.elementAdded.connect(onElementAdded);
     }
 
     public function onElementAdded(entry: HierarchyEntry): Void {

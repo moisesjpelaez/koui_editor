@@ -1,10 +1,10 @@
 package arm.panels;
 
 import arm.ElementsData;
+import arm.ElementEvents;
 import arm.base.UIBase;
 import arm.tools.HierarchyUtils;
 import arm.types.Enums;
-import armory.system.Signal;
 import haxe.ds.ObjectMap;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
@@ -13,10 +13,6 @@ import zui.Zui.Align;
 import zui.Zui.Handle;
 
 class HierarchyPanel {
-    public var elementAdded: Signal = new Signal(); // args: (key: String, element: Element)
-    public var elementSelected: Signal = new Signal(); // args: (element: Element)
-	public var elementDropped: Signal = new Signal(); // args: (element: Element, target: Element, zone: DropZone)
-
 	// Layout constants
 	static inline var INDENT_PER_DEPTH: Int = 15;
 	static inline var EXPAND_BUTTON_WIDTH: Int = 25;
@@ -48,6 +44,9 @@ class HierarchyPanel {
 	public function new() {
         elements = ElementsData.data.elements;
 		sceneTabHandle = new Handle();
+
+		ElementEvents.elementAdded.connect(onElementAdded);
+		ElementEvents.elementSelected.connect(onElementSelected);
 	}
 
 	public function draw(uiBase: UIBase, params: Dynamic): Void {
@@ -176,7 +175,7 @@ class HierarchyPanel {
 		// Selection on click start
 		if (uiBase.ui.isPushed) {
             selectedElement = entry.element;
-			elementSelected.emit(entry.element);
+			ElementEvents.elementSelected.emit(entry.element);
 
 			// Only allow dragging non-root elements
 			if (!isRoot) {
@@ -287,7 +286,7 @@ class HierarchyPanel {
 	function performDrop() {
 		if (draggedItem == null || dropTargetElement == null || dropZone == None) return;
 		if (draggedItem.element == dropTargetElement) return;
-		elementDropped.emit(draggedItem.element, dropTargetElement, dropZone);
+		ElementEvents.elementDropped.emit(draggedItem.element, dropTargetElement, dropZone);
 	}
 
     function registerChildren(parent: Element): Void {
@@ -305,18 +304,18 @@ class HierarchyPanel {
 
             // Generate a key based on the class name, then add via centralized data
             var childKey: String = Type.getClassName(Type.getClass(child)).split(".").pop();
-            elementAdded.emit({ key: childKey, element: child });
+            ElementEvents.elementAdded.emit({ key: childKey, element: child });
             registerChildren(child);
         }
     }
 
-    public function selectElement(element: Element): Void {
+    public function onElementSelected(element: Element): Void {
         selectedElement = element;
 		if (selectedElement == null) draggedItem = null;
     }
 
     public function onElementAdded(entry: HierarchyEntry): Void {
-        selectElement(entry.element);
+        onElementSelected(entry.element);
         registerChildren(entry.element);
     }
 }
