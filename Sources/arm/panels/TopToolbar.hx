@@ -103,7 +103,23 @@ class TopToolbar {
 			}
 
 			if (iconButton(ui, 5, 0, "Reload Theme")) {
-				themeReloadRequested.emit();
+				// Load ui_override.ksn from Assets directory
+				var basePath = Krom.getFilesLocation();
+				var assetsPath = basePath + "/../../../Assets/ui_override.ksn";
+
+				var blob = Krom.loadBlob(assetsPath);
+				if (blob != null) {
+					var themeContent = haxe.io.Bytes.ofData(blob).toString();
+					var error = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
+
+					if (error != null) {
+						trace('Theme reload ERROR: ${error}');
+					} else {
+						trace('Theme reloaded successfully from: ${assetsPath}');
+					}
+				} else {
+					trace('Theme file not found: ${assetsPath}');
+				}
 			}
 
 			// Load button (using import/open icon at position 2,2)
