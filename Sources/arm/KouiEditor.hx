@@ -131,6 +131,7 @@ class KouiEditor extends iron.Trait {
 					break;
 				}
 			}
+			selectedElement = null;
 			ElementEvents.elementSelected.emit(null);
 		}
 	}
