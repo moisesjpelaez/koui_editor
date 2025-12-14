@@ -131,9 +131,7 @@ class KouiEditor extends iron.Trait {
 					break;
 				}
 			}
-			selectedElement = null;
-			uiBase.hwnds[PanelHierarchy].redraws = 2;
-			uiBase.hwnds[PanelProperties].redraws = 2;
+			ElementEvents.elementSelected.emit(null);
 		}
 	}
 
