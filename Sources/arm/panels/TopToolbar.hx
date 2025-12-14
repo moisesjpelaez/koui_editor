@@ -106,7 +106,7 @@ class TopToolbar {
 				// Load ui_override.ksn from Assets directory
 				var basePath = Krom.getFilesLocation();
 				var assetsPaths = [
-					basePath + "/../../Assets/ui_override.ksn",
+					basePath + "/../../../../Assets/ui_override.ksn",
 					basePath + "/../../../Assets/ui_override.ksn",
 				];
 				var assetsPath: String = "";

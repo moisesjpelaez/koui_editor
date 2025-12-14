@@ -39,6 +39,30 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
         if sdk_koui_path and os.path.exists(sdk_koui_path):
             koui_editor_path = sdk_koui_path
             print(f"Koui Editor: Using SDK build at {koui_editor_path}")
+
+            project_path = arm.utils.get_fp()
+            assets_dir = os.path.join(project_path, 'Assets')
+            if not os.path.exists(assets_dir):
+                os.makedirs(assets_dir)
+                print(f"Koui Editor: Created Assets directory")
+
+            # Ensure ui_override.ksn exists in project Assets directory
+            ui_override_project = os.path.join(assets_dir, 'ui_override.ksn')
+            if not os.path.exists(ui_override_project):
+                # Copy default from library
+                ui_override_default = os.path.join(this_dir, 'Assets', 'ui_override.ksn')
+                if os.path.exists(ui_override_default):
+                    import shutil
+                    shutil.copy2(ui_override_default, ui_override_project)
+                    print(f"Koui Editor: Copied default ui_override.ksn to project Assets")
+
+            # Ensure ui_override.ksn exists in build directory
+            ui_override_build = os.path.join(koui_editor_path, 'ui_override.ksn')
+            if not os.path.exists(ui_override_build):
+                if os.path.exists(ui_override_project):
+                    import shutil
+                    shutil.copy2(ui_override_project, ui_override_build)
+                    print(f"Koui Editor: Copied ui_override.ksn to build directory")
         else:
             self.report({'ERROR'},
                 f'Koui Editor not found.\n'
