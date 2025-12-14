@@ -105,9 +105,22 @@ class TopToolbar {
 			if (iconButton(ui, 5, 0, "Reload Theme")) {
 				// Load ui_override.ksn from Assets directory
 				var basePath = Krom.getFilesLocation();
-				var assetsPath = basePath + "/../../../Assets/ui_override.ksn";
+				var assetsPaths = [
+					basePath + "/../../Assets/ui_override.ksn",
+					basePath + "/../../../Assets/ui_override.ksn",
+				];
+				var assetsPath: String = "";
 
-				var blob = Krom.loadBlob(assetsPath);
+				var blob: js.lib.ArrayBuffer = null;
+				for (path in assetsPaths) {
+					var _blob = Krom.loadBlob(path);
+					if (_blob != null) {
+						assetsPath = path;
+						blob = _blob;
+						break;
+					}
+				}
+
 				if (blob != null) {
 					var themeContent = haxe.io.Bytes.ofData(blob).toString();
 					var error = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
