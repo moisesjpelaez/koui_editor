@@ -9,6 +9,7 @@ import arm.panels.HierarchyPanel;
 import arm.panels.PropertiesPanel;
 import arm.panels.ElementsPanel;
 import arm.panels.TopToolbar;
+import arm.tools.CanvasUtils;
 import arm.tools.HierarchyUtils;
 import arm.tools.NameUtils;
 import arm.types.Enums;
@@ -68,6 +69,9 @@ class KouiEditor extends iron.Trait {
 		Assets.loadEverything(function() {
 			elementsData = ElementData.data;
 			elements = elementsData.elements;
+
+			// Initialize canvas name from command line args
+			CanvasUtils.init();
 
 			// Initialize framework
 			Base.font = Assets.fonts.font_default;

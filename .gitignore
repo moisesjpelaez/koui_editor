@@ -3,5 +3,6 @@
 !*.blend
 khafile.js
 build*
+Bundled*
 Sources/Main.hx
 Sources/arm/node*

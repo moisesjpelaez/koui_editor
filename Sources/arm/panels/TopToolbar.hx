@@ -1,6 +1,7 @@
 package arm.panels;
 
 import arm.base.UIBase;
+import arm.tools.CanvasUtils;
 import arm.tools.ImageUtils;
 import armory.system.Signal;
 import iron.App;
@@ -9,11 +10,9 @@ import zui.Id;
 import zui.Zui;
 import zui.Zui.Handle;
 import zui.Zui.State;
+using zui.Ext;
 
 class TopToolbar {
-	public var themeReloadRequested: Signal = new Signal();
-	public var saveRequested: Signal = new Signal();
-	public var loadRequested: Signal = new Signal();
 	public var snappingToggled: Signal = new Signal(); // args: (enabled: Bool, snapValue: Float)
 	public var snapValueChanged: Signal = new Signal(); // args: (snapValue: Float)
 
@@ -145,12 +144,12 @@ class TopToolbar {
 
 			// Load button (using import/open icon at position 2,2)
 			if (iconButton(ui, 2, 2, "Load Canvas")) {
-				loadRequested.emit();
+				CanvasUtils.loadCanvas();
 			}
 
 			// Save button (using save/export icon at position 3,2)
 			if (iconButton(ui, 3, 2, "Save Canvas")) {
-				saveRequested.emit();
+				CanvasUtils.saveCanvas();
 			}
 		}
 
