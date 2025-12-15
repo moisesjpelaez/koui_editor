@@ -45,7 +45,7 @@ class UIBase {
 		// Skip updates when window is minimized or too small
 		if (App.w() < MIN_SIDEBAR_W || App.h() < MIN_PANEL_SIZE * 2) return;
 
-		var mouse = Input.getMouse();
+		var mouse: Mouse = Input.getMouse();
 
 		// Clamp sidebar width when window is resized
 		var maxW = Std.int(App.w() * 0.7);
@@ -69,13 +69,13 @@ class UIBase {
 
 			// Vertical resize (between top and bottom panels)
 			if (borderStarted == SideBottom || borderStarted == SideTop) {
-				var my = Std.int(mouse.movementY);
+				var my: Int = Std.int(mouse.movementY);
 				// Check if resizing sidebar panels or bottom center panel
 				if (borderHandle == hwnds[PanelBottom]) {
 					// Bottom center panel - resize by top border
 					Config.raw.layout[LayoutBottomH] -= my;
 					// Clamp
-					var maxBottomH = Std.int(App.h() * 0.7);
+					var maxBottomH: Int = Std.int(App.h() * 0.7);
 					if (Config.raw.layout[LayoutBottomH] < MIN_PANEL_SIZE) {
 						Config.raw.layout[LayoutBottomH] = MIN_PANEL_SIZE;
 					} else if (Config.raw.layout[LayoutBottomH] > maxBottomH) {
@@ -144,42 +144,42 @@ class UIBase {
 	}
 
 	public function getTabX(): Int {
-		var w = App.w();
+		var w: Int = App.w();
 		if (w < MIN_SIDEBAR_W) return 0; // Window minimized or too small
-		var sidebarW = Config.raw.layout[LayoutSidebarW];
+		var sidebarW: Int = Config.raw.layout[LayoutSidebarW];
 		if (sidebarW > w - MIN_PANEL_SIZE) sidebarW = w - MIN_PANEL_SIZE;
 		return w - sidebarW;
 	}
 
 	public function getSidebarW(): Int {
-		var w = App.w();
+		var w: Int = App.w();
 		if (w < MIN_SIDEBAR_W) return MIN_SIDEBAR_W; // Return minimum when window too small
-		var sidebarW = Config.raw.layout[LayoutSidebarW];
+		var sidebarW: Int = Config.raw.layout[LayoutSidebarW];
 		if (sidebarW > w - MIN_PANEL_SIZE) return w - MIN_PANEL_SIZE;
 		if (sidebarW < MIN_SIDEBAR_W) return MIN_SIDEBAR_W;
 		return sidebarW;
 	}
 
 	public function getSidebarH0(): Int {
-		var h = Config.raw.layout[LayoutSidebarH0];
+		var h: Int = Config.raw.layout[LayoutSidebarH0];
 		if (h < MIN_PANEL_SIZE) return MIN_PANEL_SIZE;
 		return h;
 	}
 
 	public function getSidebarH1(): Int {
-		var h = Config.raw.layout[LayoutSidebarH1];
+		var h: Int = Config.raw.layout[LayoutSidebarH1];
 		if (h < MIN_PANEL_SIZE) return MIN_PANEL_SIZE;
 		return h;
 	}
 
 	public function getBottomH(): Int {
-		var h = Config.raw.layout[LayoutBottomH];
+		var h: Int = Config.raw.layout[LayoutBottomH];
 		if (h < MIN_PANEL_SIZE) return MIN_PANEL_SIZE;
 		return h;
 	}
 
 	public function adjustHeightsToWindow() {
-		var totalH = App.h();
+		var totalH: Int = App.h();
 
 		// Skip adjustment if window is minimized or too small
 		if (totalH < MIN_PANEL_SIZE * 2) return;
