@@ -25,7 +25,7 @@ class ImageUtils {
 	public static function init(): Void {
 		if (alphaPipeline != null) return;
 
-		var structure = new VertexStructure();
+		var structure: VertexStructure = new VertexStructure();
 		structure.add("vertexPosition", VertexData.Float32_3X);
 		structure.add("vertexUV", VertexData.Float32_2X);
 		structure.add("vertexColor", VertexData.UInt8_4X_Normalized);

@@ -6,8 +6,8 @@ class ThemeUtils {
      * Theme files must use tabs for indentation, not spaces.
      */
     public static function normalizeIndentation(text: String): String {
-        var lines = text.split("\n");
-        var normalized = [];
+        var lines: Array<String> = text.split("\n");
+        var normalized: Array<String> = [];
 
         for (line in lines) {
             // Count leading spaces and convert to tabs
@@ -42,22 +42,22 @@ class ThemeUtils {
 
     public static function validateThemeSyntax(text: String): Null<String> {
         // Regex patterns from ThemeParser
-        var regIndent = ~/^(\t*)(.*)$/i;
-        var regEmpty = ~/^[ \t]*(\/\/.*)?$/i;
-        var lineReg = ~/^([\w\-]+)(![\w\-]+)?( *> *([\w\-]+))? *: *(.*)$/i;
-        var ruleReg = ~/^(\?)?([\w\-]+) *: *(.*)$/i;
-        var rulesReg = ~/^@rules( )*:( )*$/i;
-        var globalsReg = ~/^(@globals)( )*:( )*$/i;
+        var regIndent: EReg = ~/^(\t*)(.*)$/i;
+        var regEmpty: EReg = ~/^[ \t]*(\/\/.*)?$/i;
+        var lineReg: EReg = ~/^([\w\-]+)(![\w\-]+)?( *> *([\w\-]+))? *: *(.*)$/i;
+        var ruleReg: EReg = ~/^(\?)?([\w\-]+) *: *(.*)$/i;
+        var rulesReg: EReg = ~/^@rules( )*:( )*$/i;
+        var globalsReg: EReg = ~/^(@globals)( )*:( )*$/i;
 
         // Normalize line endings to \n only (remove \r)
         text = StringTools.replace(text, "\r\n", "\n");
         text = StringTools.replace(text, "\r", "\n");
 
-        var lines = text.split("\n");
-        var lineNum = 0;
-        var foundRules = false;
-        var visitingRules = false;
-        var visitingGlobals = false;
+        var lines: Array<String> = text.split("\n");
+        var lineNum: Int = 0;
+        var foundRules: Bool = false;
+        var visitingRules: Bool = false;
+        var visitingGlobals: Bool = false;
 
         for (line in lines) {
             lineNum++;
@@ -73,14 +73,14 @@ class ThemeUtils {
             }
 
             // Get line content without indentation
-            var lineContent = regIndent.matched(2);
+            var lineContent: String = regIndent.matched(2);
 
             // Check for spaces in indentation (only tabs allowed)
             if (lineContent.length > 0 && lineContent != StringTools.ltrim(lineContent)) {
                 return 'Line ${lineNum}: Tabs must be used for indentation, not spaces';
             }
 
-            var indentLevel = regIndent.matched(1).length;
+            var indentLevel: Int = regIndent.matched(1).length;
 
             // Check for @rules block
             if (!foundRules) {
