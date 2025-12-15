@@ -175,6 +175,7 @@ class KouiEditor extends iron.Trait {
 			Krom.setMouseCursor(0); // Default cursor
 		}
 
+		// FIXME: elements flicker when zooming
 		if (isInCanvas && !isPanning) {
 			if (mouse.wheelDelta < 0) {
 				currentScale += 0.1;
@@ -205,6 +206,7 @@ class KouiEditor extends iron.Trait {
 	function updateDragAndDrop() {
 		if (isPanning) return;
 
+		// FIXME: elements flicker on mouse start and on mouse release
 		var mouse: Mouse = Input.getMouse();
 		if (mouse.started()) {
 			var element: Element = Koui.getElementAtPosition(Std.int(mouse.x), Std.int(mouse.y));
