@@ -35,7 +35,7 @@ class KouiEditor extends iron.Trait {
 
 	// Created elements
 	var elementsData: ElementData;
-	var elements: Array<HierarchyEntry> = [];
+	var elements: Array<THierarchyEntry> = [];
 
 	// Drag and drop state
 	var selectedElement: Element = null;
@@ -207,7 +207,7 @@ class KouiEditor extends iron.Trait {
 	function updateDragAndDrop() {
 		if (isPanning) return;
 
-		// FIXME: elements flicker on mouse release
+		// FIXME: elements flicker on mouse start and release
 		var mouse: Mouse = Input.getMouse();
 		if (mouse.started()) {
 			var element: Element = Koui.getElementAtPosition(Std.int(mouse.x), Std.int(mouse.y));
@@ -392,7 +392,7 @@ class KouiEditor extends iron.Trait {
 		uiBase.hwnds[PanelProperties].redraws = 2;
 	}
 
-	function onElementAdded(entry: HierarchyEntry): Void {
+	function onElementAdded(entry: THierarchyEntry): Void {
 		anchorPane.add(entry.element, Anchor.TopLeft);
 
 		// Generate unique name based on parent's children

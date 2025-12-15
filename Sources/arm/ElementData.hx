@@ -4,7 +4,7 @@ import koui.elements.layouts.AnchorPane;
 import arm.ElementEvents;
 import koui.elements.Element;
 
-typedef HierarchyEntry = {
+typedef THierarchyEntry = {
 	var key: String;
 	var element: Element;
 }
@@ -12,13 +12,13 @@ typedef HierarchyEntry = {
 class ElementData {
     public static var data: ElementData = new ElementData();
     public static var root: AnchorPane;
-    public var elements: Array<HierarchyEntry> = [];
+    public var elements: Array<THierarchyEntry> = [];
 
     public function new() {
         ElementEvents.elementAdded.connect(onElementAdded);
     }
 
-    public function onElementAdded(entry: HierarchyEntry): Void {
+    public function onElementAdded(entry: THierarchyEntry): Void {
         elements.push({ key: entry.key, element: entry.element });
     }
 

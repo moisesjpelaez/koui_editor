@@ -9,6 +9,7 @@ import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.Label;
 
+import zui.Zui;
 import zui.Zui.Handle;
 
 class PropertiesPanel {
@@ -80,7 +81,7 @@ class PropertiesPanel {
     }
 
     function drawProperties(uiBase: UIBase): Void {
-        var ui = uiBase.ui;
+        var ui: Zui = uiBase.ui;
 
         // Get element name from ElementData
         var elemName = "";
@@ -98,15 +99,15 @@ class PropertiesPanel {
 
         // Key (Name) - editable text input
         nameHandle.text = elemName;
-        var newName = ui.textInput(nameHandle, "Key", Right);
+        var newName: String = ui.textInput(nameHandle, "Key", Right);
         if (nameHandle.changed) {
             if (newName != null && newName != "") ElementData.data.updateElementKey(selectedElement, newName);
         }
 
         // TID - editable text input
-        var originalTID = selectedElement.getTID();
+        var originalTID: String = selectedElement.getTID();
         tidHandle.text = originalTID;
-        var newTID = ui.textInput(tidHandle, "TID", Right);
+        var newTID: String = ui.textInput(tidHandle, "TID", Right);
         if (tidHandle.changed) {
             if (newTID != null && newTID != "") {
                 // Check if TID exists in theme
@@ -124,9 +125,9 @@ class PropertiesPanel {
         ui.text("Position", Left);
         ui.row([1/2, 1/2]);
         posXHandle.text = Std.string(selectedElement.posX);
-        var posXStr = ui.textInput(posXHandle, "X", Right);
+        var posXStr: String = ui.textInput(posXHandle, "X", Right);
         if (posXHandle.changed) {
-            var val = Std.parseInt(posXStr);
+            var val: Int = Std.parseInt(posXStr);
             if (val != null) {
                 selectedElement.posX = val;
             } else {
@@ -136,9 +137,9 @@ class PropertiesPanel {
         }
 
         posYHandle.text = Std.string(selectedElement.posY);
-        var posYStr = ui.textInput(posYHandle, "Y", Right);
+        var posYStr: String = ui.textInput(posYHandle, "Y", Right);
         if (posYHandle.changed) {
-            var val = Std.parseInt(posYStr);
+            var val: Int = Std.parseInt(posYStr);
             if (val != null) {
                 selectedElement.posY = val;
             } else {
@@ -151,9 +152,9 @@ class PropertiesPanel {
         ui.text("Size", Left);
         ui.row([1/2, 1/2]);
         widthHandle.text = Std.string(selectedElement.width);
-        var widthStr = ui.textInput(widthHandle, "Width", Right);
+        var widthStr: String = ui.textInput(widthHandle, "Width", Right);
         if (widthHandle.changed) {
-            var val = Std.parseInt(widthStr);
+            var val: Int = Std.parseInt(widthStr);
             if (val != null) {
                 selectedElement.width = val;
             } else {
@@ -163,9 +164,9 @@ class PropertiesPanel {
         }
 
         heightHandle.text = Std.string(selectedElement.height);
-        var heightStr = ui.textInput(heightHandle, "Height", Right);
+        var heightStr: String = ui.textInput(heightHandle, "Height", Right);
         if (heightHandle.changed) {
-            var val = Std.parseInt(heightStr);
+            var val: Int = Std.parseInt(heightStr);
             if (val != null) {
                 selectedElement.height = val;
             } else {
@@ -184,7 +185,7 @@ class PropertiesPanel {
     }
 
     function drawElementProperties(uiBase: UIBase) {
-        var ui = uiBase.ui;
+        var ui: Zui = uiBase.ui;
 
         if (selectedElement is Label) {
             ui.text("Label", Center);
@@ -192,7 +193,7 @@ class PropertiesPanel {
 
             var label: Label = cast(selectedElement, Label);
             labelTextHandle.text = label.text;
-            var newText = ui.textInput(labelTextHandle, "Text", Right);
+            var newText: String = ui.textInput(labelTextHandle, "Text", Right);
             if (labelTextHandle.changed) {
                 if (newText != null && newText != "") label.text = newText;
             }
@@ -202,7 +203,7 @@ class PropertiesPanel {
 
             var button: Button = cast(selectedElement, Button);
             buttonTextHandle.text = button.text;
-            var newText = ui.textInput(buttonTextHandle, "Text", Right);
+            var newText: String = ui.textInput(buttonTextHandle, "Text", Right);
             if (buttonTextHandle.changed) {
                 if (newText != null && newText != "") button.text = newText;
             }
@@ -224,7 +225,7 @@ class PropertiesPanel {
         // Update all handles with the new element's values
         if (element != null) {
             // Find element name
-            var elemName = "";
+            var elemName: String = "";
             for (entry in ElementData.data.elements) {
                 if (entry.element == element) {
                     elemName = entry.key;

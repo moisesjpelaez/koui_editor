@@ -66,14 +66,14 @@ class ImageUtils {
 	/**
 	 * Helper to get a tile rectangle from a 50x50 icon atlas.
 	 */
-	public static inline function tile50(x: Int, y: Int): {x: Int, y: Int, w: Int, h: Int} {
-		return { x: x * 50, y: y * 50, w: 50, h: 50 };
-	}
-
-	/**
-	 * Helper to get a tile rectangle from a 100x100 icon atlas (2x scale).
-	 */
-	public static inline function tile100(x: Int, y: Int): {x: Int, y: Int, w: Int, h: Int} {
-		return { x: x * 100, y: y * 100, w: 100, h: 100 };
+	public static inline function tile(x: Int, y: Int, ?factor: Int = 50): TTileRect {
+		return { x: x * factor, y: y * factor, w: factor, h: factor };
 	}
 }
+
+typedef TTileRect = {
+	var x: Int;
+	var y: Int;
+	var w: Int;
+	var h: Int;
+};

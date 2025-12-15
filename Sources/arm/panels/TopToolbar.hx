@@ -37,24 +37,24 @@ class TopToolbar {
 	function iconButton(ui: Zui, tileX: Int, tileY: Int, tooltip: String, highlight: Bool = false): Bool {
 		if (icons == null) return ui.button("?");
 
-		var col = ui.t.WINDOW_BG_COL;
+		var col: Int = ui.t.WINDOW_BG_COL;
 		if (col < 0) col += untyped 4294967296;
-		var light = col > 0xff666666 + 4294967296;
+		var light: Bool = col > 0xff666666 + 4294967296;
 
 		// Base color
-		var iconAccent = light ? 0xff666666 : 0xffaaaaaa;
+		var iconAccent: Int = light ? 0xff666666 : 0xffaaaaaa;
 
 		if (highlight) {
 			iconAccent = ui.t.HIGHLIGHT_COL;
 		}
 
 		// Store position before drawing
-		@:privateAccess var startX = ui._x;
-		@:privateAccess var startY = ui._y;
+		@:privateAccess var startX: Float = ui._x;
+		@:privateAccess var startY: Float = ui._y;
 
-		var rect = ImageUtils.tile50(tileX, tileY);
+		var rect: TTileRect = ImageUtils.tile(tileX, tileY);
 		ui.g.pipeline = ImageUtils.getPipeline();
-		var state = ui.image(icons, iconAccent, null, rect.x, rect.y, rect.w, rect.h);
+		var state: State = ui.image(icons, iconAccent, null, rect.x, rect.y, rect.w, rect.h);
 		ui.g.pipeline = null;
 
 		// Apply hover and pressed visual feedback on top of the icon
@@ -76,14 +76,14 @@ class TopToolbar {
 	}
 
 	public function draw(uiBase: UIBase): Void {
-		var ui = uiBase.ui;
+		var ui: Zui = uiBase.ui;
 
 		// Calculate center position
 		var centerX: Int = Std.int((App.w() - uiBase.getSidebarW()) / 2 - TOOLBAR_WIDTH / 2);
 		var topY: Int = 5;
 
 		// Don't fill background, make it floating
-		var savedFillBg = ui.t.FILL_WINDOW_BG;
+		var savedFillBg: Bool = ui.t.FILL_WINDOW_BG;
 		ui.t.FILL_WINDOW_BG = false;
 
 		if (ui.window(Id.handle(), centerX, topY, TOOLBAR_WIDTH, TOOLBAR_HEIGHT, false)) {
@@ -104,8 +104,8 @@ class TopToolbar {
 
 			if (iconButton(ui, 5, 0, "Reload Theme")) {
 				// Load ui_override.ksn from Assets directory
-				var basePath = Krom.getFilesLocation();
-				var assetsPaths = [
+				var basePath: String = Krom.getFilesLocation();
+				var assetsPaths: Array<String> = [
 					basePath + "/../../../../Assets/ui_override.ksn",
 					basePath + "/../../../Assets/ui_override.ksn",
 				];
@@ -113,7 +113,7 @@ class TopToolbar {
 
 				var blob: js.lib.ArrayBuffer = null;
 				for (path in assetsPaths) {
-					var _blob = Krom.loadBlob(path);
+					var _blob: js.lib.ArrayBuffer = Krom.loadBlob(path);
 					if (_blob != null) {
 						assetsPath = path;
 						blob = _blob;
@@ -122,15 +122,15 @@ class TopToolbar {
 				}
 
 				if (blob != null) {
-					var themeContent = haxe.io.Bytes.ofData(blob).toString();
-					var error = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
+					var themeContent: String = haxe.io.Bytes.ofData(blob).toString();
+					var error: String = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
 
 					if (error != null) {
 						trace('Theme reload ERROR: ${error}');
 					} else {
-						var buildPath = basePath + "/ui_override.ksn";
+						var buildPath: String = basePath + "/ui_override.ksn";
 						try {
-						var bytes = haxe.io.Bytes.ofString(themeContent);
+						var bytes: haxe.io.Bytes = haxe.io.Bytes.ofString(themeContent);
 						Krom.fileSaveBytes(buildPath, bytes.getData());
 							trace('Theme reloaded successfully from: ${assetsPath}');
 							trace('Theme copied to build directory: ${buildPath}');
