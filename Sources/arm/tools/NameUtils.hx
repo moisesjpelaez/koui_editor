@@ -1,6 +1,6 @@
 package arm.tools;
 
-import arm.ElementsData;
+import arm.ElementData;
 import koui.elements.Element;
 
 class NameUtils {
@@ -26,7 +26,7 @@ class NameUtils {
 		// Collect sibling names (excluding the element itself)
 		for (sibling in siblings) {
 			if (sibling != element) {
-				for (entry in ElementsData.data.elements) {
+				for (entry in ElementData.data.elements) {
 					if (entry.element == sibling) {
 						existingNames.push(entry.key);
 						break;

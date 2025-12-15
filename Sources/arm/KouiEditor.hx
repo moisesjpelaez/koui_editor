@@ -1,6 +1,6 @@
 package arm;
 
-import arm.ElementsData;
+import arm.ElementData;
 import arm.ElementEvents;
 import arm.base.Base;
 import arm.base.UIBase;
@@ -34,7 +34,7 @@ class KouiEditor extends iron.Trait {
 	var sizeInit: Bool = false;
 
 	// Created elements
-	var elementsData: ElementsData;
+	var elementsData: ElementData;
 	var elements: Array<HierarchyEntry> = [];
 
 	// Drag and drop state
@@ -66,7 +66,7 @@ class KouiEditor extends iron.Trait {
 		super();
 
 		Assets.loadEverything(function() {
-			elementsData = ElementsData.data;
+			elementsData = ElementData.data;
 			elements = elementsData.elements;
 
 			// Initialize framework
@@ -99,7 +99,7 @@ class KouiEditor extends iron.Trait {
 				anchorPane.setTID("fixed_anchorpane");
 				Koui.add(anchorPane, Anchor.MiddleCenter);
 				elements.push({ key: "AnchorPane", element: anchorPane });
-				ElementsData.root = anchorPane;
+				ElementData.root = anchorPane;
 				hierarchyPanel.onElementAdded(elements[0]); // Manually register the root element in the hierarchy
 			});
 

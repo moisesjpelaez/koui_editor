@@ -1,6 +1,6 @@
 package arm.panels;
 
-import arm.ElementsData;
+import arm.ElementData;
 import arm.ElementEvents;
 import arm.types.Enums;
 import arm.base.UIBase;
@@ -82,14 +82,16 @@ class PropertiesPanel {
     function drawProperties(uiBase: UIBase): Void {
         var ui = uiBase.ui;
 
-        // Get element name from ElementsData
+        // Get element name from ElementData
         var elemName = "";
-        for (entry in ElementsData.data.elements) {
+        for (entry in ElementData.data.elements) {
             if (entry.element == selectedElement) {
                 elemName = entry.key;
                 break;
             }
         }
+
+        drawElementProperties(uiBase);
 
         ui.text("Element", Center);
         ui.separator();
@@ -98,7 +100,7 @@ class PropertiesPanel {
         nameHandle.text = elemName;
         var newName = ui.textInput(nameHandle, "Key", Right);
         if (nameHandle.changed) {
-            if (newName != null && newName != "") ElementsData.data.updateElementKey(selectedElement, newName);
+            if (newName != null && newName != "") ElementData.data.updateElementKey(selectedElement, newName);
         }
 
         // TID - editable text input
@@ -179,6 +181,10 @@ class PropertiesPanel {
         // Disabled checkbox
         disabledHandle.selected = selectedElement.disabled;
         selectedElement.disabled = ui.check(disabledHandle, "Disabled");
+    }
+
+    function drawElementProperties(uiBase: UIBase) {
+        var ui = uiBase.ui;
 
         if (selectedElement is Label) {
             ui.text("Label", Center);
@@ -219,7 +225,7 @@ class PropertiesPanel {
         if (element != null) {
             // Find element name
             var elemName = "";
-            for (entry in ElementsData.data.elements) {
+            for (entry in ElementData.data.elements) {
                 if (entry.element == element) {
                     elemName = entry.key;
                     break;
