@@ -149,7 +149,6 @@ class KouiEditor extends iron.Trait {
 			isPanning = true;
 			panStartX = mouse.x;
 			panStartY = mouse.y;
-			Krom.setMouseCursor(1); // Hand cursor (grabbing)
 		}
 		else if (mouse.down("middle") && isPanning) {
 			// Calculate delta movement
@@ -169,6 +168,8 @@ class KouiEditor extends iron.Trait {
 			// Update start position for next frame
 			panStartX = mouse.x;
 			panStartY = mouse.y;
+
+			Krom.setMouseCursor(9);
 		}
 		else if (!mouse.down("middle") && isPanning) {
 			isPanning = false;
@@ -206,16 +207,18 @@ class KouiEditor extends iron.Trait {
 	function updateDragAndDrop() {
 		if (isPanning) return;
 
-		// FIXME: elements flicker on mouse start and on mouse release
+		// FIXME: elements flicker on mouse release
 		var mouse: Mouse = Input.getMouse();
 		if (mouse.started()) {
 			var element: Element = Koui.getElementAtPosition(Std.int(mouse.x), Std.int(mouse.y));
 			var canvasArea: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize, App.h() - uiBase.getBottomH() - borderSize); // TODO: use a better variable name
 			var hierarchyArea: Vec2 = new Vec2(canvasArea.x + 2 * borderSize, App.h() - uiBase.getSidebarH1() - borderSize); // TODO: use a better variable name
+
 			if (element != null && element != anchorPane) {
 				if (element.parent is Button) selectedElement = element.parent;
 				else selectedElement = element;
 				ElementEvents.elementSelected.emit(selectedElement);
+
 				draggedElement = selectedElement;
 				dragOffsetX = Std.int(mouse.x - draggedElement.posX * Koui.uiScale);
 				dragOffsetY = Std.int(mouse.y - draggedElement.posY * Koui.uiScale);
@@ -233,8 +236,6 @@ class KouiEditor extends iron.Trait {
 				@:privateAccess draggedElement.invalidateElem();
 			}
 			draggedElement = null;
-			uiBase.hwnds[PanelHierarchy].redraws = 2;
-			uiBase.hwnds[PanelProperties].redraws = 2;
 		}
 	}
 
@@ -374,7 +375,7 @@ class KouiEditor extends iron.Trait {
 		// Perform the mutation
 		switch (zone) {
 			case AsChild:
-				HierarchyUtils.moveAsChild(element, target, anchorPane);
+				HierarchyUtils.moveAsChild(element, target, anchorPane); // TODO: remove third param?
 			case BeforeSibling:
 				HierarchyUtils.moveRelativeToTarget(element, target, true);
 			case AfterSibling:

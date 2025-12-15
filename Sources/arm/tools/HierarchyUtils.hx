@@ -3,43 +3,27 @@ package arm.tools;
 import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.Panel;
+
 import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.Expander;
 import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.Layout;
 import koui.elements.layouts.Layout.Anchor;
 import koui.elements.layouts.ScrollPane;
-import koui.elements.layouts.RowLayout;
 
 class HierarchyUtils {
 	public static function canAcceptChild(target: Element): Bool {
-		if (target == null) return false;
-
-		// Valid containers that can accept children
-		if (Std.isOfType(target, AnchorPane)) return true;
-		if (Std.isOfType(target, Panel)) return true;
-		if (Std.isOfType(target, ColLayout)) return true;
-		if (Std.isOfType(target, RowLayout)) return true;
-		if (Std.isOfType(target, Expander)) return true;
-		if (Std.isOfType(target, GridLayout)) return true;
-		// if (Std.isOfType(target, ScrollPane)) return true;
-
-		return false;
+		return target != null && (target is Layout || target is Panel);
 	}
 
 	public static function isUserContainer(element: Element): Bool {
 		if (element == null) return false;
-
-		// Only show elements that are valid containers
 		return canAcceptChild(element);
 	}
 
 	public static function getParentElement(element: Element): Element {
 		if (element == null) return null;
-		if (element.layout != null) {
-			return cast(element.layout, Element);
-		}
+		if (element.layout != null) return cast(element.layout, Element);
 		return element.parent;
 	}
 
@@ -54,69 +38,39 @@ class HierarchyUtils {
 
 	public static function getChildren(parent: Element): Array<Element> {
 		if (parent == null) return [];
-
-		if (Std.isOfType(parent, AnchorPane)) {
-			return @:privateAccess cast(parent, AnchorPane).elements;
-		}
-		if (Std.isOfType(parent, ScrollPane)) {
-			return @:privateAccess cast(parent, ScrollPane).elements;
-		}
-		if (Std.isOfType(parent, Expander)) {
-			return @:privateAccess cast(parent, Expander).elements;
-		}
-
+		if (parent is AnchorPane || parent is ScrollPane || parent is Expander || parent is GridLayout) return @:privateAccess untyped parent.elements;
 		return @:privateAccess parent.children;
 	}
 
 	public static function detachFromCurrentParent(element: Element): Void {
 		if (element == null) return;
-
 		if (element.layout != null) {
-			var lyt: Layout = element.layout;
-			if (Std.isOfType(lyt, AnchorPane)) {
-				cast(lyt, AnchorPane).remove(element);
-			} else if (Std.isOfType(lyt, ScrollPane)) {
-				cast(lyt, ScrollPane).remove(element);
-			} else if (Std.isOfType(lyt, Expander)) {
-				cast(lyt, Expander).remove(element);
-			} else if (Std.isOfType(lyt, GridLayout)) {
-				cast(lyt, GridLayout).remove(element);
-			} else {
-				element.layout = null;
+			var layout: Layout = element.layout;
+			if (layout is AnchorPane || layout is ScrollPane || layout is Expander || layout is GridLayout) {
+				untyped layout.remove(element);
+				return;
 			}
-			return;
 		}
-
-		if (element.parent != null) {
-			@:privateAccess element.parent.removeChild(element);
-		}
+		if (element.parent != null) @:privateAccess element.parent.removeChild(element);
 	}
 
-	public static function moveAsChild(element: Element, target: Element, ?fallbackParent: AnchorPane): Void {
+	public static function moveAsChild(element: Element, target: Element, ?fallbackParent: AnchorPane): Void { // TODO: remove third arg?
 		detachFromCurrentParent(element);
 
-		if (Std.isOfType(target, AnchorPane)) {
-			cast(target, AnchorPane).add(element, Anchor.TopLeft);
-			return;
-		}
-		if (Std.isOfType(target, ScrollPane)) {
-			cast(target, ScrollPane).add(element);
-			return;
-		}
-		if (Std.isOfType(target, Expander)) {
-			cast(target, Expander).add(element);
-			return;
-		}
-		if (Std.isOfType(target, GridLayout)) {
-			// Grid placement needs row/col; use fallback if provided.
-			if (fallbackParent != null) {
-				fallbackParent.add(element, Anchor.TopLeft);
-			}
-			return;
+		if (target is Layout && (target is AnchorPane || target is ScrollPane || target is Expander)) {
+			untyped cast(target, Layout).add(element);
+		} else if (target is Panel) {
+			target.addChild(element);
 		}
 
-		// Plain Element parenting.
-		target.addChild(element);
+		// TODO: test GridLayout case
+		// if (Std.isOfType(target, GridLayout)) {
+		// 	// Grid placement needs row/col; use fallback if provided.
+		// 	if (fallbackParent != null) {
+		// 		fallbackParent.add(element, Anchor.TopLeft);
+		// 	}
+		// 	return;
+		// }
 	}
 
 	public static function moveRelativeToTarget(element: Element, target: Element, before: Bool): Void {
@@ -125,54 +79,28 @@ class HierarchyUtils {
 
 		detachFromCurrentParent(element);
 
-		if (Std.isOfType(parent, AnchorPane)) {
-			cast(parent, AnchorPane).add(element, Anchor.TopLeft);
-			var arr: Array<Element> = @:privateAccess cast(parent, AnchorPane).elements;
-			arr.remove(element);
-			var targetIdx: Int = arr.indexOf(target);
-			if (targetIdx < 0) return;
-			var insertIdx: Int = before ? targetIdx : targetIdx + 1;
-			arr.insert(insertIdx, element);
-			return;
+		var elements: Array<Element>;
+		if (parent is AnchorPane || parent is ScrollPane || parent is Expander || parent is GridLayout) {
+			untyped cast(parent, Layout).add(element);
+			elements = @:privateAccess untyped cast(parent, Layout).elements;
+		} else {
+			elements = @:privateAccess parent.children;
+
 		}
-
-		// if (Std.isOfType(parent, ScrollPane)) {
-		// 	cast(parent, ScrollPane).add(element);
-		// 	var arr: Array<Element> = @:privateAccess cast(parent, ScrollPane).elements;
-		// 	arr.remove(element);
-		// 	var targetIdx: Int = arr.indexOf(target);
-		// 	if (targetIdx < 0) return;
-		// 	var insertIdx: Int = before ? targetIdx : targetIdx + 1;
-		// 	arr.insert(insertIdx, element);
-		// 	return;
-		// }
-
-		if (Std.isOfType(parent, Expander)) {
-			var exp: Expander = cast parent;
-			var arr: Array<Element> = @:privateAccess exp.elements;
-			var targetIdx: Int = arr.indexOf(target);
-			if (targetIdx < 0) return;
-			var insertIdx: Int = before ? targetIdx : targetIdx + 1;
-			exp.add(element, insertIdx);
-			return;
-		}
-
-		// Plain Element sibling ordering via children array.
-		var children: Array<Element> = @:privateAccess parent.children;
-		children.remove(element);
-		var tIdx: Int = children.indexOf(target);
-		if (tIdx < 0) return;
-		var iIdx: Int = before ? tIdx : tIdx + 1;
-		@:privateAccess element.parent = parent;
-		children.insert(iIdx, element);
+		elements.remove(element);
+		var targetIdx: Int = elements.indexOf(target);
+		if (targetIdx < 0) return;
+		var insertIdx: Int = before ? targetIdx : targetIdx + 1;
+		elements.insert(insertIdx, element);
 	}
 
 	public static function shouldSkipInternalChild(parent: Element, child: Element): Bool {
         // Skip Button's internal label
-        if (Std.isOfType(parent, Button)) {
-            // Button's internal _label element
+        if (parent is Button) {
             return true;
         }
+		// TODO: Add more cases as needed. Return single line once ready.
+
         return false;
     }
 }
