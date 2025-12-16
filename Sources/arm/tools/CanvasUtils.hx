@@ -443,7 +443,7 @@ class CanvasUtils {
 	/**
 	 * Clears all elements from the canvas (except root AnchorPane).
 	 */
-	static function clearCanvas(): Void {
+	public static function clearCanvas(): Void {
 		var root: AnchorPane = elementsData.root;
 		// Remove all elements from root
 		var children: Array<Element> = HierarchyUtils.getChildren(root).copy();
@@ -455,5 +455,7 @@ class CanvasUtils {
 		// (HierarchyPanel holds a reference to this array)
 		elements.resize(0);
 		elements.push({ key: "AnchorPane", element: root });
+
+		ElementEvents.elementSelected.emit(null);
 	}
 }
