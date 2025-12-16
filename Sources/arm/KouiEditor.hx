@@ -63,6 +63,9 @@ class KouiEditor extends iron.Trait {
 	var propertiesPanel: PropertiesPanel = new PropertiesPanel();
 	var elementsPanel: ElementsPanel = new ElementsPanel();
 
+	// HACK: ensure canvas is loaded after Koui init
+	var canvasLoaded: Bool = false;
+
 	public function new() {
 		super();
 
@@ -70,13 +73,13 @@ class KouiEditor extends iron.Trait {
 			elementsData = ElementData.data;
 			elements = elementsData.elements;
 
-			// Initialize canvas name from command line args
-			CanvasUtils.init();
-
 			// Initialize framework
 			Base.font = Assets.fonts.font_default;
 			Base.init();
 			Base.resizing.connect(onResized);
+
+			// Initialize canvas utilities
+			CanvasUtils.init();
 
 			// Create UIBase with the loaded font
 			uiBase = new UIBase(Assets.fonts.font_default);
@@ -89,7 +92,7 @@ class KouiEditor extends iron.Trait {
 
 				var argCount = Krom.getArgCount();
 				// Arguments are: [0]=krom_path, [1]=koui_editor_path, [2]=koui_editor_path,
-				//                [3]=canvas_arg, [4]=uiscale, [5]=resolution_x, [6]=resolution_y
+				//                [3]=canvas_arg, [4]=uiscale, [5]=resolution_x, [6]=resolution_y, [7]=project_dir, [8]=project_ext
 				if (argCount >= 7) {
 					var resX: Int = Std.parseInt(Krom.getArg(5));
 					var resY: Int = Std.parseInt(Krom.getArg(6));
@@ -101,10 +104,14 @@ class KouiEditor extends iron.Trait {
 
 				anchorPane = new AnchorPane(0, 0, canvasWidth, canvasHeight);
 				anchorPane.setTID("fixed_anchorpane");
+
+				// Initialize canvas name from command line args
 				Koui.add(anchorPane, Anchor.MiddleCenter);
 				elements.push({ key: "AnchorPane", element: anchorPane });
 				ElementData.root = anchorPane;
 				hierarchyPanel.onElementAdded(elements[0]); // Manually register the root element in the hierarchy
+
+				CanvasUtils.refreshTheme();
 			});
 
 			App.onResize = onResized;
@@ -122,6 +129,10 @@ class KouiEditor extends iron.Trait {
 
 	function update() {
 		if (uiBase == null) return;
+		if (!canvasLoaded) {
+			CanvasUtils.loadCanvas();
+			canvasLoaded = true;
+		}
 		uiBase.update();
 		canvasControl();
 		updateDragAndDrop();

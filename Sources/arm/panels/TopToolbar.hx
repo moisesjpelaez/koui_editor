@@ -102,44 +102,7 @@ class TopToolbar {
 			}
 
 			if (iconButton(ui, 5, 0, "Reload Theme")) {
-				// Load ui_override.ksn from Assets directory
-				var basePath: String = Krom.getFilesLocation();
-				var assetsPaths: Array<String> = [
-					basePath + "/../../../../Assets/ui_override.ksn",
-					basePath + "/../../../Assets/ui_override.ksn",
-				];
-				var assetsPath: String = "";
-
-				var blob: js.lib.ArrayBuffer = null;
-				for (path in assetsPaths) {
-					var _blob: js.lib.ArrayBuffer = Krom.loadBlob(path);
-					if (_blob != null) {
-						assetsPath = path;
-						blob = _blob;
-						break;
-					}
-				}
-
-				if (blob != null) {
-					var themeContent: String = haxe.io.Bytes.ofData(blob).toString();
-					var error: String = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
-
-					if (error != null) {
-						trace('Theme reload ERROR: ${error}');
-					} else {
-						var buildPath: String = basePath + "/ui_override.ksn";
-						try {
-						var bytes: haxe.io.Bytes = haxe.io.Bytes.ofString(themeContent);
-						Krom.fileSaveBytes(buildPath, bytes.getData());
-							trace('Theme reloaded successfully from: ${assetsPath}');
-							trace('Theme copied to build directory: ${buildPath}');
-						} catch (e: Dynamic) {
-							trace('Theme reloaded but failed to copy to build directory: ${e}');
-						}
-					}
-				} else {
-					trace('Theme file not found: ${assetsPath}');
-				}
+				CanvasUtils.refreshTheme();
 			}
 
 			// Load button (using import/open icon at position 2,2)

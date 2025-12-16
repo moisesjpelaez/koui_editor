@@ -76,20 +76,23 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
             return {'CANCELLED'}
         os.chdir(krom_location)
 
-        # Build canvas path if a canvas name is provided
-        canvas_arg = ""
-        if self.canvas_name:
-            project_path = arm.utils.get_fp()
-            canvas_arg = os.path.join(project_path, 'Bundled', 'canvas', self.canvas_name + '.json')
-            canvas_arg = canvas_arg.replace('\\', '/')
+        # Ensure canvas_name is not empty
+        canvas_name = self.canvas_name if self.canvas_name else "UntitledCanvas"
+
+        # Get project directory (where the .blend file is)
+        project_dir = os.path.dirname(bpy.data.filepath) if bpy.data.filepath else os.getcwd()
 
         uiscale = str(arm.utils.get_ui_scale())
-        cmd = [krom_path, koui_editor_path, koui_editor_path, canvas_arg, uiscale]
+        cmd = [krom_path, koui_editor_path, koui_editor_path, canvas_name, uiscale]
 
         # Pass render resolution
         render_settings = context.scene.render
         cmd.append(str(render_settings.resolution_x))
         cmd.append(str(render_settings.resolution_y))
+
+        # Pass project directory
+        cmd.append(project_dir)
+        cmd.append(ext)
 
         if get_os() == 'win':
             cmd.append('--consolepid')
@@ -128,19 +131,28 @@ def register():
 
         # Define replacement execute
         def _koui_edit_canvas_execute(self, context):
-            canvas_name = ''
+            canvas_name = 'UntitledCanvas'
             try:
                 if self.is_object:
                     obj = bpy.context.object
                 else:
                     obj = bpy.context.scene
                 item = obj.arm_traitlist[obj.arm_traitlist_index]
-                canvas_name = item.canvas_name_prop
+
+                # Use canvas_name_prop if set, otherwise use the trait's name
+                if item.canvas_name_prop:
+                    canvas_name = item.canvas_name_prop
+                elif item.name:
+                    canvas_name = item.name
+
+                log.info(f"Koui Editor: Using canvas name = '{canvas_name}'")
 
                 # Launch Koui editor via our operator
                 bpy.ops.koui.launch_editor(canvas_name=canvas_name)
-            except Exception:
-                log.error("Koui Editor: could not launch from patched button")
+            except Exception as e:
+                log.error(f"Koui Editor: could not launch from patched button: {e}")
+                import traceback
+                log.error(traceback.format_exc())
             return {'FINISHED'}
 
         ArmEditCanvasButton.execute = _koui_edit_canvas_execute

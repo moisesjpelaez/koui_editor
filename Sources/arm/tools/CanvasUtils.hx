@@ -10,7 +10,6 @@ import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.Label;
 import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.Layout.Anchor;
 
 // JSON structure typedefs
 typedef TCanvasData = {
@@ -46,41 +45,48 @@ class CanvasUtils {
 	// Canvas name from command line args (e.g., "MyCanvas")
 	public static var canvasName: String = "UntitledCanvas";
 
+	// Project directory from command line args
+	public static var projectDir: String = "";
+	public static var buildPath: String = "";
+	public static var projectExt: String = "";
+
 	/**
 	 * Initializes the canvas name from command line arguments.
-	 * Scans all arguments to find one ending with .json
+	 * Canvas name (trait name from Blender) is at Arg[3]
 	 */
 	public static function init(): Void {
+		// TODO: refactor in KouiEditor.init()
 		var argCount: Int = Krom.getArgCount();
 
-		// Debug: print all arguments
-		trace('Argument count: ${argCount}');
-		for (i in 0...argCount) {
-			trace('Arg[${i}]: ${Krom.getArg(i)}');
-		}
-
-		// Scan through arguments to find one that looks like a canvas path (.json file)
-		for (i in 0...argCount) {
-			var arg: String = Krom.getArg(i);
-			if (arg != null && StringTools.endsWith(arg.toLowerCase(), ".json")) {
-				// Found a .json argument - extract canvas name from it
-				var name: String = arg;
-				// Remove path separators
-				var lastSlash: Int = Std.int(Math.max(name.lastIndexOf("/"), name.lastIndexOf("\\")));
-				if (lastSlash >= 0) {
-					name = name.substring(lastSlash + 1);
-				}
-				// Remove .json extension
-				name = name.substring(0, name.length - 5);
-				if (name != "") {
-					canvasName = name;
-					trace('Found canvas name from arg[${i}]: ${canvasName}');
-					break;
-				}
+		// Canvas name is at Arg[3]: the trait name from Blender
+		if (argCount > 3) {
+			var name: String = Krom.getArg(3);
+			// Skip if it's a flag (starts with --)
+			if (name != null && name != "" && !StringTools.startsWith(name, "--")) {
+				canvasName = name;
 			}
 		}
 
-		trace('Final canvas name: ${canvasName}');
+		// Project directory is at Arg[7]: the project path from Blender
+		// Args: [0]=krom_path, [1]=assets, [2]=shaders, [3]=canvas_name, [4]=uiscale, [5]=res_x, [6]=res_y, [7]=project_dir, [8]=project_ext
+		if (argCount > 7) {
+			var dir: String = Krom.getArg(7);
+			if (dir != null && dir != "" && !StringTools.startsWith(dir, "--")) {
+				projectDir = StringTools.replace(dir, "/", "\\");
+			}
+			var ext: String = Krom.getArg(8);
+			if (ext != null && ext != "" && !StringTools.startsWith(ext, "--")) {
+				projectExt = ext;
+			}
+			buildPath = "/Libraries/koui_editor/tools/" + projectExt;
+		} else {
+			projectDir = StringTools.replace(Krom.getFilesLocation(), "/", "\\") + "/../../..";
+			projectExt = "d3d11"; // TODO: check if d3d11 or opengl
+			buildPath = "/tools/" + projectExt;
+		}
+
+		trace('Canvas name: ${canvasName}');
+		trace('Project dir: ${projectDir}');
 	}
 
 	/**
@@ -88,35 +94,14 @@ class CanvasUtils {
 	 * Path: Bundled/koui_canvas/[canvasName].json
 	 */
 	public static function getCanvasPath(): String {
-		var basePath: String = Krom.getFilesLocation();
-		basePath = StringTools.replace(basePath, "\\", "/");
-
-		// basePath is: .../koui_editor/build_koui_editor/debug/krom
-		// Navigate up 3 levels to project root, then to Bundled/koui_canvas
-		var parts: Array<String> = basePath.split("/");
-		parts.pop(); // remove "krom"
-		parts.pop(); // remove "debug"
-		parts.pop(); // remove "build_koui_editor"
-
-		var projectRoot: String = parts.join("/");
-		return projectRoot + "/Bundled/koui_canvas/" + canvasName + ".json";
+		return projectDir + "/Bundled/koui_canvas/" + canvasName + ".json";
 	}
 
 	/**
 	 * Gets the directory path for canvas files.
 	 */
 	public static function getCanvasDir(): String {
-		var basePath: String = Krom.getFilesLocation();
-		basePath = StringTools.replace(basePath, "\\", "/");
-
-		// Split and remove last 3 segments
-		var parts: Array<String> = basePath.split("/");
-		parts.pop(); // remove "krom"
-		parts.pop(); // remove "debug"
-		parts.pop(); // remove "build_koui_editor"
-
-		var projectRoot: String = parts.join("/");
-		return projectRoot + "/Bundled/koui_canvas";
+		return projectDir + "/Bundled/koui_canvas";
 	}
 
 	/**
@@ -125,9 +110,38 @@ class CanvasUtils {
 	public static function ensureCanvasDir(): Void {
 		var dir: String = getCanvasDir();
 		var cmd: String = kha.System.systemId == "Windows"
-			? 'cmd /c if not exist "' + StringTools.replace(dir, "/", "\\") + '" mkdir "' + StringTools.replace(dir, "/", "\\") + '"'
+			? 'cmd /c if not exist "' + StringTools.replace(dir, "\\", "/") + '" mkdir "' + StringTools.replace(dir, "\\", "/") + '"'
 			: 'mkdir -p "' + dir + '"';
 		Krom.sysCommand(cmd);
+	}
+
+	/**
+	 * Reloads the theme from the project's Assets/ui_override.ksn file.
+	 */
+	public static function refreshTheme(): Void {
+		var assetsPath: String = projectDir + "/Assets/ui_override.ksn";
+		var blob: js.lib.ArrayBuffer = Krom.loadBlob(assetsPath);
+
+		if (blob != null) {
+			var themeContent: String = haxe.io.Bytes.ofData(blob).toString();
+			var error: String = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
+
+			if (error != null) {
+				trace('Theme reload ERROR: ${error}');
+			} else {
+				var buildPath: String = projectDir + buildPath + "/ui_override.ksn";
+				try {
+				var bytes: haxe.io.Bytes = haxe.io.Bytes.ofString(themeContent);
+				Krom.fileSaveBytes(buildPath, bytes.getData());
+					trace('Theme reloaded successfully from: ${assetsPath}');
+					trace('Theme copied to build directory: ${buildPath}');
+				} catch (e: Dynamic) {
+					trace('Theme reloaded but failed to copy to build directory: ${e}');
+				}
+			}
+		} else {
+			trace('Theme file not found: ${assetsPath}');
+		}
 	}
 
 	/**
@@ -153,24 +167,7 @@ class CanvasUtils {
 	 * Loads the canvas from Bundled/koui_canvas/[canvasName].json if it exists.
 	 */
 	public static function loadCanvas(): Void {
-		var basePath: String = Krom.getFilesLocation();
-
-		// Try multiple path formats (relative and absolute)
-		var paths: Array<String> = [
-			basePath + "/../../../Bundled/koui_canvas/" + canvasName + ".json",
-			getCanvasPath(),
-		];
-
-		var blob: js.lib.ArrayBuffer = null;
-
-		for (path in paths) {
-			var _blob: js.lib.ArrayBuffer = Krom.loadBlob(path);
-			if (_blob != null) {
-				blob = _blob;
-				break;
-			}
-		}
-
+		var blob: js.lib.ArrayBuffer = Krom.loadBlob(getCanvasPath());
 		if (blob == null) {
 			trace('Canvas file not found: ${canvasName}');
 			return;
