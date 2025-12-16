@@ -76,10 +76,6 @@ class PropertiesPanel {
                     uiBase.ui.text("No element selected");
                 }
             }
-
-            if (uiBase.ui.tab(settingsTabHandle, "Settings")) {
-                // Settings content here
-            }
 		}
     }
 
