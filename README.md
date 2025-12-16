@@ -7,7 +7,7 @@ A [Koui](https://gitlab.com/koui/Koui) editor for [Armory 3D](https://armory3d.o
 - `git clone https://github.com/moisesjpelaez/koui_editor.git` into `Libraries` folder
 - Create a `Subprojects` folder alongside your `.blend` file
 - `git clone https://gitlab.com/koui/Koui.git` into the `Subprojects` folder
-- add the `project.addAssets("Assets/ui_override.ksn");` flag to your `khafile`
+- add the `project.addAssets("Assets/ui_override.ksn");` to your `khafile`
 
 ## License
 This project is licensed under the terms of the zlib License. See the [LICENSE](LICENSE.md) file for details.
