@@ -50,8 +50,8 @@ class KouiEditor extends iron.Trait {
 	var panStartY: Float = 0;
 	var canvasPanX: Float = 100; // Initial left padding
 	var canvasPanY: Float = 75;  // Initial top padding
-	var initialScale: Float = 1.0;
-	var currentScale: Float = 1.0;
+	var initialScale: Float = 0.8;
+	var currentScale: Float = 0.8;
 
 	// Constants
 	var borderSize: Int = 8;
@@ -62,6 +62,7 @@ class KouiEditor extends iron.Trait {
 	var hierarchyPanel: HierarchyPanel = new HierarchyPanel();
 	var propertiesPanel: PropertiesPanel = new PropertiesPanel();
 	var elementsPanel: ElementsPanel = new ElementsPanel();
+	var baseH: Int = 576;
 
 	// HACK: ensure canvas is loaded after Koui init
 	var canvasLoaded: Bool = false;
@@ -87,8 +88,8 @@ class KouiEditor extends iron.Trait {
 			Koui.init(function() {
 				Koui.setPadding(100, 100, 75, 75);
 
-				var canvasWidth: Int = Std.int(App.w() * 0.85);
-				var canvasHeight: Int = Std.int(App.h() * 0.85);
+				var canvasWidth: Int = Std.int(App.w());
+				var canvasHeight: Int = Std.int(App.h());
 
 				var argCount = Krom.getArgCount();
 				// Arguments are: [0]=krom_path, [1]=koui_editor_path, [2]=koui_editor_path,
@@ -101,6 +102,7 @@ class KouiEditor extends iron.Trait {
 						canvasHeight = resY;
 					}
 				}
+				baseH = canvasHeight;
 
 				anchorPane = new AnchorPane(0, 0, canvasWidth, canvasHeight);
 				anchorPane.setTID("fixed_anchorpane");
@@ -205,7 +207,10 @@ class KouiEditor extends iron.Trait {
 		}
 
 		// Handle '1' key reset
-		if (keyboard.started("1")) {
+		if (keyboard.started("1")) resetCanvasView();
+	}
+
+	function resetCanvasView() {
 			canvasPanX = 0;
 			canvasPanY = 0;
 
@@ -216,7 +221,6 @@ class KouiEditor extends iron.Trait {
 			@:privateAccess Koui.anchorPane.elemUpdated(anchorPane);
 
 			sizeInit = false;
-		}
 	}
 
 	function updateDragAndDrop() {
@@ -328,9 +332,8 @@ class KouiEditor extends iron.Trait {
 
 	function onResized() {
 		if (!sizeInit) {
-			Koui.uiScale = (App.h() - uiBase.getBottomH()) / 576;
-			initialScale = Koui.uiScale;
-			currentScale = initialScale;
+			Koui.uiScale = ((App.h() - uiBase.getBottomH()) / baseH) * initialScale;
+			currentScale = Koui.uiScale;
 		}
 		@:privateAccess Koui.onResize(App.w() - uiBase.getSidebarW(), App.h() - uiBase.getBottomH());
 		if (Scene.active != null && Scene.active.camera != null) {
