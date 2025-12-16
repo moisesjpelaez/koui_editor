@@ -1,9 +1,11 @@
 package arm.tools;
 
-import arm.ElementData;
+import arm.ElementsData;
 import koui.elements.Element;
 
 class NameUtils {
+	static var elements: Array<THierarchyEntry> = ElementsData.data.elements;
+
 	public static function generateName(element: Element, parent: Element): String {
 		var baseName: String = Type.getClassName(Type.getClass(element)).split(".").pop();
 		var siblings: Array<Element> = HierarchyUtils.getChildren(parent);
@@ -26,7 +28,7 @@ class NameUtils {
 		// Collect sibling names (excluding the element itself)
 		for (sibling in siblings) {
 			if (sibling != element) {
-				for (entry in ElementData.data.elements) {
+				for (entry in elements) {
 					if (entry.element == sibling) {
 						existingNames.push(entry.key);
 						break;

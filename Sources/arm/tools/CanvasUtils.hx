@@ -1,7 +1,7 @@
 package arm.tools;
 
-import arm.ElementData;
-import arm.ElementData.THierarchyEntry;
+import arm.ElementsData;
+import arm.ElementsData.THierarchyEntry;
 import arm.ElementEvents;
 
 import haxe.Json;
@@ -16,7 +16,7 @@ typedef TCanvasData = {
 	var name: String;
 	var version: String;
 	var canvas: TCanvasSettings;
-	var elements: Array<TElementData>;
+	var elements: Array<TElementsData>;
 }
 
 typedef TCanvasSettings = {
@@ -24,7 +24,7 @@ typedef TCanvasSettings = {
 	var height: Int;
 }
 
-typedef TElementData = {
+typedef TElementsData = {
 	var key: String;
 	var type: String;
 	var tID: String;
@@ -50,25 +50,24 @@ class CanvasUtils {
 	public static var buildPath: String = "";
 	public static var projectExt: String = "";
 
+	static var elementsData: ElementsData = ElementsData.data;
+    static var elements: Array<THierarchyEntry> = ElementsData.data.elements;
+
 	/**
 	 * Initializes the canvas name from command line arguments.
 	 * Canvas name (trait name from Blender) is at Arg[3]
 	 */
 	public static function init(): Void {
-		// TODO: refactor in KouiEditor.init()
+		// Args: [0]=krom_path, [1]=assets, [2]=shaders, [3]=canvas_name, [4]=uiscale, [5]=res_x, [6]=res_y, [7]=project_dir, [8]=project_ext
 		var argCount: Int = Krom.getArgCount();
 
-		// Canvas name is at Arg[3]: the trait name from Blender
 		if (argCount > 3) {
 			var name: String = Krom.getArg(3);
-			// Skip if it's a flag (starts with --)
 			if (name != null && name != "" && !StringTools.startsWith(name, "--")) {
 				canvasName = name;
 			}
 		}
 
-		// Project directory is at Arg[7]: the project path from Blender
-		// Args: [0]=krom_path, [1]=assets, [2]=shaders, [3]=canvas_name, [4]=uiscale, [5]=res_x, [6]=res_y, [7]=project_dir, [8]=project_ext
 		if (argCount > 7) {
 			var dir: String = Krom.getArg(7);
 			if (dir != null && dir != "" && !StringTools.startsWith(dir, "--")) {
@@ -79,9 +78,13 @@ class CanvasUtils {
 				projectExt = ext;
 			}
 			buildPath = "/Libraries/koui_editor/tools/" + projectExt;
-		} else {
+		} else { // Fallback for standalone testing
 			projectDir = StringTools.replace(Krom.getFilesLocation(), "/", "\\") + "/../../..";
-			projectExt = "d3d11"; // TODO: check if d3d11 or opengl
+			#if kha_opengl
+			projectExt = "opengl";
+			#else
+			projectExt = "d3d11";
+			#end
 			buildPath = "/tools/" + projectExt;
 		}
 
@@ -110,7 +113,7 @@ class CanvasUtils {
 	public static function ensureCanvasDir(): Void {
 		var dir: String = getCanvasDir();
 		var cmd: String = kha.System.systemId == "Windows"
-			? 'cmd /c if not exist "' + StringTools.replace(dir, "\\", "/") + '" mkdir "' + StringTools.replace(dir, "\\", "/") + '"'
+			? 'cmd /c if not exist "' + StringTools.replace(dir, "/", "\\") + '" mkdir "' + StringTools.replace(dir, "/", "\\") + '"'
 			: 'mkdir -p "' + dir + '"';
 		Krom.sysCommand(cmd);
 	}
@@ -188,12 +191,12 @@ class CanvasUtils {
 	 * Serializes the current canvas state to a TCanvasData structure.
 	 */
 	static function serializeCanvas(): TCanvasData {
-		var root: AnchorPane = ElementData.root;
-		var elementsData: Array<TElementData> = [];
+		var root: AnchorPane = elementsData.root;
+		var elementsData: Array<TElementsData> = [];
 
 		// Build a map of element -> key for parent references
 		var elementKeyMap: Map<Element, String> = new Map();
-		for (entry in ElementData.data.elements) {
+		for (entry in elements) {
 			elementKeyMap.set(entry.element, entry.key);
 		}
 
@@ -214,7 +217,7 @@ class CanvasUtils {
 	/**
 	 * Recursively serializes elements in hierarchy order.
 	 */
-	static function serializeElementsRecursive(parent: Element, elementKeyMap: Map<Element, String>, output: Array<TElementData>): Void {
+	static function serializeElementsRecursive(parent: Element, elementKeyMap: Map<Element, String>, output: Array<TElementsData>): Void {
 		// Get children of this parent
 		var children: Array<Element> = HierarchyUtils.getChildren(parent);
 
@@ -226,7 +229,7 @@ class CanvasUtils {
 
 			// Find the entry for this child
 			var entry: THierarchyEntry = null;
-			for (e in ElementData.data.elements) {
+			for (e in elements) {
 				if (e.element == child) {
 					entry = e;
 					break;
@@ -234,7 +237,7 @@ class CanvasUtils {
 			}
 
 			if (entry != null) {
-				var elementData: TElementData = serializeElement(entry, elementKeyMap);
+				var elementData: TElementsData = serializeElement(entry, elementKeyMap);
 				if (elementData != null) {
 					output.push(elementData);
 				}
@@ -246,9 +249,9 @@ class CanvasUtils {
 	}
 
 	/**
-	 * Serializes a single element to TElementData.
+	 * Serializes a single element to TElementsData.
 	 */
-	static function serializeElement(entry: THierarchyEntry, elementKeyMap: Map<Element, String>): TElementData {
+	static function serializeElement(entry: THierarchyEntry, elementKeyMap: Map<Element, String>): TElementsData {
 		var element: Element = entry.element;
 		var type: String = getElementType(element);
 
@@ -328,7 +331,7 @@ class CanvasUtils {
 	 * Deserializes a canvas from TCanvasData and rebuilds the editor state.
 	 */
 	static function deserializeCanvas(canvasData: TCanvasData): Void {
-		var root: AnchorPane = ElementData.root;
+		var root: AnchorPane = elementsData.root;
 		// Clear existing elements (except root)
 		clearCanvas();
 
@@ -356,7 +359,7 @@ class CanvasUtils {
 			ElementEvents.elementAdded.emit({ key: elemData.key, element: element });
 
 			// Now update the key to the loaded value (KouiEditor generated a unique name)
-			for (entry in ElementData.data.elements) {
+			for (entry in elements) {
 				if (entry.element == element) {
 					entry.key = elemData.key;
 					break;
@@ -381,9 +384,9 @@ class CanvasUtils {
 	}
 
 	/**
-	 * Creates an element from TElementData.
+	 * Creates an element from TElementsData.
 	 */
-	static function createElementFromData(data: TElementData): Element {
+	static function createElementFromData(data: TElementsData): Element {
 		var element: Element = null;
 
 		switch (data.type) {
@@ -441,17 +444,16 @@ class CanvasUtils {
 	 * Clears all elements from the canvas (except root AnchorPane).
 	 */
 	static function clearCanvas(): Void {
-		var root: AnchorPane = ElementData.root;
-
+		var root: AnchorPane = elementsData.root;
 		// Remove all elements from root
 		var children: Array<Element> = HierarchyUtils.getChildren(root).copy();
 		for (child in children) {
 			root.remove(child);
 		}
 
-		// Clear ElementData but keep the root - clear in-place to preserve array reference
+		// Clear ElementsData but keep the root - clear in-place to preserve array reference
 		// (HierarchyPanel holds a reference to this array)
-		ElementData.data.elements.resize(0);
-		ElementData.data.elements.push({ key: "AnchorPane", element: root });
+		elements.resize(0);
+		elements.push({ key: "AnchorPane", element: root });
 	}
 }

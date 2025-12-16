@@ -64,10 +64,10 @@ class ImageUtils {
 	}
 
 	/**
-	 * Helper to get a tile rectangle from a 50x50 icon atlas.
+	 * Helper to get a tile rectangle from an atlas.
 	 */
-	public static inline function tile(x: Int, y: Int, ?factor: Int = 50): TTileRect {
-		return { x: x * factor, y: y * factor, w: factor, h: factor };
+	public static inline function tile(x: Int, y: Int, ?size: Int = 50): TTileRect {
+		return { x: x * size, y: y * size, w: size, h: size };
 	}
 }
 

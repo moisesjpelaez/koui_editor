@@ -1,6 +1,6 @@
 package arm;
 
-import arm.ElementData;
+import arm.ElementsData;
 import arm.ElementEvents;
 import arm.base.Base;
 import arm.base.UIBase;
@@ -35,8 +35,8 @@ class KouiEditor extends iron.Trait {
 	var sizeInit: Bool = false;
 
 	// Created elements
-	var elementsData: ElementData;
-	var elements: Array<THierarchyEntry> = [];
+	var elementsData: ElementsData = ElementsData.data;
+	var elements: Array<THierarchyEntry> = ElementsData.data.elements;
 
 	// Drag and drop state
 	var selectedElement: Element = null;
@@ -48,8 +48,8 @@ class KouiEditor extends iron.Trait {
 	var isPanning: Bool = false;
 	var panStartX: Float = 0;
 	var panStartY: Float = 0;
-	var canvasPanX: Float = 100; // Initial left padding
-	var canvasPanY: Float = 75;  // Initial top padding
+	var canvasPanX: Float = 0;
+	var canvasPanY: Float = 0;
 	var initialScale: Float = 0.8;
 	var currentScale: Float = 0.8;
 
@@ -71,9 +71,6 @@ class KouiEditor extends iron.Trait {
 		super();
 
 		Assets.loadEverything(function() {
-			elementsData = ElementData.data;
-			elements = elementsData.elements;
-
 			// Initialize framework
 			Base.font = Assets.fonts.font_default;
 			Base.init();
@@ -110,7 +107,7 @@ class KouiEditor extends iron.Trait {
 				// Initialize canvas name from command line args
 				Koui.add(anchorPane, Anchor.MiddleCenter);
 				elements.push({ key: "AnchorPane", element: anchorPane });
-				ElementData.root = anchorPane;
+				elementsData.root = anchorPane;
 				hierarchyPanel.onElementAdded(elements[0]); // Manually register the root element in the hierarchy
 
 				CanvasUtils.refreshTheme();
@@ -131,7 +128,7 @@ class KouiEditor extends iron.Trait {
 
 	function update() {
 		if (uiBase == null) return;
-		if (!canvasLoaded) {
+		if (!canvasLoaded) { // HACK: ensure canvas is loaded after Koui init
 			CanvasUtils.loadCanvas();
 			canvasLoaded = true;
 		}

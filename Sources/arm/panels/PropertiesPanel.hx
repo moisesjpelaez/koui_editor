@@ -1,6 +1,6 @@
 package arm.panels;
 
-import arm.ElementData;
+import arm.ElementsData;
 import arm.ElementEvents;
 import arm.types.Enums;
 import arm.base.UIBase;
@@ -37,6 +37,9 @@ class PropertiesPanel {
     var buttonIconSizeHandle: Handle;
     var buttonIsPressedHandle: Handle;
     var buttonIsToggleHandle: Handle;
+
+    var elementsData: ElementsData = ElementsData.data;
+    var elements: Array<THierarchyEntry> = ElementsData.data.elements;
 
     public function new() {
         propertiesTabHandle = new Handle();
@@ -83,9 +86,9 @@ class PropertiesPanel {
     function drawProperties(uiBase: UIBase): Void {
         var ui: Zui = uiBase.ui;
 
-        // Get element name from ElementData
+        // Get element name from ElementsData
         var elemName = "";
-        for (entry in ElementData.data.elements) {
+        for (entry in elements) {
             if (entry.element == selectedElement) {
                 elemName = entry.key;
                 break;
@@ -101,7 +104,7 @@ class PropertiesPanel {
         nameHandle.text = elemName;
         var newName: String = ui.textInput(nameHandle, "Key", Right);
         if (nameHandle.changed) {
-            if (newName != null && newName != "") ElementData.data.updateElementKey(selectedElement, newName);
+            if (newName != null && newName != "") elementsData.updateElementKey(selectedElement, newName);
         }
 
         // TID - editable text input
@@ -226,7 +229,7 @@ class PropertiesPanel {
         if (element != null) {
             // Find element name
             var elemName: String = "";
-            for (entry in ElementData.data.elements) {
+            for (entry in elements) {
                 if (entry.element == element) {
                     elemName = entry.key;
                     break;

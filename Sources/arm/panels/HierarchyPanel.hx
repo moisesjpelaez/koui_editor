@@ -1,6 +1,6 @@
 package arm.panels;
 
-import arm.ElementData;
+import arm.ElementsData;
 import arm.ElementEvents;
 import arm.KouiEditor;
 import arm.base.UIBase;
@@ -27,7 +27,8 @@ class HierarchyPanel {
 	var sceneTabs: Array<String> = ["Scene"];
 	var sceneCounter: Int = 1;
 
-    var elements: Array<THierarchyEntry> = [];
+	var elementsData: ElementsData = ElementsData.data;
+    var elements: Array<THierarchyEntry> = ElementsData.data.elements;
 
 	// Expand/collapse state - keyed by element reference
 	var expanded: ObjectMap<Element, Bool> = new ObjectMap();
@@ -42,7 +43,6 @@ class HierarchyPanel {
 	var dragStartY: Float = 0;
 
 	public function new() {
-        elements = ElementData.data.elements;
 		sceneTabHandle = new Handle();
 
 		ElementEvents.elementAdded.connect(onElementAdded);
@@ -174,7 +174,7 @@ class HierarchyPanel {
 
 		// Selection on click start
 		if (uiBase.ui.isPushed) {
-			if (entry.element == ElementData.root) return;
+			if (entry.element == elementsData.root) return;
             selectedElement = entry.element;
 			ElementEvents.elementSelected.emit(entry.element);
 
@@ -320,7 +320,7 @@ class HierarchyPanel {
     }
 
     public function onElementAdded(entry: THierarchyEntry): Void {
-		if (entry.element == ElementData.root) return;
+		if (entry.element == elementsData.root) return;
         onElementSelected(entry.element);
         registerChildren(entry.element);
     }

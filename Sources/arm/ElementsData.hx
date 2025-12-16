@@ -9,9 +9,9 @@ typedef THierarchyEntry = {
 	var element: Element;
 }
 
-class ElementData {
-    public static var data: ElementData = new ElementData();
-    public static var root: AnchorPane;
+class ElementsData {
+    public static var data: ElementsData = new ElementsData();
+    public var root: AnchorPane;
     public var elements: Array<THierarchyEntry> = [];
 
     public function new() {
