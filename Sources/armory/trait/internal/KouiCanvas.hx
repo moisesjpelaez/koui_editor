@@ -48,15 +48,8 @@ private typedef TElementsData = {
 	var properties: Dynamic;
 }
 
-private typedef TButtonEvents = {
-	var onPressed: Signal;
-	var onHold: Signal;
-	var onReleased: Signal;
-}
-
 // KouiCanvas types
 // TODO: Add more element typedefs as needed
-// Remove `elementMap` once they are all added
 typedef TButton = {
 	var button: Button;
 	var onPressed: Signal;
@@ -351,7 +344,7 @@ class KouiCanvas extends Trait {
 	 * @return The element, or null if not found
 	 */
 	public function getElement(key: String): Null<Element> {
-		var element = elementMap.get(key);
+		var element: Element = elementMap.get(key);
 		if (element == null) trace('[KouiCanvas] Element not found: "$key"');
 		return element;
 	}
@@ -371,7 +364,7 @@ class KouiCanvas extends Trait {
 	 * @return The element cast to type T, or null
 	 */
 	public function getElementAs<T: Element>(cls: Class<T>, key: String): Null<T> {
-		var element = elementMap.get(key);
+		var element: Element = elementMap.get(key);
 		if (element == null) {
 			trace('[KouiCanvas] Element not found: "$key"');
 			return null;
@@ -449,7 +442,7 @@ class KouiCanvas extends Trait {
 	 * @return The active KouiCanvas trait, or null if not found
 	 */
 	public static function getActiveCanvas(): Null<KouiCanvas> {
-		var activeCanvas = iron.Scene.active.getTrait(KouiCanvas);
+		var activeCanvas: Null<KouiCanvas> = iron.Scene.active.getTrait(KouiCanvas);
 		if (activeCanvas == null) {
 			activeCanvas = iron.Scene.active.camera.getTrait(KouiCanvas);
 		}
