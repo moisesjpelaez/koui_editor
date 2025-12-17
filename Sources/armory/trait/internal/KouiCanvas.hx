@@ -56,6 +56,7 @@ private typedef TButtonEvents = {
 
 // KouiCanvas types
 // TODO: Add more element typedefs as needed
+// Remove `elementMap` once they are all added
 typedef TButton = {
 	var button: Button;
 	var onPressed: Signal;
