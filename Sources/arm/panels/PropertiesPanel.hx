@@ -171,15 +171,9 @@ class PropertiesPanel {
             }
         }
 
-        // FIXME: prevent elements from deselecting if dropdown menu overlaps the Properties Panel
-        // Anchor - dropdown
-        var anchorNames = ["Top Left", "Top Center", "Top Right", "Middle Left", "Middle Center", "Middle Right", "Bottom Left", "Bottom Center", "Bottom Right", "Follow Layout"];
-        anchorHandle.position = selectedElement.anchor;
-        var newAnchor = ui.combo(anchorHandle, anchorNames, "Anchor", true, Right);
-        if (anchorHandle.changed) {
-            selectedElement.anchor = cast(anchorHandle.position, Anchor);
-            selectedElement.invalidateElem();
-        }
+        // Anchor - 3x3 grid selector
+        ui.text("Anchor", Left);
+        drawAnchorGrid(ui, selectedElement);
 
         // Position - two columns for X and Y
         ui.text("Position", Left);
@@ -242,6 +236,66 @@ class PropertiesPanel {
         // Disabled checkbox
         disabledHandle.selected = selectedElement.disabled;
         selectedElement.disabled = ui.check(disabledHandle, "Disabled");
+    }
+
+    function drawAnchorGrid(ui: Zui, element: Element) {
+        var currentAnchor = element.anchor;
+
+        // Define the anchor positions in a 3x3 grid
+        var anchors = [
+            [Anchor.TopLeft, Anchor.TopCenter, Anchor.TopRight],
+            [Anchor.MiddleLeft, Anchor.MiddleCenter, Anchor.MiddleRight],
+            [Anchor.BottomLeft, Anchor.BottomCenter, Anchor.BottomRight]
+        ];
+
+        // Store original colors and sizes
+        var origButtonCol = ui.t.BUTTON_COL;
+        var origButtonHoverCol = ui.t.BUTTON_HOVER_COL;
+        var origButtonPressedCol = ui.t.BUTTON_PRESSED_COL;
+        var origButtonH = ui.t.BUTTON_H;
+        var origElementH = ui.t.ELEMENT_H;
+        var origElementOffset = ui.t.ELEMENT_OFFSET;
+
+        // Make buttons square and smaller, reduce spacing
+        var buttonSize = Std.int(origButtonH * 0.8);
+        ui.t.BUTTON_H = buttonSize;
+        ui.t.ELEMENT_H = buttonSize;
+        ui.t.ELEMENT_OFFSET = 4;
+
+        // Draw 3 rows
+        for (row in 0...3) {
+            ui.row([1/3, 1/3, 1/3]);
+
+            for (col in 0...3) {
+                var anchor = anchors[row][col];
+                var isSelected = (anchor == currentAnchor);
+
+                // Highlight selected anchor with different color
+                if (isSelected) {
+                    ui.t.BUTTON_COL = ui.t.HIGHLIGHT_COL;
+                    ui.t.BUTTON_HOVER_COL = ui.t.HIGHLIGHT_COL;
+                    ui.t.BUTTON_PRESSED_COL = ui.t.HIGHLIGHT_COL;
+                }
+
+                // Use simple icon representation
+                if (ui.button("")) {
+                    element.anchor = anchor;
+                    element.invalidateElem();
+                }
+
+                // Restore colors if they were changed
+                if (isSelected) {
+                    ui.t.BUTTON_COL = origButtonCol;
+                    ui.t.BUTTON_HOVER_COL = origButtonHoverCol;
+                    ui.t.BUTTON_PRESSED_COL = origButtonPressedCol;
+                }
+            }
+        }
+
+        // Restore original button height and spacing
+        ui.t.BUTTON_H = origButtonH;
+        ui.t.ELEMENT_H = origElementH;
+        ui.t.ELEMENT_OFFSET = origElementOffset;
     }
 
     function drawElementProperties(uiBase: UIBase) {
