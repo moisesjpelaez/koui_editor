@@ -368,7 +368,8 @@ class KouiCanvas extends Trait {
 		return elementMap.keys();
 	}
 
-	public function connectButtonEvent(button: Button, eventType: ButtonEvent, callback: Void->Void): Void {
+	public function connectButtonEvent(buttonKey: String, eventType: ButtonEvent, callback: Void->Void): Void {
+		var button: Button = getElementAs(Button, buttonKey);
 		var btnEvents: TButtonEvents = buttonsMap.get(button);
 		if (btnEvents != null) {
 			switch (eventType) {
@@ -382,7 +383,8 @@ class KouiCanvas extends Trait {
 		}
 	}
 
-	public function disconnectButtonEvent(button: Button, eventType: ButtonEvent, callback: Void->Void): Void {
+	public function disconnectButtonEvent(buttonKey: String, eventType: ButtonEvent, callback: Void->Void): Void {
+		var button: Button = getElementAs(Button, buttonKey);
 		var btnEvents: TButtonEvents = buttonsMap.get(button);
 		if (btnEvents != null) {
 			switch (eventType) {
