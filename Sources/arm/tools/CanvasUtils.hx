@@ -1,5 +1,6 @@
 package arm.tools;
 
+import arm.CanvasSettings;
 import arm.ElementsData;
 import arm.ElementsData.THierarchyEntry;
 import arm.ElementEvents;
@@ -22,6 +23,12 @@ typedef TCanvasData = {
 typedef TCanvasSettings = {
 	var width: Int;
 	var height: Int;
+	var settings: {
+		var scaleOnResize: Bool;
+		var expandHorizontal: Bool;
+		var expandVertical: Bool;
+		var autoExpand: Bool;
+	};
 }
 
 typedef TElementsData = {
@@ -182,6 +189,7 @@ class CanvasUtils {
 
 			deserializeCanvas(canvasData);
 			trace('Canvas loaded: ${canvasName}');
+			ElementEvents.canvasLoaded.emit();
 		} catch (e: Dynamic) {
 			trace('Failed to parse canvas: ${e}');
 		}
@@ -208,7 +216,13 @@ class CanvasUtils {
 			version: FORMAT_VERSION,
 			canvas: {
 				width: root.width,
-				height: root.height
+				height: root.height,
+				settings: {
+					scaleOnResize: CanvasSettings.scaleOnResize,
+					expandHorizontal: CanvasSettings.expandHorizontal,
+					expandVertical: CanvasSettings.expandVertical,
+					autoExpand: CanvasSettings.autoExpand
+				}
 			},
 			elements: elementsData
 		};
@@ -338,6 +352,14 @@ class CanvasUtils {
 		// Resize canvas if needed
 		root.width = canvasData.canvas.width;
 		root.height = canvasData.canvas.height;
+
+		// Load canvas settings
+		if (canvasData.canvas.settings != null) {
+			CanvasSettings.scaleOnResize = canvasData.canvas.settings.scaleOnResize;
+			CanvasSettings.expandHorizontal = canvasData.canvas.settings.expandHorizontal;
+			CanvasSettings.expandVertical = canvasData.canvas.settings.expandVertical;
+			CanvasSettings.autoExpand = canvasData.canvas.settings.autoExpand;
+		}
 
 		// First pass: create all elements and store in a map
 		var elementMap: Map<String, Element> = new Map();

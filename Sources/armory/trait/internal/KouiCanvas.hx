@@ -1,5 +1,6 @@
 package armory.trait.internal;
 
+import iron.App;
 import iron.Trait;
 import koui.Koui;
 import koui.elements.Element;
@@ -19,6 +20,14 @@ private typedef TCanvasData = {
 private typedef TCanvasSettings = {
 	var width: Int;
 	var height: Int;
+	var settings: TSettings;
+}
+
+private typedef TSettings = {
+	var scaleOnResize: Bool;
+	var expandHorizontal: Bool;
+	var expandVertical: Bool;
+	var autoExpand: Bool;
 }
 
 private typedef TElementsData = {
@@ -69,6 +78,14 @@ class KouiCanvas extends Trait {
 	/** Whether the canvas is visible */
 	private var canvasVisible: Bool = true;
 
+	var scaleOnResize: Bool = false;
+	var expandHorizontal: Bool = false;
+	var expandVertical: Bool = false;
+	var autoExpand: Bool = false;
+
+	var baseH: Int = 576;
+	var baseW: Int = 1024;
+
 	/**
 	 * Create a new KouiCanvas trait.
 	 * @param canvasName Name of the canvas (without .json extension)
@@ -89,12 +106,19 @@ class KouiCanvas extends Trait {
 					return;
 				}
 
+				var canvasData: TCanvasData = null;
 				try {
-					var canvasData: TCanvasData = haxe.Json.parse(blob.toString());
+					canvasData = haxe.Json.parse(blob.toString());
+				} catch (e: Dynamic) {
+					trace('[KouiCanvas] Failed to parse canvas JSON: $e');
+					return;
+				}
+
+				try {
 					buildCanvas(canvasData);
 					trace('[KouiCanvas] Canvas loaded: $canvasName');
 				} catch (e: Dynamic) {
-					trace('[KouiCanvas] Failed to parse canvas JSON: $e');
+					trace('[KouiCanvas] Failed to build canvas: $e');
 				}
 			});
 		});
@@ -121,6 +145,7 @@ class KouiCanvas extends Trait {
 				rootPane = null;
 			}
 			elementMap.clear();
+			if (scaleOnResize) App.resized.disconnect(onAppResized);
 		});
 	}
 
@@ -128,6 +153,19 @@ class KouiCanvas extends Trait {
 	 * Build the canvas from parsed JSON data.
 	 */
 	private function buildCanvas(canvasData: TCanvasData): Void {
+		// Settings
+		if (canvasData.canvas.settings != null) {
+			scaleOnResize = canvasData.canvas.settings.scaleOnResize;
+			expandHorizontal = canvasData.canvas.settings.expandHorizontal;
+			expandVertical = canvasData.canvas.settings.expandVertical;
+			autoExpand = canvasData.canvas.settings.autoExpand;
+		}
+		if (scaleOnResize != null && scaleOnResize) {
+			App.resized.connect(onAppResized);
+			baseH = canvasData.canvas.height;
+			baseW = canvasData.canvas.width;
+		}
+
 		// Create root pane with canvas dimensions
 		rootPane = new AnchorPane(0, 0, canvasData.canvas.width, canvasData.canvas.height);
 		elementMap.set("AnchorPane", rootPane);
@@ -222,6 +260,19 @@ class KouiCanvas extends Trait {
 		}
 
 		return element;
+	}
+
+	function onAppResized(w: Int, h: Int): Void {
+		if (expandHorizontal) {
+			Koui.uiScale = w / baseH;
+		} else if (expandVertical) {
+			Koui.uiScale = h / baseW;
+		} else {
+			var scaleW = w / baseW;
+			var scaleH = h / baseH;
+			Koui.uiScale = Math.min(scaleW, scaleH);
+		}
+		@:privateAccess Koui.onResize(w, h);
 	}
 
 	// =========================================================================

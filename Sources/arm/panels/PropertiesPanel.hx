@@ -1,5 +1,6 @@
 package arm.panels;
 
+import arm.CanvasSettings;
 import arm.ElementsData;
 import arm.ElementEvents;
 import arm.types.Enums;
@@ -13,9 +14,16 @@ import zui.Zui;
 import zui.Zui.Handle;
 
 class PropertiesPanel {
-    var propertiesTabHandle: Handle;
-    var settingsTabHandle: Handle;
+    var tabHandle: Handle;
 
+    // Settings
+    var scaleOnResizeHandle: Handle;
+    var scaleOnResizeGroup: Handle;
+    var expandHorizontalHandle: Handle;
+    var expandVerticalHandle: Handle;
+    var autoExpandHandle: Handle;
+
+    // Properties
     var selectedElement: Element = null;
 
     // Element handles
@@ -42,8 +50,11 @@ class PropertiesPanel {
     var elements: Array<THierarchyEntry> = ElementsData.data.elements;
 
     public function new() {
-        propertiesTabHandle = new Handle();
-        settingsTabHandle = new Handle();
+        tabHandle = new Handle({position: 0});
+
+        // Initialize settings handles
+        scaleOnResizeHandle = new Handle({selected: true});
+        scaleOnResizeGroup = new Handle({position: 0});
 
         // Initialize property handles
         nameHandle = new Handle({text: ""});
@@ -65,15 +76,51 @@ class PropertiesPanel {
         // TODO: button events. Use Signals?
 
         ElementEvents.elementSelected.connect(onElementSelected);
+        ElementEvents.canvasLoaded.connect(onCanvasLoaded);
     }
 
     public function draw(uiBase: UIBase, params: Dynamic): Void {
         if (uiBase.ui.window(uiBase.hwnds[PanelProperties], params.tabx, params.h0, params.w, params.h1)) {
-            if (uiBase.ui.tab(propertiesTabHandle, "Properties")) {
+            if (uiBase.ui.tab(tabHandle, "Properties")) {
                 if (selectedElement != null) {
                     drawProperties(uiBase);
                 } else {
                     uiBase.ui.text("No element selected");
+                }
+            }
+
+            if (uiBase.ui.tab(tabHandle, "Settings")) {
+                uiBase.ui.text("Canvas Scale", Center);
+                uiBase.ui.separator();
+
+                CanvasSettings.scaleOnResize = uiBase.ui.check(scaleOnResizeHandle, "Scale on Resize");
+
+                if (CanvasSettings.scaleOnResize) {
+                    uiBase.ui.text("Scale Mode");
+
+                    // Set radio selection based on current settings
+                    if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 0;
+                    else if (CanvasSettings.expandVertical) scaleOnResizeGroup.position = 1;
+                    else if (CanvasSettings.autoExpand) scaleOnResizeGroup.position = 2;
+
+                    // Radio buttons for scale mode (all use the same handle)
+                    if (uiBase.ui.radio(scaleOnResizeGroup, 0, "Expand Horizontal")) {
+                        CanvasSettings.expandHorizontal = true;
+                        CanvasSettings.expandVertical = false;
+                        CanvasSettings.autoExpand = false;
+                    }
+
+                    if (uiBase.ui.radio(scaleOnResizeGroup, 1, "Expand Vertical")) {
+                        CanvasSettings.expandHorizontal = false;
+                        CanvasSettings.expandVertical = true;
+                        CanvasSettings.autoExpand = false;
+                    }
+
+                    if (uiBase.ui.radio(scaleOnResizeGroup, 2, "Auto Expand")) {
+                        CanvasSettings.expandHorizontal = false;
+                        CanvasSettings.expandVertical = false;
+                        CanvasSettings.autoExpand = true;
+                    }
                 }
             }
 		}
@@ -241,5 +288,13 @@ class PropertiesPanel {
             visibleHandle.selected = element.visible;
             disabledHandle.selected = element.disabled;
         }
+    }
+
+    public function onCanvasLoaded(): Void {
+        scaleOnResizeHandle.selected = CanvasSettings.scaleOnResize;
+
+        if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 0;
+        else if (CanvasSettings.expandVertical) scaleOnResizeGroup.position = 1;
+        else if (CanvasSettings.autoExpand) scaleOnResizeGroup.position = 2;
     }
 }
