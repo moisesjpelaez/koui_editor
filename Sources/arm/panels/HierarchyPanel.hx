@@ -12,6 +12,7 @@ import zui.Zui;
 import zui.Zui.Align;
 import zui.Zui.Handle;
 
+@:access(zui.Zui)
 class HierarchyPanel {
 	// Layout constants
 	static inline var INDENT_PER_DEPTH: Int = 15;
@@ -102,11 +103,11 @@ class HierarchyPanel {
 		var isExpanded: Bool = expanded.exists(entry.element) ? expanded.get(entry.element) : true;
 
 		// Cache window coordinates
-		var winX: Float = @:privateAccess uiBase.ui._windowX;
-		var winY: Float = @:privateAccess uiBase.ui._windowY;
-		var winW: Float = @:privateAccess uiBase.ui._windowW;
-		var localX: Float = @:privateAccess uiBase.ui._x;
-		var localY: Float = @:privateAccess uiBase.ui._y;
+		var winX: Float = uiBase.ui._windowX;
+		var winY: Float = uiBase.ui._windowY;
+		var winW: Float = uiBase.ui._windowW;
+		var localX: Float = uiBase.ui._x;
+		var localY: Float = uiBase.ui._y;
 		var rowH: Int = uiBase.ui.t.ELEMENT_H;
 		var indentWidth: Int = depth * INDENT_PER_DEPTH;
 
@@ -205,8 +206,8 @@ class HierarchyPanel {
     function drawDragGhost(uiBase: UIBase) {
 		if (!isDragging || draggedItem == null) return;
 
-		var winX: Float = @:privateAccess uiBase.ui._windowX;
-		var winY: Float = @:privateAccess uiBase.ui._windowY;
+		var winX: Float = uiBase.ui._windowX;
+		var winY: Float = uiBase.ui._windowY;
 
 		var ghostX: Float = uiBase.ui.inputX - winX - GHOST_OFFSET;
 		var ghostY: Float = uiBase.ui.inputY - winY - GHOST_OFFSET;

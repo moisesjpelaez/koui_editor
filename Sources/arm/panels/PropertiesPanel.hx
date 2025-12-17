@@ -14,6 +14,7 @@ import koui.elements.layouts.Layout.Anchor;
 import zui.Zui;
 import zui.Zui.Handle;
 
+@:access(koui.elements.Element)
 class PropertiesPanel {
     var tabHandle: Handle;
 
@@ -174,7 +175,7 @@ class PropertiesPanel {
         var newAnchor = ui.combo(anchorHandle, anchorNames, "Anchor", true, Right);
         if (anchorHandle.changed) {
             selectedElement.anchor = cast(anchorHandle.position, Anchor);
-            @:privateAccess selectedElement.invalidateElem();
+            selectedElement.invalidateElem();
         }
 
         // Position - two columns for X and Y

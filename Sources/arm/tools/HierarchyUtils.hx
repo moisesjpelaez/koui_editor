@@ -11,6 +11,7 @@ import koui.elements.layouts.Layout;
 import koui.elements.layouts.Layout.Anchor;
 import koui.elements.layouts.ScrollPane;
 
+@:access(koui.elements.Element, koui.elements.layouts.Layout, koui.elements.layouts.AnchorPane, koui.elements.layouts.ScrollPane, koui.elements.layouts.Expander, koui.elements.layouts.GridLayout)
 class HierarchyUtils {
 	public static function canAcceptChild(target: Element): Bool {
 		return target != null && (target is Layout || target is Panel);
@@ -38,8 +39,8 @@ class HierarchyUtils {
 
 	public static function getChildren(parent: Element): Array<Element> {
 		if (parent == null) return [];
-		if (parent is AnchorPane || parent is ScrollPane || parent is Expander || parent is GridLayout) return @:privateAccess untyped parent.elements;
-		return @:privateAccess parent.children;
+		if (parent is AnchorPane || parent is ScrollPane || parent is Expander || parent is GridLayout) return untyped parent.elements;
+		return parent.children;
 	}
 
 	public static function detachFromCurrentParent(element: Element): Void {
@@ -51,7 +52,7 @@ class HierarchyUtils {
 				return;
 			}
 		}
-		if (element.parent != null) @:privateAccess element.parent.removeChild(element);
+		if (element.parent != null) element.parent.removeChild(element);
 	}
 
 	public static function moveAsChild(element: Element, target: Element, ?fallbackParent: AnchorPane): Void { // TODO: remove third arg?
@@ -82,9 +83,9 @@ class HierarchyUtils {
 		var elements: Array<Element>;
 		if (parent is AnchorPane || parent is ScrollPane || parent is Expander || parent is GridLayout) {
 			untyped cast(parent, Layout).add(element);
-			elements = @:privateAccess untyped cast(parent, Layout).elements;
+			elements = untyped cast(parent, Layout).elements;
 		} else {
-			elements = @:privateAccess parent.children;
+			elements = parent.children;
 
 		}
 		elements.remove(element);

@@ -29,6 +29,7 @@ import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.Layout;
 import koui.elements.layouts.Layout.Anchor;
 
+@:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane)
 class KouiEditor extends iron.Trait {
 	var uiBase: UIBase;
 
@@ -177,11 +178,11 @@ class KouiEditor extends iron.Trait {
 			canvasPanX += deltaX;
 			canvasPanY += deltaY;
 
-			@:privateAccess anchorPane.posX = Std.int(canvasPanX / Koui.uiScale);
-			@:privateAccess anchorPane.posY = Std.int(canvasPanY / Koui.uiScale);
-			@:privateAccess anchorPane.drawX = Std.int(@:privateAccess anchorPane.posX * Koui.uiScale);
-			@:privateAccess anchorPane.drawY = Std.int(@:privateAccess anchorPane.posY * Koui.uiScale);
-			@:privateAccess Koui.anchorPane.elemUpdated(anchorPane);
+			anchorPane.posX = Std.int(canvasPanX / Koui.uiScale);
+			anchorPane.posY = Std.int(canvasPanY / Koui.uiScale);
+			anchorPane.drawX = Std.int(anchorPane.posX * Koui.uiScale);
+			anchorPane.drawY = Std.int(anchorPane.posY * Koui.uiScale);
+			Koui.anchorPane.elemUpdated(anchorPane);
 
 			// Update start position for next frame
 			panStartX = mouse.x;
@@ -215,11 +216,11 @@ class KouiEditor extends iron.Trait {
 			canvasPanX = 0;
 			canvasPanY = 0;
 
-			@:privateAccess anchorPane.posX = Std.int(canvasPanX / Koui.uiScale);
-			@:privateAccess anchorPane.posY = Std.int(canvasPanY / Koui.uiScale);
-			@:privateAccess anchorPane.drawX = Std.int(@:privateAccess anchorPane.posX * Koui.uiScale);
-			@:privateAccess anchorPane.drawY = Std.int(@:privateAccess anchorPane.posY * Koui.uiScale);
-			@:privateAccess Koui.anchorPane.elemUpdated(anchorPane);
+			anchorPane.posX = Std.int(canvasPanX / Koui.uiScale);
+			anchorPane.posY = Std.int(canvasPanY / Koui.uiScale);
+			anchorPane.drawX = Std.int(anchorPane.posX * Koui.uiScale);
+			anchorPane.drawY = Std.int(anchorPane.posY * Koui.uiScale);
+			Koui.anchorPane.elemUpdated(anchorPane);
 
 			sizeInit = false;
 	}
@@ -242,9 +243,9 @@ class KouiEditor extends iron.Trait {
 				draggedElement = selectedElement;
 
 				// Store original anchor and switch to TopLeft BEFORE calculating offset
-				dragAnchor = @:privateAccess draggedElement.getAnchorResolved();
+				dragAnchor = draggedElement.getAnchorResolved();
 				draggedElement.anchor = TopLeft;
-				@:privateAccess draggedElement.invalidateElem();
+				draggedElement.invalidateElem();
 
 				// Now calculate offset using TopLeft-based posX/posY
 				dragOffsetX = Std.int(mouse.x - draggedElement.posX * Koui.uiScale);
@@ -261,44 +262,42 @@ class KouiEditor extends iron.Trait {
 			anchorOffsetX = elemX;
 			anchorOffsetY = elemY;
 
-			@:privateAccess {
-				// Get parent dimensions for anchor calculations
-				var parentWidth: Int = draggedElement.parent != null ? draggedElement.parent.drawWidth : anchorPane.drawWidth;
-				var parentHeight: Int = draggedElement.parent != null ? draggedElement.parent.drawHeight : anchorPane.drawHeight;
+			// Get parent dimensions for anchor calculations
+			var parentWidth: Int = draggedElement.parent != null ? draggedElement.parent.drawWidth : anchorPane.drawWidth;
+			var parentHeight: Int = draggedElement.parent != null ? draggedElement.parent.drawHeight : anchorPane.drawHeight;
 
-				// Adjust position to simulate dragging from the original anchor point
-				switch (dragAnchor) {
-					case TopCenter:
-						elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
-					case TopRight:
-						elemX += parentWidth - draggedElement.drawWidth;
-					case MiddleLeft:
-						elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
-					case MiddleCenter:
-						elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
-						elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
-					case MiddleRight:
-						elemX += parentWidth - draggedElement.drawWidth;
-						elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
-					case BottomLeft:
-						elemY += parentHeight - draggedElement.drawHeight;
-					case BottomCenter:
-						elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
-						elemY += parentHeight - draggedElement.drawHeight;
-					case BottomRight:
-						elemX += parentWidth - draggedElement.drawWidth;
-						elemY += parentHeight - draggedElement.drawHeight;
-					default: // TopLeft - no adjustment
-				}
+			// Adjust position to simulate dragging from the original anchor point
+			switch (dragAnchor) {
+				case TopCenter:
+					elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
+				case TopRight:
+					elemX += parentWidth - draggedElement.drawWidth;
+				case MiddleLeft:
+					elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
+				case MiddleCenter:
+					elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
+					elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
+				case MiddleRight:
+					elemX += parentWidth - draggedElement.drawWidth;
+					elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
+				case BottomLeft:
+					elemY += parentHeight - draggedElement.drawHeight;
+				case BottomCenter:
+					elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
+					elemY += parentHeight - draggedElement.drawHeight;
+				case BottomRight:
+					elemX += parentWidth - draggedElement.drawWidth;
+					elemY += parentHeight - draggedElement.drawHeight;
+				default: // TopLeft - no adjustment
 			}
 
 			draggedElement.setPosition(Std.int(elemX), Std.int(elemY));
-			@:privateAccess draggedElement.invalidateElem();
+			draggedElement.invalidateElem();
 		} else {
 			if (draggedElement != null) {
 				draggedElement.anchor = dragAnchor; // Restore original anchor
 				draggedElement.setPosition(Std.int(anchorOffsetX / Koui.uiScale), Std.int(anchorOffsetY / Koui.uiScale));
-				@:privateAccess draggedElement.invalidateElem();
+				draggedElement.invalidateElem();
 			}
 			draggedElement = null;
 		}
@@ -321,10 +320,10 @@ class KouiEditor extends iron.Trait {
 			var thickness: Int = 1;
 			g2.color = 0xffe7e7e7;
 
-			var x: Int = @:privateAccess anchorPane.drawX;
-			var y: Int = @:privateAccess anchorPane.drawY;
-			var w: Int = @:privateAccess anchorPane.drawWidth;
-			var h: Int = @:privateAccess anchorPane.drawHeight;
+			var x: Int = anchorPane.drawX;
+			var y: Int = anchorPane.drawY;
+			var w: Int = anchorPane.drawWidth;
+			var h: Int = anchorPane.drawHeight;
 
 			g2.fillRect(x, y, w, thickness);
 			g2.fillRect(x, y + h - thickness, w, thickness);
@@ -338,10 +337,10 @@ class KouiEditor extends iron.Trait {
 			var thickness: Int = 2;
 			g2.color = 0xff469cff;
 
-			var x: Int = draggedElement != selectedElement ? @:privateAccess selectedElement.drawX + @:privateAccess anchorPane.drawX : Std.int(@:privateAccess selectedElement.drawX / Koui.uiScale) + @:privateAccess anchorPane.drawX;
-			var y: Int = draggedElement != selectedElement ? @:privateAccess selectedElement.drawY + @:privateAccess anchorPane.drawY : Std.int(@:privateAccess selectedElement.drawY / Koui.uiScale) + @:privateAccess anchorPane.drawY;
-			var w: Int = @:privateAccess selectedElement.drawWidth;
-			var h: Int = @:privateAccess selectedElement.drawHeight;
+			var x: Int = draggedElement != selectedElement ? selectedElement.drawX + anchorPane.drawX : Std.int(selectedElement.drawX / Koui.uiScale) + anchorPane.drawX;
+			var y: Int = draggedElement != selectedElement ? selectedElement.drawY + anchorPane.drawY : Std.int(selectedElement.drawY / Koui.uiScale) + anchorPane.drawY;
+			var w: Int = selectedElement.drawWidth;
+			var h: Int = selectedElement.drawHeight;
 
 			g2.fillRect(x, y, w, thickness);
 			g2.fillRect(x, y + h - thickness, w, thickness);
@@ -381,7 +380,7 @@ class KouiEditor extends iron.Trait {
 			Koui.uiScale = ((App.h() - uiBase.getBottomH()) / baseH) * initialScale;
 			currentScale = Koui.uiScale;
 		}
-		@:privateAccess Koui.onResize(App.w() - uiBase.getSidebarW(), App.h() - uiBase.getBottomH());
+		Koui.onResize(App.w() - uiBase.getSidebarW(), App.h() - uiBase.getBottomH());
 		if (Scene.active != null && Scene.active.camera != null) {
 			Scene.active.camera.buildProjection();
 		}
@@ -412,7 +411,7 @@ class KouiEditor extends iron.Trait {
 		// Check if dropping as sibling to root AnchorPane (which has no parent)
 		var currentParent: Element = HierarchyUtils.getParentElement(element);
 		if (target == anchorPane) {
-			var rootFirstElement: Element = @:privateAccess cast(target, AnchorPane).elements[0];
+			var rootFirstElement: Element = cast(target, AnchorPane).elements[0];
 			if (rootFirstElement != element) HierarchyUtils.moveRelativeToTarget(element, rootFirstElement, true);
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 			uiBase.hwnds[PanelProperties].redraws = 2;
