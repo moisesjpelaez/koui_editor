@@ -57,6 +57,7 @@ private typedef TElementsData = {
  * Note: Koui.init() is automatically called in Main.hx via the armory_hooks.py
  * library hook system. The game startup is wrapped inside Koui.init() callback.
  */
+@:access(koui.Koui, koui.elements.Element)
 class KouiCanvas extends Trait {
 
 	/** The canvas name (without .json extension) */
@@ -78,6 +79,7 @@ class KouiCanvas extends Trait {
 	/** Whether the canvas is visible */
 	private var canvasVisible: Bool = true;
 
+	// Settings
 	var scaleOnResize: Bool = false;
 	var autoExpand: Bool = false;
 	var expandHorizontal: Bool = false;
@@ -169,7 +171,7 @@ class KouiCanvas extends Trait {
 
 		// First pass: create all elements
 		for (elemData in canvasData.elements) {
-			var element = createElementFromData(elemData);
+			var element: Element = createElementFromData(elemData);
 			if (element != null) {
 				elementMap.set(elemData.key, element);
 			}
@@ -177,7 +179,7 @@ class KouiCanvas extends Trait {
 
 		// Second pass: parent elements correctly
 		for (elemData in canvasData.elements) {
-			var element = elementMap.get(elemData.key);
+			var element: Element = elementMap.get(elemData.key);
 			if (element == null) continue;
 
 			var parent: Element = rootPane;
@@ -190,10 +192,8 @@ class KouiCanvas extends Trait {
 				var anchorPane: AnchorPane = cast parent;
 				anchorPane.add(element, cast elemData.anchor);
 			} else {
-				// For other layouts, just add the element
-				// The element's anchor property is already set
-				@:privateAccess element.parent = parent;
-				@:privateAccess parent.children.push(element);
+				element.parent = parent;
+				parent.children.push(element);
 			}
 		}
 
@@ -269,7 +269,7 @@ class KouiCanvas extends Trait {
 			var scaleH = h / baseH;
 			Koui.uiScale = Math.min(scaleW, scaleH);
 		}
-		@:privateAccess Koui.onResize(w, h);
+		Koui.onResize(w, h);
 	}
 
 	// =========================================================================
