@@ -381,7 +381,7 @@ class KouiCanvas extends Trait {
 	}
 
 	public function getButton(key: String): Null<TButton> {
-		var btn = buttons.get(key);
+		var btn: TButton = buttons.get(key);
 		if (btn == null) {
 			trace('[KouiCanvas] Button not found: "$key"');
 			return null;
