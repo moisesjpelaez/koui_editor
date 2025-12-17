@@ -100,26 +100,26 @@ class PropertiesPanel {
 
                     // Set radio selection based on current settings
                     if (CanvasSettings.autoExpand) scaleOnResizeGroup.position = 0;
-                    else if (CanvasSettings.expandVertical) scaleOnResizeGroup.position = 1;
-                    else if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 2;
+                    else if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 1;
+                    else if (CanvasSettings.expandVertical) scaleOnResizeGroup.position = 2;
 
                     // Radio buttons for scale mode (all use the same handle)
-                    if (uiBase.ui.radio(scaleOnResizeGroup, 0, "Expand Horizontal")) {
+                    if (uiBase.ui.radio(scaleOnResizeGroup, 0, "Auto Expand")) {
                         CanvasSettings.autoExpand = true;
-                        CanvasSettings.expandVertical = false;
                         CanvasSettings.expandHorizontal = false;
+                        CanvasSettings.expandVertical = false;
                     }
 
-                    if (uiBase.ui.radio(scaleOnResizeGroup, 1, "Expand Vertical")) {
+                    if (uiBase.ui.radio(scaleOnResizeGroup, 1, "Expand Horizontal")) {
                         CanvasSettings.autoExpand = false;
-                        CanvasSettings.expandVertical = true;
-                        CanvasSettings.expandHorizontal = false;
+                        CanvasSettings.expandHorizontal = true;
+                        CanvasSettings.expandVertical = false;
                     }
 
-                    if (uiBase.ui.radio(scaleOnResizeGroup, 2, "Auto Expand")) {
-                        CanvasSettings.autoExpand = true;
-                        CanvasSettings.expandVertical = false;
+                    if (uiBase.ui.radio(scaleOnResizeGroup, 2, "Expand Vertical")) {
+                        CanvasSettings.autoExpand = false;
                         CanvasSettings.expandHorizontal = false;
+                        CanvasSettings.expandVertical = true;
                     }
                 }
             }
@@ -305,7 +305,7 @@ class PropertiesPanel {
         scaleOnResizeHandle.selected = CanvasSettings.scaleOnResize;
 
         if (CanvasSettings.autoExpand) scaleOnResizeGroup.position = 0;
-        else if (CanvasSettings.expandVertical) scaleOnResizeGroup.position = 1;
-        else if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 2;
+        else if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 1;
+        else if (CanvasSettings.expandVertical) scaleOnResizeGroup.position = 2;
     }
 }
