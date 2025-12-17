@@ -141,30 +141,34 @@ class KouiCanvas extends Trait {
 				} catch (e: Dynamic) {
 					trace('[KouiCanvas] Failed to build canvas: $e');
 				}
+
+				notifyOnRender2D(render2D);
+				notifyOnRemove(onRemove);
 			});
 		});
 
-		notifyOnRender2D(function(g: kha.graphics2.Graphics) {
-			if (!ready || !canvasVisible) return;
+	}
 
-			// Execute ready callbacks (once per callback)
-			if (onReadyFuncs != null && onReadyFuncs.length > 0) {
-				for (f in onReadyFuncs) {
-					f();
-				}
-				onReadyFuncs.resize(0);
-			}
-		});
+	function render2D(g: kha.graphics2.Graphics): Void {
+		if (!ready || !canvasVisible) return;
 
-		notifyOnRemove(function() {
-			// Clean up when trait is removed
-			if (rootPane != null) {
-				Koui.remove(rootPane);
-				rootPane = null;
+		// Execute ready callbacks (once per callback)
+		if (onReadyFuncs != null && onReadyFuncs.length > 0) {
+			for (f in onReadyFuncs) {
+				f();
 			}
-			elementMap.clear();
-			if (expandOnResize) App.resized.disconnect(onAppResized);
-		});
+			onReadyFuncs.resize(0);
+		}
+	}
+
+	function onRemove(): Void {
+		// Clean up when trait is removed
+		if (rootPane != null) {
+			Koui.remove(rootPane);
+			rootPane = null;
+		}
+		elementMap.clear();
+		if (expandOnResize) App.resized.disconnect(onAppResized);
 	}
 
 	/**
@@ -336,7 +340,9 @@ class KouiCanvas extends Trait {
 	 * @return The element, or null if not found
 	 */
 	public function getElement(key: String): Null<Element> {
-		return elementMap.get(key);
+		var element = elementMap.get(key);
+		if (element == null) trace('[KouiCanvas] Element not found: "$key"');
+		return element;
 	}
 
 	/**
@@ -355,8 +361,13 @@ class KouiCanvas extends Trait {
 	 */
 	public function getElementAs<T: Element>(cls: Class<T>, key: String): Null<T> {
 		var element = elementMap.get(key);
-		if (element == null) return null;
-		return Std.downcast(element, cls);
+		if (element == null) {
+			trace('[KouiCanvas] Element not found: "$key"');
+			return null;
+		}
+		var casted = Std.downcast(element, cls);
+		if (casted == null) trace('[KouiCanvas] Element "$key" is not of type ${Type.getClassName(cls)}');
+		return casted;
 	}
 
 	/**
@@ -368,8 +379,11 @@ class KouiCanvas extends Trait {
 		return elementMap.keys();
 	}
 
-	public function connectButtonEvent(buttonKey: String, eventType: ButtonEvent, callback: Void->Void): Void {
-		var button: Button = getElementAs(Button, buttonKey);
+	public function connectButtonEvent(button: Button, eventType: ButtonEvent, callback: Void->Void): Void {
+		if (button == null) {
+			trace('[KouiCanvas] Cannot connect event to null button');
+			return;
+		}
 		var btnEvents: TButtonEvents = buttonsMap.get(button);
 		if (btnEvents != null) {
 			switch (eventType) {
@@ -383,8 +397,11 @@ class KouiCanvas extends Trait {
 		}
 	}
 
-	public function disconnectButtonEvent(buttonKey: String, eventType: ButtonEvent, callback: Void->Void): Void {
-		var button: Button = getElementAs(Button, buttonKey);
+	public function disconnectButtonEvent(button: Button, eventType: ButtonEvent, callback: Void->Void): Void {
+		if (button == null) {
+			trace('[KouiCanvas] Cannot disconnect event from null button');
+			return;
+		}
 		var btnEvents: TButtonEvents = buttonsMap.get(button);
 		if (btnEvents != null) {
 			switch (eventType) {
