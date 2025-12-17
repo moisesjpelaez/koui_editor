@@ -9,6 +9,7 @@ import arm.base.UIBase;
 import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.Label;
+import koui.elements.layouts.Layout.Anchor;
 
 import zui.Zui;
 import zui.Zui.Handle;
@@ -19,9 +20,6 @@ class PropertiesPanel {
     // Settings
     var scaleOnResizeHandle: Handle;
     var scaleOnResizeGroup: Handle;
-    var expandHorizontalHandle: Handle;
-    var expandVerticalHandle: Handle;
-    var autoExpandHandle: Handle;
 
     // Properties
     var selectedElement: Element = null;
@@ -35,6 +33,7 @@ class PropertiesPanel {
     var heightHandle: Handle;
     var visibleHandle: Handle;
     var disabledHandle: Handle;
+    var anchorHandle: Handle;
 
     // Label handles
     var labelTextHandle: Handle;
@@ -65,6 +64,7 @@ class PropertiesPanel {
         heightHandle = new Handle({text: "0"});
         visibleHandle = new Handle({selected: true});
         disabledHandle = new Handle({selected: false});
+        anchorHandle = new Handle({position: 0});
 
         labelTextHandle = new Handle({text: "New Label"});
 
@@ -99,27 +99,27 @@ class PropertiesPanel {
                     uiBase.ui.text("Scale Mode");
 
                     // Set radio selection based on current settings
-                    if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 0;
+                    if (CanvasSettings.autoExpand) scaleOnResizeGroup.position = 0;
                     else if (CanvasSettings.expandVertical) scaleOnResizeGroup.position = 1;
-                    else if (CanvasSettings.autoExpand) scaleOnResizeGroup.position = 2;
+                    else if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 2;
 
                     // Radio buttons for scale mode (all use the same handle)
                     if (uiBase.ui.radio(scaleOnResizeGroup, 0, "Expand Horizontal")) {
-                        CanvasSettings.expandHorizontal = true;
+                        CanvasSettings.autoExpand = true;
                         CanvasSettings.expandVertical = false;
-                        CanvasSettings.autoExpand = false;
+                        CanvasSettings.expandHorizontal = false;
                     }
 
                     if (uiBase.ui.radio(scaleOnResizeGroup, 1, "Expand Vertical")) {
-                        CanvasSettings.expandHorizontal = false;
-                        CanvasSettings.expandVertical = true;
                         CanvasSettings.autoExpand = false;
+                        CanvasSettings.expandVertical = true;
+                        CanvasSettings.expandHorizontal = false;
                     }
 
                     if (uiBase.ui.radio(scaleOnResizeGroup, 2, "Auto Expand")) {
-                        CanvasSettings.expandHorizontal = false;
-                        CanvasSettings.expandVertical = false;
                         CanvasSettings.autoExpand = true;
+                        CanvasSettings.expandVertical = false;
+                        CanvasSettings.expandHorizontal = false;
                     }
                 }
             }
@@ -165,6 +165,16 @@ class PropertiesPanel {
                     tidHandle.text = originalTID;
                 }
             }
+        }
+
+        // FIXME: prevent elements from deselecting if dropdown menu overlaps the Properties Panel
+        // Anchor - dropdown
+        var anchorNames = ["Top Left", "Top Center", "Top Right", "Middle Left", "Middle Center", "Middle Right", "Bottom Left", "Bottom Center", "Bottom Right", "Follow Layout"];
+        anchorHandle.position = selectedElement.anchor;
+        var newAnchor = ui.combo(anchorHandle, anchorNames, "Anchor", true, Right);
+        if (anchorHandle.changed) {
+            selectedElement.anchor = cast(anchorHandle.position, Anchor);
+            @:privateAccess selectedElement.invalidateElem();
         }
 
         // Position - two columns for X and Y
@@ -287,14 +297,15 @@ class PropertiesPanel {
             heightHandle.text = Std.string(element.height);
             visibleHandle.selected = element.visible;
             disabledHandle.selected = element.disabled;
+            anchorHandle.position = element.anchor;
         }
     }
 
     public function onCanvasLoaded(): Void {
         scaleOnResizeHandle.selected = CanvasSettings.scaleOnResize;
 
-        if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 0;
+        if (CanvasSettings.autoExpand) scaleOnResizeGroup.position = 0;
         else if (CanvasSettings.expandVertical) scaleOnResizeGroup.position = 1;
-        else if (CanvasSettings.autoExpand) scaleOnResizeGroup.position = 2;
+        else if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 2;
     }
 }

@@ -27,6 +27,7 @@ import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.Layout;
+import koui.elements.layouts.Layout.Anchor;
 
 class KouiEditor extends iron.Trait {
 	var uiBase: UIBase;
@@ -41,8 +42,11 @@ class KouiEditor extends iron.Trait {
 	// Drag and drop state
 	var selectedElement: Element = null;
 	var draggedElement: Element = null;
+	var dragAnchor: Anchor = TopLeft;
 	var dragOffsetX: Int = 0;
 	var dragOffsetY: Int = 0;
+	var anchorOffsetX: Int = 0;
+	var anchorOffsetY: Int = 0;
 
 	// Canvas controls
 	var isPanning: Bool = false;
@@ -236,6 +240,13 @@ class KouiEditor extends iron.Trait {
 				ElementEvents.elementSelected.emit(selectedElement);
 
 				draggedElement = selectedElement;
+
+				// Store original anchor and switch to TopLeft BEFORE calculating offset
+				dragAnchor = @:privateAccess draggedElement.getAnchorResolved();
+				draggedElement.anchor = TopLeft;
+				@:privateAccess draggedElement.invalidateElem();
+
+				// Now calculate offset using TopLeft-based posX/posY
 				dragOffsetX = Std.int(mouse.x - draggedElement.posX * Koui.uiScale);
 				dragOffsetY = Std.int(mouse.y - draggedElement.posY * Koui.uiScale);
 			} else if (mouse.x < canvasArea.x && mouse.y < canvasArea.y || mouse.x > hierarchyArea.x && mouse.y < hierarchyArea.y) {
@@ -244,11 +255,49 @@ class KouiEditor extends iron.Trait {
 				ElementEvents.elementSelected.emit(null);
 			}
 		} else if (mouse.down() && draggedElement != null) {
-			draggedElement.setPosition(Std.int(mouse.x - dragOffsetX), Std.int(mouse.y - dragOffsetY));
+			// Calculate new position in TopLeft space
+			var elemX = Std.int(mouse.x - dragOffsetX);
+			var elemY = Std.int(mouse.y - dragOffsetY);
+			anchorOffsetX = elemX;
+			anchorOffsetY = elemY;
+
+			@:privateAccess {
+				// Get parent dimensions for anchor calculations
+				var parentWidth: Int = draggedElement.parent != null ? draggedElement.parent.drawWidth : anchorPane.drawWidth;
+				var parentHeight: Int = draggedElement.parent != null ? draggedElement.parent.drawHeight : anchorPane.drawHeight;
+
+				// Adjust position to simulate dragging from the original anchor point
+				switch (dragAnchor) {
+					case TopCenter:
+						elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
+					case TopRight:
+						elemX += parentWidth - draggedElement.drawWidth;
+					case MiddleLeft:
+						elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
+					case MiddleCenter:
+						elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
+						elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
+					case MiddleRight:
+						elemX += parentWidth - draggedElement.drawWidth;
+						elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
+					case BottomLeft:
+						elemY += parentHeight - draggedElement.drawHeight;
+					case BottomCenter:
+						elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
+						elemY += parentHeight - draggedElement.drawHeight;
+					case BottomRight:
+						elemX += parentWidth - draggedElement.drawWidth;
+						elemY += parentHeight - draggedElement.drawHeight;
+					default: // TopLeft - no adjustment
+				}
+			}
+
+			draggedElement.setPosition(Std.int(elemX), Std.int(elemY));
 			@:privateAccess draggedElement.invalidateElem();
 		} else {
 			if (draggedElement != null) {
-				draggedElement.setPosition(Std.int(draggedElement.posX / Koui.uiScale), Std.int(draggedElement.posY / Koui.uiScale));
+				draggedElement.anchor = dragAnchor; // Restore original anchor
+				draggedElement.setPosition(Std.int(anchorOffsetX / Koui.uiScale), Std.int(anchorOffsetY / Koui.uiScale));
 				@:privateAccess draggedElement.invalidateElem();
 			}
 			draggedElement = null;

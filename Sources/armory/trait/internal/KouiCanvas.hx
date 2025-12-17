@@ -25,9 +25,9 @@ private typedef TCanvasSettings = {
 
 private typedef TSettings = {
 	var scaleOnResize: Bool;
+	var autoExpand: Bool;
 	var expandHorizontal: Bool;
 	var expandVertical: Bool;
-	var autoExpand: Bool;
 }
 
 private typedef TElementsData = {
@@ -79,9 +79,9 @@ class KouiCanvas extends Trait {
 	private var canvasVisible: Bool = true;
 
 	var scaleOnResize: Bool = false;
+	var autoExpand: Bool = false;
 	var expandHorizontal: Bool = false;
 	var expandVertical: Bool = false;
-	var autoExpand: Bool = false;
 
 	var baseH: Int = 576;
 	var baseW: Int = 1024;
@@ -126,9 +126,6 @@ class KouiCanvas extends Trait {
 		notifyOnRender2D(function(g: kha.graphics2.Graphics) {
 			if (!ready || !canvasVisible) return;
 
-			// Koui.render() is called globally from armory_hooks.py
-			// Each canvas just manages its own elements in Koui's scene graph
-
 			// Execute ready callbacks (once per callback)
 			if (onReadyFuncs != null && onReadyFuncs.length > 0) {
 				for (f in onReadyFuncs) {
@@ -156,9 +153,9 @@ class KouiCanvas extends Trait {
 		// Settings
 		if (canvasData.canvas.settings != null) {
 			scaleOnResize = canvasData.canvas.settings.scaleOnResize;
+			autoExpand = canvasData.canvas.settings.autoExpand;
 			expandHorizontal = canvasData.canvas.settings.expandHorizontal;
 			expandVertical = canvasData.canvas.settings.expandVertical;
-			autoExpand = canvasData.canvas.settings.autoExpand;
 		}
 		if (scaleOnResize != null && scaleOnResize) {
 			App.resized.connect(onAppResized);
