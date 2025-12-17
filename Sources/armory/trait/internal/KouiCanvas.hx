@@ -54,6 +54,15 @@ private typedef TButtonEvents = {
 	var onReleased: Signal;
 }
 
+// KouiCanvas types
+// TODO: Add more element typedefs as needed
+typedef TButton = {
+	var button: Button;
+	var onPressed: Signal;
+	var onHold: Signal;
+	var onReleased: Signal;
+}
+
 enum abstract ButtonEvent(Int) from Int to Int {
 	var Pressed = 0;
 	var Hold = 1;
@@ -104,8 +113,8 @@ class KouiCanvas extends Trait {
 	var baseH: Int = 576;
 	var baseW: Int = 1024;
 
-	// Button events
-	var buttonsMap: Map<Button, TButtonEvents> = new Map();
+	// Elements
+	var buttons: Map<String, TButton> = new Map();
 
 	/**
 	 * Create a new KouiCanvas trait.
@@ -244,11 +253,13 @@ class KouiCanvas extends Trait {
 
 			case "Button":
 				var button: Button = new Button(data.properties.text != null ? data.properties.text : "");
-				var btnEvents: TButtonEvents = {
+				var btn: TButton = {
+					button: button,
 					onPressed: new Signal(),
 					onHold: new Signal(),
 					onReleased: new Signal()
-				};
+				}
+				buttons.set(data.key, btn);
 
 				if (data.properties.isToggle != null) {
 					button.isToggle = data.properties.isToggle;
@@ -260,16 +271,15 @@ class KouiCanvas extends Trait {
 				button.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
 					switch (e.getState()) {
 						case ClickStart:
-							btnEvents.onPressed.emit();
+							btn.onPressed.emit();
 						case ClickHold:
-							btnEvents.onHold.emit();
+							btn.onHold.emit();
 						case ClickEnd:
-							btnEvents.onReleased.emit();
+							btn.onReleased.emit();
 						default:
 					}
 				});
 
-				buttonsMap.set(button, btnEvents);
 				element = button;
 
 			case "AnchorPane":
@@ -370,6 +380,15 @@ class KouiCanvas extends Trait {
 		return casted;
 	}
 
+	public function getButton(key: String): Null<TButton> {
+		var btn = buttons.get(key);
+		if (btn == null) {
+			trace('[KouiCanvas] Button not found: "$key"');
+			return null;
+		}
+		return btn;
+	}
+
 	/**
 	 * Get all element keys in this canvas.
 	 *
@@ -377,42 +396,6 @@ class KouiCanvas extends Trait {
 	 */
 	public function getElementKeys(): Iterator<String> {
 		return elementMap.keys();
-	}
-
-	public function connectButtonEvent(button: Button, eventType: ButtonEvent, callback: Void->Void): Void {
-		if (button == null) {
-			trace('[KouiCanvas] Cannot connect event to null button');
-			return;
-		}
-		var btnEvents: TButtonEvents = buttonsMap.get(button);
-		if (btnEvents != null) {
-			switch (eventType) {
-				case Pressed:
-					btnEvents.onPressed.connect(callback);
-				case Hold:
-					btnEvents.onHold.connect(callback);
-				case Released:
-					btnEvents.onReleased.connect(callback);
-			}
-		}
-	}
-
-	public function disconnectButtonEvent(button: Button, eventType: ButtonEvent, callback: Void->Void): Void {
-		if (button == null) {
-			trace('[KouiCanvas] Cannot disconnect event from null button');
-			return;
-		}
-		var btnEvents: TButtonEvents = buttonsMap.get(button);
-		if (btnEvents != null) {
-			switch (eventType) {
-				case Pressed:
-					btnEvents.onPressed.disconnect(callback);
-				case Hold:
-					btnEvents.onHold.disconnect(callback);
-				case Released:
-					btnEvents.onReleased.disconnect(callback);
-			}
-		}
 	}
 
 	/**
