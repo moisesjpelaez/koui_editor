@@ -114,13 +114,13 @@ class PropertiesPanel {
                         CanvasSettings.scaleVertical = false;
                     }
 
-                    if (uiBase.ui.radio(scaleOnResizeGroup, 1, "Horizontally")) {
+                    if (uiBase.ui.radio(scaleOnResizeGroup, 1, "Horizontal")) {
                         CanvasSettings.autoScale = false;
                         CanvasSettings.scaleHorizontal = true;
                         CanvasSettings.scaleVertical = false;
                     }
 
-                    if (uiBase.ui.radio(scaleOnResizeGroup, 2, "Vertically")) {
+                    if (uiBase.ui.radio(scaleOnResizeGroup, 2, "Vertical")) {
                         CanvasSettings.autoScale = false;
                         CanvasSettings.scaleHorizontal = false;
                         CanvasSettings.scaleVertical = true;
