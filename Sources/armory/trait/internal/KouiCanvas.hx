@@ -1,5 +1,6 @@
 package armory.trait.internal;
 
+import armory.system.Signal;
 import iron.App;
 import iron.Trait;
 import koui.Koui;
@@ -8,6 +9,7 @@ import koui.elements.Button;
 import koui.elements.Label;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.Layout.Anchor;
+import koui.events.MouseEvent.MouseClickEvent;
 
 // JSON structure typedefs (matching CanvasUtils format)
 private typedef TCanvasData = {
@@ -44,6 +46,18 @@ private typedef TElementsData = {
 	var disabled: Bool;
 	var parentKey: Null<String>;
 	var properties: Dynamic;
+}
+
+private typedef TButtonEvents = {
+	var onPressed: Signal;
+	var onHold: Signal;
+	var onReleased: Signal;
+}
+
+enum abstract ButtonEvent(Int) from Int to Int {
+	var Pressed = 0;
+	var Hold = 1;
+	var Released = 2;
 }
 
 /**
@@ -89,6 +103,9 @@ class KouiCanvas extends Trait {
 
 	var baseH: Int = 576;
 	var baseW: Int = 1024;
+
+	// Button events
+	var buttonsMap: Map<Button, TButtonEvents> = new Map();
 
 	/**
 	 * Create a new KouiCanvas trait.
@@ -170,7 +187,7 @@ class KouiCanvas extends Trait {
 
 		// Create root pane with canvas dimensions
 		rootPane = new AnchorPane(0, 0, canvasData.canvas.width, canvasData.canvas.height);
-		elementMap.set("AnchorPane", rootPane);
+		elementMap.set("Scene", rootPane);
 
 		// First pass: create all elements
 		for (elemData in canvasData.elements) {
@@ -212,7 +229,7 @@ class KouiCanvas extends Trait {
 
 		switch (data.type) {
 			case "Label":
-				var label = new Label(data.properties.text != null ? data.properties.text : "");
+				var label: Label = new Label(data.properties.text != null ? data.properties.text : "");
 				if (data.properties.alignmentHor != null) {
 					label.alignmentHor = cast data.properties.alignmentHor;
 				}
@@ -222,13 +239,33 @@ class KouiCanvas extends Trait {
 				element = label;
 
 			case "Button":
-				var button = new Button(data.properties.text != null ? data.properties.text : "");
+				var button: Button = new Button(data.properties.text != null ? data.properties.text : "");
+				var btnEvents: TButtonEvents = {
+					onPressed: new Signal(),
+					onHold: new Signal(),
+					onReleased: new Signal()
+				};
+
 				if (data.properties.isToggle != null) {
 					button.isToggle = data.properties.isToggle;
 				}
 				if (data.properties.isPressed != null) {
 					button.isPressed = data.properties.isPressed;
 				}
+
+				button.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
+					switch (e.getState()) {
+						case ClickStart:
+							btnEvents.onPressed.emit();
+						case ClickHold:
+							btnEvents.onHold.emit();
+						case ClickEnd:
+							btnEvents.onReleased.emit();
+						default:
+					}
+				});
+
+				buttonsMap.set(button, btnEvents);
 				element = button;
 
 			case "AnchorPane":
@@ -329,6 +366,34 @@ class KouiCanvas extends Trait {
 	 */
 	public function getElementKeys(): Iterator<String> {
 		return elementMap.keys();
+	}
+
+	public function connectButtonEvent(button: Button, eventType: ButtonEvent, callback: Void->Void): Void {
+		var btnEvents: TButtonEvents = buttonsMap.get(button);
+		if (btnEvents != null) {
+			switch (eventType) {
+				case Pressed:
+					btnEvents.onPressed.connect(callback);
+				case Hold:
+					btnEvents.onHold.connect(callback);
+				case Released:
+					btnEvents.onReleased.connect(callback);
+			}
+		}
+	}
+
+	public function disconnectButtonEvent(button: Button, eventType: ButtonEvent, callback: Void->Void): Void {
+		var btnEvents: TButtonEvents = buttonsMap.get(button);
+		if (btnEvents != null) {
+			switch (eventType) {
+				case Pressed:
+					btnEvents.onPressed.disconnect(callback);
+				case Hold:
+					btnEvents.onHold.disconnect(callback);
+				case Released:
+					btnEvents.onReleased.disconnect(callback);
+			}
+		}
 	}
 
 	/**
