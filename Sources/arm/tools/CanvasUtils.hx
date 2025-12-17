@@ -24,10 +24,11 @@ typedef TCanvasSettings = {
 	var width: Int;
 	var height: Int;
 	var settings: {
+		var expandOnResize: Bool;
 		var scaleOnResize: Bool;
-		var autoExpand: Bool;
-		var expandHorizontal: Bool;
-		var expandVertical: Bool;
+		var autoScale: Bool;
+		var scaleHorizontal: Bool;
+		var scaleVertical: Bool;
 	};
 }
 
@@ -218,10 +219,11 @@ class CanvasUtils {
 				width: root.width,
 				height: root.height,
 				settings: {
+					expandOnResize: CanvasSettings.expandOnResize,
 					scaleOnResize: CanvasSettings.scaleOnResize,
-					autoExpand: CanvasSettings.autoExpand,
-					expandHorizontal: CanvasSettings.expandHorizontal,
-					expandVertical: CanvasSettings.expandVertical
+					autoScale: CanvasSettings.autoScale,
+					scaleHorizontal: CanvasSettings.scaleHorizontal,
+					scaleVertical: CanvasSettings.scaleVertical
 				}
 			},
 			elements: elementsData
@@ -355,10 +357,11 @@ class CanvasUtils {
 
 		// Load canvas settings
 		if (canvasData.canvas.settings != null) {
+			CanvasSettings.expandOnResize = canvasData.canvas.settings.expandOnResize;
 			CanvasSettings.scaleOnResize = canvasData.canvas.settings.scaleOnResize;
-			CanvasSettings.autoExpand = canvasData.canvas.settings.autoExpand;
-			CanvasSettings.expandHorizontal = canvasData.canvas.settings.expandHorizontal;
-			CanvasSettings.expandVertical = canvasData.canvas.settings.expandVertical;
+			CanvasSettings.autoScale = canvasData.canvas.settings.autoScale;
+			CanvasSettings.scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
+			CanvasSettings.scaleVertical = canvasData.canvas.settings.scaleVertical;
 		}
 
 		// First pass: create all elements and store in a map

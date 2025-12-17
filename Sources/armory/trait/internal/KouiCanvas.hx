@@ -24,10 +24,11 @@ private typedef TCanvasSettings = {
 }
 
 private typedef TSettings = {
+	var expandOnResize: Bool;
 	var scaleOnResize: Bool;
-	var autoExpand: Bool;
-	var expandHorizontal: Bool;
-	var expandVertical: Bool;
+	var autoScale: Bool;
+	var scaleHorizontal: Bool;
+	var scaleVertical: Bool;
 }
 
 private typedef TElementsData = {
@@ -80,10 +81,11 @@ class KouiCanvas extends Trait {
 	private var canvasVisible: Bool = true;
 
 	// Settings
+	var expandOnResize: Bool = false;
 	var scaleOnResize: Bool = false;
-	var autoExpand: Bool = false;
-	var expandHorizontal: Bool = false;
-	var expandVertical: Bool = false;
+	var autoScale: Bool = false;
+	var scaleHorizontal: Bool = false;
+	var scaleVertical: Bool = false;
 
 	var baseH: Int = 576;
 	var baseW: Int = 1024;
@@ -144,7 +146,7 @@ class KouiCanvas extends Trait {
 				rootPane = null;
 			}
 			elementMap.clear();
-			if (scaleOnResize) App.resized.disconnect(onAppResized);
+			if (expandOnResize) App.resized.disconnect(onAppResized);
 		});
 	}
 
@@ -154,12 +156,13 @@ class KouiCanvas extends Trait {
 	private function buildCanvas(canvasData: TCanvasData): Void {
 		// Settings
 		if (canvasData.canvas.settings != null) {
+			expandOnResize = canvasData.canvas.settings.expandOnResize;
 			scaleOnResize = canvasData.canvas.settings.scaleOnResize;
-			autoExpand = canvasData.canvas.settings.autoExpand;
-			expandHorizontal = canvasData.canvas.settings.expandHorizontal;
-			expandVertical = canvasData.canvas.settings.expandVertical;
+			autoScale = canvasData.canvas.settings.autoScale;
+			scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
+			scaleVertical = canvasData.canvas.settings.scaleVertical;
 		}
-		if (scaleOnResize != null && scaleOnResize) {
+		if (expandOnResize != null && expandOnResize) {
 			App.resized.connect(onAppResized);
 			baseH = canvasData.canvas.height;
 			baseW = canvasData.canvas.width;
@@ -260,14 +263,16 @@ class KouiCanvas extends Trait {
 	}
 
 	function onAppResized(w: Int, h: Int): Void {
-		if (expandHorizontal) {
-			Koui.uiScale = w / baseH;
-		} else if (expandVertical) {
-			Koui.uiScale = h / baseW;
-		} else {
-			var scaleW = w / baseW;
-			var scaleH = h / baseH;
-			Koui.uiScale = Math.min(scaleW, scaleH);
+		if (scaleOnResize) {
+			if (scaleHorizontal) {
+				Koui.uiScale = w / baseH;
+			} else if (scaleVertical) {
+				Koui.uiScale = h / baseW;
+			} else {
+				var scaleW = w / baseW;
+				var scaleH = h / baseH;
+				Koui.uiScale = Math.min(scaleW, scaleH);
+			}
 		}
 		Koui.onResize(w, h);
 	}

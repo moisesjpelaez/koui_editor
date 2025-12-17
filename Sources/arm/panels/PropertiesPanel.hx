@@ -19,6 +19,7 @@ class PropertiesPanel {
     var tabHandle: Handle;
 
     // Settings
+    var expandOnResizeHandle: Handle;
     var scaleOnResizeHandle: Handle;
     var scaleOnResizeGroup: Handle;
 
@@ -53,6 +54,7 @@ class PropertiesPanel {
         tabHandle = new Handle({position: 0});
 
         // Initialize settings handles
+        expandOnResizeHandle = new Handle({selected: true});
         scaleOnResizeHandle = new Handle({selected: true});
         scaleOnResizeGroup = new Handle({position: 0});
 
@@ -91,36 +93,37 @@ class PropertiesPanel {
             }
 
             if (uiBase.ui.tab(tabHandle, "Settings")) {
-                uiBase.ui.text("Canvas Scale", Center);
+                uiBase.ui.text("On Window Size Changed", Center);
                 uiBase.ui.separator();
 
-                CanvasSettings.scaleOnResize = uiBase.ui.check(scaleOnResizeHandle, "Scale on Resize");
+                CanvasSettings.expandOnResize = uiBase.ui.check(expandOnResizeHandle, "Expand");
+                if (CanvasSettings.expandOnResize) CanvasSettings.scaleOnResize = uiBase.ui.check(scaleOnResizeHandle, "Scale");
 
-                if (CanvasSettings.scaleOnResize) {
+                if (CanvasSettings.expandOnResize && CanvasSettings.scaleOnResize) {
                     uiBase.ui.text("Scale Mode");
 
                     // Set radio selection based on current settings
-                    if (CanvasSettings.autoExpand) scaleOnResizeGroup.position = 0;
-                    else if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 1;
-                    else if (CanvasSettings.expandVertical) scaleOnResizeGroup.position = 2;
+                    if (CanvasSettings.autoScale) scaleOnResizeGroup.position = 0;
+                    else if (CanvasSettings.scaleHorizontal) scaleOnResizeGroup.position = 1;
+                    else if (CanvasSettings.scaleVertical) scaleOnResizeGroup.position = 2;
 
                     // Radio buttons for scale mode (all use the same handle)
-                    if (uiBase.ui.radio(scaleOnResizeGroup, 0, "Auto Expand")) {
-                        CanvasSettings.autoExpand = true;
-                        CanvasSettings.expandHorizontal = false;
-                        CanvasSettings.expandVertical = false;
+                    if (uiBase.ui.radio(scaleOnResizeGroup, 0, "Auto")) {
+                        CanvasSettings.autoScale = true;
+                        CanvasSettings.scaleHorizontal = false;
+                        CanvasSettings.scaleVertical = false;
                     }
 
-                    if (uiBase.ui.radio(scaleOnResizeGroup, 1, "Expand Horizontal")) {
-                        CanvasSettings.autoExpand = false;
-                        CanvasSettings.expandHorizontal = true;
-                        CanvasSettings.expandVertical = false;
+                    if (uiBase.ui.radio(scaleOnResizeGroup, 1, "Horizontally")) {
+                        CanvasSettings.autoScale = false;
+                        CanvasSettings.scaleHorizontal = true;
+                        CanvasSettings.scaleVertical = false;
                     }
 
-                    if (uiBase.ui.radio(scaleOnResizeGroup, 2, "Expand Vertical")) {
-                        CanvasSettings.autoExpand = false;
-                        CanvasSettings.expandHorizontal = false;
-                        CanvasSettings.expandVertical = true;
+                    if (uiBase.ui.radio(scaleOnResizeGroup, 2, "Vertically")) {
+                        CanvasSettings.autoScale = false;
+                        CanvasSettings.scaleHorizontal = false;
+                        CanvasSettings.scaleVertical = true;
                     }
                 }
             }
@@ -305,8 +308,8 @@ class PropertiesPanel {
     public function onCanvasLoaded(): Void {
         scaleOnResizeHandle.selected = CanvasSettings.scaleOnResize;
 
-        if (CanvasSettings.autoExpand) scaleOnResizeGroup.position = 0;
-        else if (CanvasSettings.expandHorizontal) scaleOnResizeGroup.position = 1;
-        else if (CanvasSettings.expandVertical) scaleOnResizeGroup.position = 2;
+        if (CanvasSettings.autoScale) scaleOnResizeGroup.position = 0;
+        else if (CanvasSettings.scaleHorizontal) scaleOnResizeGroup.position = 1;
+        else if (CanvasSettings.scaleVertical) scaleOnResizeGroup.position = 2;
     }
 }
