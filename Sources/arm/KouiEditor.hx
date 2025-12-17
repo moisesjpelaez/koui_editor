@@ -231,7 +231,7 @@ class KouiEditor extends iron.Trait {
 		// FIXME: elements flicker on mouse start and release
 		var mouse: Mouse = Input.getMouse();
 		if (mouse.started()) {
-			var element: Element = Koui.getElementAtPosition(Std.int(mouse.x), Std.int(mouse.y));
+			var element: Element = getElementAtPositionUnclipped(Std.int(mouse.x), Std.int(mouse.y));
 			var canvasArea: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize, App.h() - uiBase.getBottomH() - borderSize); // TODO: use a better variable name
 			var hierarchyArea: Vec2 = new Vec2(canvasArea.x + 2 * borderSize, App.h() - uiBase.getSidebarH1() - borderSize); // TODO: use a better variable name
 
@@ -301,6 +301,35 @@ class KouiEditor extends iron.Trait {
 			}
 			draggedElement = null;
 		}
+	}
+
+	/**
+	 * Custom method to get elements at a position without clipping to anchorPane bounds.
+	 * This allows selecting elements that are positioned outside the anchorPane's visible area.
+	 */
+	function getElementAtPositionUnclipped(x: Int, y: Int): Null<Element> {
+		// Make coords relative to anchorPane layout
+		var relX: Int = x - anchorPane.layoutX;
+		var relY: Int = y - anchorPane.layoutY;
+
+		// Reverse to ensure that the topmost element is selected
+		var sortedElements: Array<Element> = anchorPane.elements.copy();
+		sortedElements.reverse();
+
+		for (element in sortedElements) {
+			if (!element.visible) {
+				continue;
+			}
+
+			// Check if element has children (recursively check them)
+			var hit: Null<Element> = element.getElementAtPosition(relX, relY);
+			if (hit != null) return hit;
+
+			// Check the element itself using isAtPosition (which uses drawX/drawY)
+			if (element.isAtPosition(x, y)) return element;
+		}
+
+		return null;
 	}
 
 	function drawRightPanels() {
