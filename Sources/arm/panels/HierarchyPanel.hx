@@ -52,9 +52,9 @@ class HierarchyPanel {
 
 		ElementEvents.elementAdded.connect(onElementAdded);
 		ElementEvents.elementSelected.connect(onElementSelected);
-		SceneEvents.sceneChanged.connect(onSceneChanged);
-		SceneEvents.sceneRemoved.connect(onSceneRemoved);
+
 		SceneEvents.sceneAdded.connect(onSceneAdded);
+		SceneEvents.sceneRemoved.connect(onSceneRemoved);
 
 		// Initialize tabs from existing scenes
 		if (sceneData.scenes.length > 0) {
@@ -103,46 +103,13 @@ class HierarchyPanel {
 
 		if (ZuiUtils.iconButton(uiBase.ui, icons, 1, 2, "Add Scene", false, false, 0.4)) {
 			var newSceneName = NameUtils.generateUniqueName("Scene", sceneTabs);
-			sceneTabs.push(newSceneName);
-			sceneTabHandle.position = sceneTabs.length - 1;
 			SceneEvents.sceneAdded.emit(newSceneName);
 		}
 
 		if (ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete Scene", false, sceneTabs.length <= 1, 0.4)) {
-			var idx: Int = sceneTabHandle.position;
-			var sceneName: String = sceneTabs[idx];
-			sceneTabs.splice(idx, 1);
-			if (idx >= sceneTabs.length) {
-				sceneTabHandle.position = sceneTabs.length - 1;
-			}
+			var sceneName: String = sceneTabs[sceneTabHandle.position];
 			SceneEvents.sceneRemoved.emit(sceneName);
 		}
-	}
-
-	function onSceneAdded(sceneName: String): Void {
-		if (!sceneTabs.contains(sceneName)) {
-			sceneTabs.push(sceneName);
-		}
-		sceneTabHandle.position = sceneTabs.indexOf(sceneName);
-	}
-
-	function onSceneRemoved(sceneName: String): Void {
-		var idx = sceneTabs.indexOf(sceneName);
-		if (idx >= 0) {
-			sceneTabs.splice(idx, 1);
-			if (sceneTabHandle.position >= sceneTabs.length) {
-				sceneTabHandle.position = Std.int(Math.max(0, sceneTabs.length - 1));
-			}
-		}
-	}
-
-	function onSceneChanged(sceneName: String): Void {
-		var idx = sceneTabs.indexOf(sceneName);
-		if (idx == -1) {
-			sceneTabs.push(sceneName);
-			idx = sceneTabs.length - 1;
-		}
-		sceneTabHandle.position = idx;
 	}
 
 	function drawItem(uiBase: UIBase, entry: THierarchyEntry, depth: Int) {
@@ -444,4 +411,22 @@ class HierarchyPanel {
     public function setIcons(iconsImage: Image): Void {
         icons = iconsImage;
     }
+
+	function onSceneAdded(sceneName: String): Void {
+		if (!sceneTabs.contains(sceneName)) {
+			sceneTabs.push(sceneName);
+		}
+		sceneTabHandle.position = sceneTabs.indexOf(sceneName);
+	}
+
+	function onSceneRemoved(sceneName: String): Void {
+		var idx = sceneTabs.indexOf(sceneName);
+		if (idx >= 0) {
+			sceneTabs.splice(idx, 1);
+			if (sceneTabHandle.position >= sceneTabs.length) {
+				sceneTabHandle.position = Std.int(Math.max(0, sceneTabs.length - 1));
+				SceneEvents.sceneChanged.emit(sceneTabs[sceneTabHandle.position]);
+			}
+		}
+	}
 }
