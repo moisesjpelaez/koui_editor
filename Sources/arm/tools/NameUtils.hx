@@ -6,22 +6,41 @@ import koui.elements.Element;
 class NameUtils {
 	static var elements: Array<THierarchyEntry> = ElementsData.data.elements;
 
-	public static function generateName(element: Element, parent: Element): String {
-		var baseName: String = Type.getClassName(Type.getClass(element)).split(".").pop();
-		var siblings: Array<Element> = HierarchyUtils.getChildren(parent);
-
-		// Count same-type siblings (excluding the element itself)
-		var sameTypeCount: Int = 0;
-		for (sibling in siblings) {
-			if (sibling != element && Type.getClass(sibling) == Type.getClass(element)) {
-				sameTypeCount++;
+	/**
+	 * Generate a unique name from a base name and a list of existing names.
+	 * Finds the lowest available number suffix (e.g., "Scene_1", "Scene_2", etc.)
+	 * @param baseName The base name (e.g., "Scene", "Button")
+	 * @param existingNames Array of existing names to check against
+	 * @param separator The separator between base name and number (default: " ")
+	 * @return A unique name with the lowest available number suffix
+	 */
+	public static function generateUniqueName(baseName: String, existingNames: Array<String>, separator: String = "_"): String {
+		// Collect existing numbers for this base name
+		var existingNumbers: Array<Int> = [];
+		for (name in existingNames) {
+			// Check if name starts with our baseName
+			if (name.indexOf(baseName) == 0) {
+				// Try to extract the number suffix
+				var parts: Array<String> = name.split(separator);
+				if (parts.length > 1) {
+					var num: Null<Int> = Std.parseInt(parts[parts.length - 1]);
+					if (num != null) {
+						existingNumbers.push(num);
+					}
+				}
 			}
 		}
 
-		return baseName + "_" + (sameTypeCount + 1);
+		// Find the lowest available number starting from 1
+		var counter: Int = 1;
+		while (existingNumbers.indexOf(counter) != -1) {
+			counter++;
+		}
+
+		return baseName + separator + counter;
 	}
 
-	public static function ensureUniqueName(proposedName: String, element: Element, parent: Element): String {
+	static function getSiblingNames(element: Element, parent: Element): Array<String> {
 		var siblings: Array<Element> = HierarchyUtils.getChildren(parent);
 		var existingNames: Array<String> = [];
 
@@ -37,25 +56,27 @@ class NameUtils {
 			}
 		}
 
+		return existingNames;
+	}
+
+	public static function generateName(element: Element, parent: Element): String {
+		var baseName: String = Type.getClassName(Type.getClass(element)).split(".").pop();
+		var existingNames: Array<String> = getSiblingNames(element, parent);
+		return generateUniqueName(baseName, existingNames, "_");
+	}
+
+	public static function ensureUniqueName(proposedName: String, element: Element, parent: Element): String {
+		var existingNames: Array<String> = getSiblingNames(element, parent);
+
 		// If no conflict, use proposed name
 		if (existingNames.indexOf(proposedName) == -1) {
 			return proposedName;
 		}
 
-		// Extract base and number from proposedName (e.g., "Button_1" -> "Button", 1)
+		// Extract base name from proposedName (e.g., "Button_1" -> "Button")
 		var parts: Array<String> = proposedName.split("_");
 		var baseName: String = parts[0];
-		var startNum: Int = parts.length > 1 ? Std.parseInt(parts[parts.length - 1]) : 1;
-		if (startNum == null) startNum = 1;
 
-		// Increment until we find a unique name
-		var uniqueName: String = proposedName;
-		var counter: Int = startNum;
-		while (existingNames.indexOf(uniqueName) != -1) {
-			counter++;
-			uniqueName = baseName + "_" + counter;
-		}
-
-		return uniqueName;
+		return generateUniqueName(baseName, existingNames, "_");
 	}
 }

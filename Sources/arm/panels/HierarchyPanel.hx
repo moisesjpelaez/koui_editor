@@ -4,6 +4,7 @@ import arm.ElementsData;
 import arm.ElementEvents;
 import arm.base.UIBase;
 import arm.tools.HierarchyUtils;
+import arm.tools.NameUtils;
 import arm.tools.ZuiUtils;
 import arm.types.Enums;
 import haxe.ds.ObjectMap;
@@ -26,7 +27,7 @@ class HierarchyPanel {
 
 	// Scene management
  	var sceneTabHandle: Handle;
-	var sceneTabs: Array<String> = ["Scene"];
+	var sceneTabs: Array<String> = ["Scene_1"];
 	var sceneCounter: Int = 1;
 
 	var elementsData: ElementsData = ElementsData.data;
@@ -72,8 +73,8 @@ class HierarchyPanel {
 		sceneTabHandle.position = uiBase.ui.combo(sceneTabHandle, sceneTabs, "", true);
 
 		if (ZuiUtils.iconButton(uiBase.ui, icons, 1, 2, "Add Scene", false, false, 0.4)) {
-			sceneCounter++;
-			sceneTabs.push("Scene " + sceneCounter);
+			var newSceneName = NameUtils.generateUniqueName("Scene", sceneTabs);
+			sceneTabs.push(newSceneName);
 			sceneTabHandle.position = sceneTabs.length - 1;
 		}
 

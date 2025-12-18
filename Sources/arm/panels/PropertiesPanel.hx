@@ -178,6 +178,9 @@ class PropertiesPanel {
                     trace('Error: TID "${newTID}" not found in theme. Reverting to "${originalTID}".');
                     tidHandle.text = originalTID;
                 }
+
+                uiBase.hwnds[PanelHierarchy].redraws = 2;
+		        uiBase.hwnds[PanelProperties].redraws = 2;
             }
         }
 
