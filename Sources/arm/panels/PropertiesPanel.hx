@@ -165,6 +165,8 @@ class PropertiesPanel {
         var newName: String = ui.textInput(nameHandle, "Key", Right);
         if (nameHandle.changed) {
             if (newName != null && newName != "") sceneData.updateElementKey(selectedElement, newName);
+            uiBase.hwnds[PanelHierarchy].redraws = 2;
+            uiBase.hwnds[PanelProperties].redraws = 2;
         }
 
         // TID - editable text input

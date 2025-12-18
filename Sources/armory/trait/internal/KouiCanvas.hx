@@ -10,13 +10,14 @@ import koui.elements.Label;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.Layout.Anchor;
 import koui.events.MouseEvent.MouseClickEvent;
+import koui.utils.SceneManager;
 
 // JSON structure typedefs (matching CanvasUtils format)
 private typedef TCanvasData = {
 	var name: String;
 	var version: String;
 	var canvas: TCanvasSettings;
-	var elements: Array<TElementData>;
+	var scenes: Array<TSceneData>;
 }
 
 private typedef TCanvasSettings = {
@@ -31,6 +32,11 @@ private typedef TSettings = {
 	var autoScale: Bool;
 	var scaleHorizontal: Bool;
 	var scaleVertical: Bool;
+}
+
+private typedef TSceneData = {
+	var key: String;
+	var elements: Array<TElementData>;
 }
 
 private typedef TElementData = {
@@ -49,7 +55,6 @@ private typedef TElementData = {
 }
 
 // KouiCanvas types
-// TODO: Add more element typedefs as needed
 typedef TButton = {
 	var element: Button;
 	var onPressed: Signal;
@@ -63,6 +68,14 @@ enum abstract ButtonEvent(Int) from Int to Int {
 	var Released = 2;
 }
 
+// Runtime scene storage
+private typedef TKouiScene = {
+	var key: String;
+	var root: AnchorPane;
+	var elements: Map<String, Element>;
+	var buttons: Map<String, TButton>;
+}
+
 /**
  * Runtime trait for loading and displaying Koui canvases.
  * Attach this trait to a game object in Blender to render a UI canvas.
@@ -71,6 +84,9 @@ enum abstract ButtonEvent(Int) from Int to Int {
  * - Elements are created once from JSON and persist in memory
  * - Direct property modification on elements (no handle lookups)
  * - Better performance for complex UIs
+ *
+ * Supports multiple scenes within a single canvas. Use setScene() to switch
+ * between scenes at runtime. The first scene is automatically activated on load.
  *
  * Note: Koui.init() is automatically called in Main.hx via the armory_hooks.py
  * library hook system. The game startup is wrapped inside Koui.init() callback.
@@ -81,15 +97,15 @@ class KouiCanvas extends Trait {
 	/** The canvas name (without .json extension) */
 	public var cnvName: String;
 
-	/** Map of element key -> Element for fast lookup */
-	private var elementMap: Map<String, Element>;
+	/** All scenes in this canvas */
+	private var scenes: Map<String, TKouiScene>;
 
-	/** The root AnchorPane containing all canvas elements */
-	private var rootPane: AnchorPane;
+	/** The currently active scene */
+	private var currentScene: TKouiScene;
 
 	/** Whether the canvas has finished loading */
 	public var ready(get, null): Bool;
-	private function get_ready(): Bool { return rootPane != null; }
+	private function get_ready(): Bool { return currentScene != null; }
 
 	/** Callbacks to execute when canvas is ready */
 	private var onReadyFuncs: Array<Void->Void> = null;
@@ -107,9 +123,6 @@ class KouiCanvas extends Trait {
 	var baseH: Int = 576;
 	var baseW: Int = 1024;
 
-	// Elements
-	var buttons: Map<String, TButton> = new Map();
-
 	/**
 	 * Create a new KouiCanvas trait.
 	 * @param canvasName Name of the canvas (without .json extension)
@@ -120,7 +133,7 @@ class KouiCanvas extends Trait {
 		trace("[KouiCanvas] Initializing canvas: " + canvasName);
 
 		cnvName = canvasName;
-		elementMap = new Map();
+		scenes = new Map();
 
 		notifyOnInit(function() {
 			// Load canvas JSON
@@ -166,11 +179,9 @@ class KouiCanvas extends Trait {
 
 	function onRemove(): Void {
 		// Clean up when trait is removed
-		if (rootPane != null) {
-			Koui.remove(rootPane);
-			rootPane = null;
-		}
-		elementMap.clear();
+		SceneManager.clearScenes();
+		scenes.clear();
+		currentScene = null;
 		if (expandOnResize) App.resized.disconnect(onAppResized);
 	}
 
@@ -192,46 +203,76 @@ class KouiCanvas extends Trait {
 			baseW = canvasData.canvas.width;
 		}
 
-		// Create root pane with canvas dimensions
-		rootPane = new AnchorPane(0, 0, canvasData.canvas.width, canvasData.canvas.height);
-		elementMap.set("Scene", rootPane);
-
-		// First pass: create all elements
-		for (elemData in canvasData.elements) {
-			var element: Element = createElementFromData(elemData);
-			if (element != null) {
-				elementMap.set(elemData.key, element);
-			}
+		// Build each scene
+		var isFirst: Bool = true;
+		for (sceneData in canvasData.scenes) {
+			buildScene(sceneData, canvasData.canvas.width, canvasData.canvas.height, isFirst);
+			isFirst = false;
 		}
+	}
 
-		// Second pass: parent elements correctly
-		for (elemData in canvasData.elements) {
-			var element: Element = elementMap.get(elemData.key);
-			if (element == null) continue;
+	/**
+	 * Build a single scene from JSON data.
+	 */
+	private function buildScene(sceneData: TSceneData, canvasWidth: Int, canvasHeight: Int, isFirst: Bool): Void {
+		var sceneKey: String = sceneData.key;
 
-			var parent: Element = rootPane;
-			if (elemData.parentKey != null && elementMap.exists(elemData.parentKey)) {
-				parent = elementMap.get(elemData.parentKey);
+		// Create scene storage
+		var kouiScene: TKouiScene = {
+			key: sceneKey,
+			root: null,
+			elements: new Map(),
+			buttons: new Map()
+		};
+
+		// Use SceneManager to create the scene
+		SceneManager.addScene(sceneKey, function(scenePane: AnchorPane) {
+			scenePane.setSize(canvasWidth, canvasHeight);
+			kouiScene.root = scenePane;
+			kouiScene.elements.set(sceneKey, scenePane);
+
+			// First pass: create all elements
+			for (elemData in sceneData.elements) {
+				var element: Element = createElementFromData(elemData, kouiScene);
+				if (element != null) {
+					kouiScene.elements.set(elemData.key, element);
+				}
 			}
 
-			// Add to parent with correct anchor
-			if (Std.isOfType(parent, AnchorPane)) {
-				var anchorPane: AnchorPane = cast parent;
-				anchorPane.add(element, cast elemData.anchor);
-			} else {
-				element.parent = parent;
-				parent.children.push(element);
+			// Second pass: parent elements correctly
+			for (elemData in sceneData.elements) {
+				var element: Element = kouiScene.elements.get(elemData.key);
+				if (element == null) continue;
+
+				var parent: Element = scenePane;
+				if (elemData.parentKey != null && kouiScene.elements.exists(elemData.parentKey)) {
+					parent = kouiScene.elements.get(elemData.parentKey);
+				}
+
+				// Add to parent with correct anchor
+				if (Std.isOfType(parent, AnchorPane)) {
+					var anchorPane: AnchorPane = cast parent;
+					anchorPane.add(element, cast elemData.anchor);
+				} else {
+					element.parent = parent;
+					parent.children.push(element);
+				}
 			}
+		});
+
+		// Store scene
+		scenes.set(sceneKey, kouiScene);
+
+		// First scene becomes active
+		if (isFirst) {
+			currentScene = kouiScene;
 		}
-
-		// Add root pane to Koui's default layout
-		Koui.add(rootPane, TopLeft);
 	}
 
 	/**
 	 * Create an element from JSON data.
 	 */
-	private function createElementFromData(data: TElementData): Element {
+	private function createElementFromData(data: TElementData, kouiScene: TKouiScene): Element {
 		var element: Element = null;
 
 		switch (data.type) {
@@ -253,7 +294,7 @@ class KouiCanvas extends Trait {
 					onHold: new Signal(),
 					onReleased: new Signal()
 				}
-				buttons.set(data.key, btn);
+				kouiScene.buttons.set(data.key, btn);
 
 				if (data.properties.isToggle != null) {
 					button.isToggle = data.properties.isToggle;
@@ -337,20 +378,73 @@ class KouiCanvas extends Trait {
 		onReadyFuncs.push(f);
 	}
 
+	// -------------------------------------------------------------------------
+	// Scene Management
+	// -------------------------------------------------------------------------
+
 	/**
-	 * Get an element by its key.
+	 * Switch to a different scene by name.
+	 * The previous scene is hidden and the new scene is shown.
+	 *
+	 * @param sceneName The name of the scene to switch to
+	 * @return True if the scene was found and switched, false otherwise
+	 */
+	public function setScene(sceneName: String): Bool {
+		var scene: TKouiScene = scenes.get(sceneName);
+		if (scene == null) {
+			trace('[KouiCanvas] Scene not found: "$sceneName"');
+			return false;
+		}
+
+		SceneManager.setScene(sceneName);
+		currentScene = scene;
+		return true;
+	}
+
+	/**
+	 * Get the name of the currently active scene.
+	 *
+	 * @return The current scene name, or null if no scene is active
+	 */
+	public function getCurrentSceneName(): Null<String> {
+		return currentScene != null ? currentScene.key : null;
+	}
+
+	/**
+	 * Get all scene names in this canvas.
+	 *
+	 * @return Array of scene names
+	 */
+	public function getSceneNames(): Array<String> {
+		var names: Array<String> = [];
+		for (key in scenes.keys()) {
+			names.push(key);
+		}
+		return names;
+	}
+
+	// -------------------------------------------------------------------------
+	// Element Access (Current Scene)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Get an element by its key from the current scene.
 	 *
 	 * @param key The element's unique key
 	 * @return The element, or null if not found
 	 */
 	public function getElement(key: String): Null<Element> {
-		var element: Element = elementMap.get(key);
-		if (element == null) trace('[KouiCanvas] Element not found: "$key"');
+		if (currentScene == null) {
+			trace('[KouiCanvas] No scene active');
+			return null;
+		}
+		var element: Element = currentScene.elements.get(key);
+		if (element == null) trace('[KouiCanvas] Element not found: "$key" in scene "${currentScene.key}"');
 		return element;
 	}
 
 	/**
-	 * Get an element by its key, cast to a specific type.
+	 * Get an element by its key from the current scene, cast to a specific type.
 	 * Returns null if the element doesn't exist or isn't of the requested type.
 	 *
 	 * Example:
@@ -364,33 +458,89 @@ class KouiCanvas extends Trait {
 	 * @return The element cast to type T, or null
 	 */
 	public function getElementAs<T: Element>(cls: Class<T>, key: String): Null<T> {
-		var element: Element = elementMap.get(key);
-		if (element == null) {
-			trace('[KouiCanvas] Element not found: "$key"');
-			return null;
-		}
+		var element: Element = getElement(key);
+		if (element == null) return null;
 		var casted = Std.downcast(element, cls);
 		if (casted == null) trace('[KouiCanvas] Element "$key" is not of type ${Type.getClassName(cls)}');
 		return casted;
 	}
 
+	/**
+	 * Get a button from the current scene with its signal handlers.
+	 *
+	 * @param key The button's unique key
+	 * @return The TButton with signals, or null if not found
+	 */
 	public function getButton(key: String): Null<TButton> {
-		var btn: TButton = buttons.get(key);
+		if (currentScene == null) {
+			trace('[KouiCanvas] No scene active');
+			return null;
+		}
+		var btn: TButton = currentScene.buttons.get(key);
 		if (btn == null) {
-			trace('[KouiCanvas] Button not found: "$key"');
+			trace('[KouiCanvas] Button not found: "$key" in scene "${currentScene.key}"');
 			return null;
 		}
 		return btn;
 	}
 
 	/**
-	 * Get all element keys in this canvas.
+	 * Get all element keys in the current scene.
 	 *
 	 * @return Iterator over all element keys
 	 */
 	public function getElementKeys(): Iterator<String> {
-		return elementMap.keys();
+		if (currentScene == null) return [].iterator();
+		return currentScene.elements.keys();
 	}
+
+	// -------------------------------------------------------------------------
+	// Cross-Scene Element Access
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Get an element by its key from a specific scene.
+	 * Use this for cross-scene element access.
+	 *
+	 * @param sceneName The scene to look in
+	 * @param key The element's unique key
+	 * @return The element, or null if not found
+	 */
+	public function getElementFromScene(sceneName: String, key: String): Null<Element> {
+		var scene: TKouiScene = scenes.get(sceneName);
+		if (scene == null) {
+			trace('[KouiCanvas] Scene not found: "$sceneName"');
+			return null;
+		}
+		var element: Element = scene.elements.get(key);
+		if (element == null) trace('[KouiCanvas] Element not found: "$key" in scene "$sceneName"');
+		return element;
+	}
+
+	/**
+	 * Get a button from a specific scene with its signal handlers.
+	 *
+	 * @param sceneName The scene to look in
+	 * @param key The button's unique key
+	 * @return The TButton with signals, or null if not found
+	 */
+	public function getButtonFromScene(sceneName: String, key: String): Null<TButton> {
+		var scene: TKouiScene = scenes.get(sceneName);
+		if (scene == null) {
+			trace('[KouiCanvas] Scene not found: "$sceneName"');
+			return null;
+		}
+		var btn: TButton = scene.buttons.get(key);
+		if (btn == null) {
+			trace('[KouiCanvas] Button not found: "$key" in scene "$sceneName"');
+			return null;
+		}
+		return btn;
+	}
+
+	// -------------------------------------------------------------------------
+	// Canvas Properties
+	// -------------------------------------------------------------------------
 
 	/**
 	 * Set whether the canvas is visible.
@@ -400,8 +550,8 @@ class KouiCanvas extends Trait {
 	 */
 	public function setCanvasVisible(visible: Bool): Void {
 		canvasVisible = visible;
-		if (rootPane != null) {
-			rootPane.visible = visible;
+		if (currentScene != null && currentScene.root != null) {
+			currentScene.root.visible = visible;
 		}
 	}
 
@@ -415,25 +565,27 @@ class KouiCanvas extends Trait {
 	}
 
 	/**
-	 * Set the canvas dimensions.
+	 * Set the canvas dimensions for all scenes.
 	 *
 	 * @param width The new width
 	 * @param height The new height
 	 */
 	public function setCanvasDimensions(width: Int, height: Int): Void {
-		if (rootPane != null) {
-			rootPane.width = width;
-			rootPane.height = height;
+		for (scene in scenes) {
+			if (scene.root != null) {
+				scene.root.width = width;
+				scene.root.height = height;
+			}
 		}
 	}
 
 	/**
-	 * Get the root AnchorPane of this canvas.
+	 * Get the root AnchorPane of the current scene.
 	 *
-	 * @return The root pane, or null if canvas isn't ready
+	 * @return The root pane, or null if no scene is active
 	 */
 	public function getRoot(): Null<AnchorPane> {
-		return rootPane;
+		return currentScene != null ? currentScene.root : null;
 	}
 
 	/**

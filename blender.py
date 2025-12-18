@@ -203,14 +203,29 @@ def register():
 
             canvas_file = os.path.join(canvas_path, self.canvas_name + '.json')
             if not os.path.exists(canvas_file):
-                # Create a minimal empty canvas
+                # Create a minimal empty canvas with one scene
                 import json
                 render_settings = bpy.context.scene.render
                 empty_canvas = {
                     "name": self.canvas_name,
-                    "width": render_settings.resolution_x,
-                    "height": render_settings.resolution_y,
-                    "elements": []
+                    "version": "1.1",
+                    "canvas": {
+                        "width": render_settings.resolution_x,
+                        "height": render_settings.resolution_y,
+                        "settings": {
+                            "expandOnResize": False,
+                            "scaleOnResize": False,
+                            "autoScale": False,
+                            "scaleHorizontal": False,
+                            "scaleVertical": False
+                        }
+                    },
+                    "scenes": [
+                        {
+                            "key": "Scene_1",
+                            "elements": []
+                        }
+                    ]
                 }
                 with open(canvas_file, 'w') as f:
                     json.dump(empty_canvas, f, indent=2)
