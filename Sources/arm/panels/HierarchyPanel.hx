@@ -2,7 +2,6 @@ package arm.panels;
 
 import arm.ElementsData;
 import arm.ElementEvents;
-import arm.KouiEditor;
 import arm.base.UIBase;
 import arm.tools.HierarchyUtils;
 import arm.types.Enums;
