@@ -529,7 +529,38 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function onSceneNameChanged(oldKey: String, newKey: String): Void {
-		// TODO
+		// Cache all elements from current scene before removing
+		var currentScene = sceneData.currentScene;
+		var cachedElements: Array<{key: String, element: Element, anchor: Int}> = [];
+
+		for (entry in currentScene.elements) {
+			// Store element with its anchor position
+			cachedElements.push({
+				key: entry.key,
+				element: entry.element,
+				anchor: cast entry.element.anchor
+			});
+			// Remove from old root so it doesn't get destroyed
+			rootPane.remove(entry.element);
+		}
+
+		// Remove old scene entry from sceneData to avoid duplicate
+		var sceneIdx = sceneData.scenes.indexOf(currentScene);
+		if (sceneIdx >= 0) {
+			sceneData.scenes.splice(sceneIdx, 1);
+		}
+
+		// Remove from SceneManager and re-add with new name
+		SceneManager.removeScene(oldKey);
+		SceneManager.addScene(newKey, setupRootScene);
+		SceneManager.setScene(newKey);
+		sceneData.currentScene.key = newKey;
+
+		// Restore all cached elements to the new root pane
+		for (cached in cachedElements) {
+			rootPane.add(cached.element, cast cached.anchor);
+			sceneData.currentScene.elements.push({key: cached.key, element: cached.element});
+		}
 	}
 
 	function onSceneRemoved(sceneName: String): Void {

@@ -450,9 +450,6 @@ class CanvasUtils {
 				// Update anchor if it's a root-level element (already added by KouiEditor, just update anchor)
 				element.anchor = cast elemData.anchor;
 			}
-
-			// Update the scene entry map to include this element
-			scene.elements.push({ key: elemData.key, element: element });
 		}
 	}
 
