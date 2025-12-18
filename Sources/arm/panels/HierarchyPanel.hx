@@ -121,15 +121,15 @@ class HierarchyPanel {
 		// Row layout with delete icon column
 		if (entry.element == elementsData.root) {
 			if (hasChildren) {
-				uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 1]);
+				uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 1 - (indentWidth + EXPAND_BUTTON_WIDTH) / winW]);
 			} else {
-				uiBase.ui.row([indentWidth / winW, 1]);
+				uiBase.ui.row([indentWidth / winW, 1 - indentWidth / winW]);
 			}
 		} else {
 			if (hasChildren) {
-				uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 5/7, 2/7]);
+				uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 0.8 - (indentWidth * 0.5 + EXPAND_BUTTON_WIDTH) / winW, 0.2 - (indentWidth * 0.5 + EXPAND_BUTTON_WIDTH) / winW]); // TODO: needs testing for nested children
 			} else {
-				uiBase.ui.row([indentWidth / winW, 5/7, 2/7]);
+				uiBase.ui.row([indentWidth / winW, 0.8 - indentWidth * 0.5 / winW, 0.2 - indentWidth * 0.5 / winW]);
 			}
 		}
 
