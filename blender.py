@@ -213,9 +213,9 @@ def register():
                         "width": render_settings.resolution_x,
                         "height": render_settings.resolution_y,
                         "settings": {
-                            "expandOnResize": False,
-                            "scaleOnResize": False,
-                            "autoScale": False,
+                            "expandOnResize": True,
+                            "scaleOnResize": True,
+                            "autoScale": True,
                             "scaleHorizontal": False,
                             "scaleVertical": False
                         }
