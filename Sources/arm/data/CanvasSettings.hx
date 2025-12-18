@@ -1,4 +1,4 @@
-package arm;
+package arm.data;
 
 class CanvasSettings {
     public static var expandOnResize: Bool = true;

@@ -1,7 +1,8 @@
 package arm.panels;
 
-import arm.ElementsData;
-import arm.ElementEvents;
+import arm.data.SceneData;
+import arm.events.ElementEvents;
+import arm.events.SceneEvents;
 import arm.base.UIBase;
 import arm.tools.HierarchyUtils;
 import arm.tools.NameUtils;
@@ -26,12 +27,11 @@ class HierarchyPanel {
 	static inline var GHOST_OFFSET: Float = 10;
 
 	// Scene management
- 	var sceneTabHandle: Handle;
-	var sceneTabs: Array<String> = ["Scene_1"];
+	 var sceneTabHandle: Handle;
+	var sceneTabs: Array<String> = [];
 	var sceneCounter: Int = 1;
 
-	var elementsData: ElementsData = ElementsData.data;
-    var elements: Array<THierarchyEntry> = ElementsData.data.elements;
+	var sceneData: SceneData = SceneData.data;
 
 	// Expand/collapse state - keyed by element reference
 	var expanded: ObjectMap<Element, Bool> = new ObjectMap();
@@ -52,15 +52,39 @@ class HierarchyPanel {
 
 		ElementEvents.elementAdded.connect(onElementAdded);
 		ElementEvents.elementSelected.connect(onElementSelected);
+		SceneEvents.sceneChanged.connect(onSceneChanged);
+		SceneEvents.sceneRemoved.connect(onSceneRemoved);
+		SceneEvents.sceneAdded.connect(onSceneAdded);
+
+		// Initialize tabs from existing scenes
+		if (sceneData.scenes.length > 0) {
+			for (scene in sceneData.scenes) {
+				sceneTabs.push(scene.key);
+			}
+			// set combo to currentScene if present
+			if (sceneData.currentScene != null) {
+				var idx = sceneTabs.indexOf(sceneData.currentScene.key);
+				sceneTabHandle.position = idx >= 0 ? idx : 0;
+			} else {
+				sceneTabHandle.position = 0;
+			}
+		}
 	}
 
 	public function draw(uiBase: UIBase, params: Dynamic): Void {
 		if (uiBase.ui.window(uiBase.hwnds[PanelHierarchy], params.tabx, 0, params.w, params.h0)) {
+			// Ensure tabs have at least the current scene
+			if (sceneTabs.length == 0 && sceneData.currentScene != null) {
+				sceneTabs.push(sceneData.currentScene.key);
+				sceneTabHandle.position = 0;
+			}
 			drawSceneSelector(uiBase);
 			uiBase.ui.separator();
 
-            // Draw root element
-            drawItem(uiBase, elements[0], 0);
+            // Draw root element (only if currentScene exists)
+            if (sceneData.currentScene != null) {
+                drawItem(uiBase, { key: sceneData.currentScene.key, element: sceneData.currentScene.root }, 0);
+            }
 		}
 
 		drawDragGhost(uiBase);
@@ -72,19 +96,53 @@ class HierarchyPanel {
 
 		sceneTabHandle.position = uiBase.ui.combo(sceneTabHandle, sceneTabs, "", true);
 
+		if (sceneTabHandle.changed) {
+			var sceneName: String = sceneTabs[sceneTabHandle.position];
+			SceneEvents.sceneChanged.emit(sceneName);
+		}
+
 		if (ZuiUtils.iconButton(uiBase.ui, icons, 1, 2, "Add Scene", false, false, 0.4)) {
 			var newSceneName = NameUtils.generateUniqueName("Scene", sceneTabs);
 			sceneTabs.push(newSceneName);
 			sceneTabHandle.position = sceneTabs.length - 1;
+			SceneEvents.sceneAdded.emit(newSceneName);
 		}
 
 		if (ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete Scene", false, sceneTabs.length <= 1, 0.4)) {
 			var idx: Int = sceneTabHandle.position;
+			var sceneName: String = sceneTabs[idx];
 			sceneTabs.splice(idx, 1);
 			if (idx >= sceneTabs.length) {
 				sceneTabHandle.position = sceneTabs.length - 1;
 			}
+			SceneEvents.sceneRemoved.emit(sceneName);
 		}
+	}
+
+	function onSceneAdded(sceneName: String): Void {
+		if (!sceneTabs.contains(sceneName)) {
+			sceneTabs.push(sceneName);
+		}
+		sceneTabHandle.position = sceneTabs.indexOf(sceneName);
+	}
+
+	function onSceneRemoved(sceneName: String): Void {
+		var idx = sceneTabs.indexOf(sceneName);
+		if (idx >= 0) {
+			sceneTabs.splice(idx, 1);
+			if (sceneTabHandle.position >= sceneTabs.length) {
+				sceneTabHandle.position = Std.int(Math.max(0, sceneTabs.length - 1));
+			}
+		}
+	}
+
+	function onSceneChanged(sceneName: String): Void {
+		var idx = sceneTabs.indexOf(sceneName);
+		if (idx == -1) {
+			sceneTabs.push(sceneName);
+			idx = sceneTabs.length - 1;
+		}
+		sceneTabHandle.position = idx;
 	}
 
 	function drawItem(uiBase: UIBase, entry: THierarchyEntry, depth: Int) {
@@ -96,7 +154,9 @@ class HierarchyPanel {
 		var children: Array<Element> = [];
 		for (child in allChildren) {
 			// Include containers and elements that are in our elements list
-			for (e in elements) {
+			var currentScene = SceneData.data.currentScene;
+			if (currentScene == null) continue;
+			for (e in currentScene.elements) {
 				if (e.element == child) {
 					children.push(child);
 					break;
@@ -119,7 +179,7 @@ class HierarchyPanel {
 		drawDropIndicator(uiBase.ui, entry.element, localX, localY, winW, rowH, indentWidth);
 
 		// Row layout with delete icon column
-		if (entry.element == elementsData.root) {
+		if (entry.element == sceneData.currentScene.root) {
 			if (hasChildren) {
 				uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 1 - (indentWidth + EXPAND_BUTTON_WIDTH) / winW]);
 			} else {
@@ -141,7 +201,8 @@ class HierarchyPanel {
 		}
 
 		// For root element, show scene name as text input for renaming
-		if (entry.element == elementsData.root) {
+		if (entry.element == sceneData.currentScene.root) {
+			if (sceneTabs.length == 0) return; // nothing to edit
 			var currentIdx: Int = sceneTabHandle.position;
 			if (currentIdx >= sceneTabs.length) currentIdx = sceneTabs.length - 1;
 			if (currentIdx < 0) currentIdx = 0;
@@ -165,7 +226,9 @@ class HierarchyPanel {
 					newName = NameUtils.generateUniqueName(baseName, otherScenes, "_");
 				}
 
+				var oldName: String = sceneTabs[currentIdx];
 				sceneTabs[currentIdx] = newName;
+				SceneEvents.sceneNameChanged.emit(oldName, newName);
 			}
 		} else {
 			// Item button with selection highlighting
@@ -174,8 +237,8 @@ class HierarchyPanel {
 		}
 
 		// Delete icon button
-		if (entry.element != elementsData.root) {
-			var deleteDisabled = entry.element == elementsData.root;
+		if (entry.element != sceneData.currentScene.root) {
+			var deleteDisabled = entry.element == sceneData.currentScene.root;
 			var deleteClicked = ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete", false, deleteDisabled, 0.4);
 			if (deleteClicked) {
 				ElementEvents.elementRemoved.emit(entry.element);
@@ -188,7 +251,9 @@ class HierarchyPanel {
 		// Recursively draw children
 		if (hasChildren && isExpanded) {
 			for (child in children) {
-                for (entry in elements) {
+				var currentScene = SceneData.data.currentScene;
+				if (currentScene == null) continue;
+                for (entry in currentScene.elements) {
                     if (entry.element == child) {
                         drawItem(uiBase, entry, depth + 1);
                         break;
@@ -221,11 +286,11 @@ class HierarchyPanel {
 	}
 
 	function handleItemInteraction(uiBase: UIBase, entry: THierarchyEntry) {
-		var isRoot: Bool = elements.length > 0 && entry.element == elements[0].element;
+		var isRoot: Bool = sceneData.currentScene.root != null && entry.element == sceneData.currentScene.root;
 
 		// Selection on click start
 		if (uiBase.ui.isPushed) {
-			if (entry.element == elementsData.root) return;
+			if (entry.element == sceneData.currentScene.root) return;
             selectedElement = entry.element;
 			ElementEvents.elementSelected.emit(entry.element);
 
@@ -371,7 +436,7 @@ class HierarchyPanel {
     }
 
     public function onElementAdded(entry: THierarchyEntry): Void {
-		if (entry.element == elementsData.root) return;
+		if (entry.element == sceneData.currentScene.root) return;
         onElementSelected(entry.element);
         registerChildren(entry.element);
     }

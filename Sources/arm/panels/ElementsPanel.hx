@@ -1,6 +1,6 @@
 package arm.panels;
 
-import arm.ElementEvents;
+import arm.events.ElementEvents;
 import arm.base.UIBase;
 import iron.App;
 import koui.elements.Button;

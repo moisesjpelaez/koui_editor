@@ -16,7 +16,7 @@ private typedef TCanvasData = {
 	var name: String;
 	var version: String;
 	var canvas: TCanvasSettings;
-	var elements: Array<TElementsData>;
+	var elements: Array<TElementData>;
 }
 
 private typedef TCanvasSettings = {
@@ -33,7 +33,7 @@ private typedef TSettings = {
 	var scaleVertical: Bool;
 }
 
-private typedef TElementsData = {
+private typedef TElementData = {
 	var key: String;
 	var type: String;
 	var tID: String;
@@ -231,7 +231,7 @@ class KouiCanvas extends Trait {
 	/**
 	 * Create an element from JSON data.
 	 */
-	private function createElementFromData(data: TElementsData): Element {
+	private function createElementFromData(data: TElementData): Element {
 		var element: Element = null;
 
 		switch (data.type) {

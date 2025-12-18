@@ -1,7 +1,8 @@
 package arm;
 
-import arm.ElementsData;
-import arm.ElementEvents;
+import arm.data.SceneData;
+import arm.events.ElementEvents;
+import arm.events.SceneEvents;
 import arm.base.Base;
 import arm.base.UIBase;
 import arm.panels.BottomPanel;
@@ -27,17 +28,18 @@ import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.Layout.Anchor;
+import koui.utils.SceneManager;
 
 @:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane)
 class KouiEditor extends iron.Trait {
 	var uiBase: UIBase;
 
-	var anchorPane: AnchorPane;
+	var rootPane: AnchorPane;
 	var sizeInit: Bool = false;
 
 	// Created elements
-	var elementsData: ElementsData = ElementsData.data;
-	var elements: Array<THierarchyEntry> = ElementsData.data.elements;
+	var sceneData: SceneData = SceneData.data;
+	// var elements: Array<THierarchyEntry> = SceneData.data.elements;
 
 	// Drag and drop state
 	var selectedElement: Element = null;
@@ -68,8 +70,9 @@ class KouiEditor extends iron.Trait {
 	var elementsPanel: ElementsPanel = new ElementsPanel();
 	var baseH: Int = 576;
 
-	// HACK: ensure canvas is loaded after Koui init
-	var canvasLoaded: Bool = false;
+	var canvasLoaded: Bool = false; // HACK: ensure canvas is loaded after Koui init
+	var canvasWidth: Int = 1024;
+	var canvasHeight: Int = 576;
 
 	public function new() {
 		super();
@@ -89,8 +92,8 @@ class KouiEditor extends iron.Trait {
 			Koui.init(function() {
 				Koui.setPadding(100, 100, 75, 75);
 
-				var canvasWidth: Int = Std.int(App.w());
-				var canvasHeight: Int = Std.int(App.h());
+				canvasWidth = Std.int(App.w());
+				canvasHeight = Std.int(App.h());
 
 				var argCount = Krom.getArgCount();
 				// Arguments are: [0]=krom_path, [1]=koui_editor_path, [2]=koui_editor_path,
@@ -105,15 +108,7 @@ class KouiEditor extends iron.Trait {
 				}
 				baseH = canvasHeight;
 
-				anchorPane = new AnchorPane(0, 0, canvasWidth, canvasHeight);
-				anchorPane.setTID("fixed_anchorpane");
-
-				// Initialize canvas name from command line args
-				Koui.add(anchorPane, Anchor.MiddleCenter);
-				elements.push({ key: "AnchorPane", element: anchorPane });
-				elementsData.root = anchorPane;
-				hierarchyPanel.onElementAdded(elements[0]); // Manually register the root element in the hierarchy
-
+				SceneManager.addScene("Scene_1", setupRootScene);
 				CanvasUtils.refreshTheme();
 			});
 
@@ -124,6 +119,11 @@ class KouiEditor extends iron.Trait {
 			ElementEvents.elementDropped.connect(onElementDropped);
 			ElementEvents.elementRemoved.connect(onElementRemoved);
 
+			SceneEvents.sceneAdded.connect(onSceneAdded);
+			SceneEvents.sceneChanged.connect(onSceneChanged);
+			SceneEvents.sceneNameChanged.connect(onSceneNameChanged);
+			SceneEvents.sceneRemoved.connect(onSceneRemoved);
+
 			topToolbar.setIcons(Assets.images.icons);
 			hierarchyPanel.setIcons(Assets.images.icons);
 			propertiesPanel.setIcons(Assets.images.icons);
@@ -131,6 +131,22 @@ class KouiEditor extends iron.Trait {
 
 		notifyOnUpdate(update);
 		notifyOnRender2D(render2D);
+	}
+
+	function setupRootScene(scene: AnchorPane): Void {
+		scene.setSize(canvasWidth, canvasHeight);
+		scene.setTID("fixed_anchorpane");
+		scene.anchor = Anchor.MiddleCenter;
+		scene.invalidateElem();
+		var s: TSceneEntry = {
+		    key: "Scene_1",
+		    root: scene,
+		    elements: []
+		};
+		sceneData.scenes.push(s);
+		sceneData.currentScene = s;
+		rootPane = scene;
+		hierarchyPanel.onElementAdded({ key: sceneData.currentScene.key, element: sceneData.currentScene.root }); // Manually register the root element in the
 	}
 
 	function update() {
@@ -144,7 +160,7 @@ class KouiEditor extends iron.Trait {
 		updateDragAndDrop();
 
 		var keyboard: Keyboard = Input.getKeyboard();
-		if (keyboard.started("delete") && selectedElement != null && selectedElement != anchorPane) {
+		if (keyboard.started("delete") && selectedElement != null && selectedElement != rootPane) {
 			ElementEvents.elementRemoved.emit(selectedElement);
 		}
 	}
@@ -172,11 +188,11 @@ class KouiEditor extends iron.Trait {
 			canvasPanX += deltaX;
 			canvasPanY += deltaY;
 
-			anchorPane.posX = Std.int(canvasPanX / Koui.uiScale);
-			anchorPane.posY = Std.int(canvasPanY / Koui.uiScale);
-			anchorPane.drawX = Std.int(anchorPane.posX * Koui.uiScale);
-			anchorPane.drawY = Std.int(anchorPane.posY * Koui.uiScale);
-			Koui.anchorPane.elemUpdated(anchorPane);
+			rootPane.posX = Std.int(canvasPanX / Koui.uiScale);
+			rootPane.posY = Std.int(canvasPanY / Koui.uiScale);
+			rootPane.drawX = Std.int(rootPane.posX * Koui.uiScale);
+			rootPane.drawY = Std.int(rootPane.posY * Koui.uiScale);
+			Koui.anchorPane.elemUpdated(rootPane);
 
 			// Update start position for next frame
 			panStartX = mouse.x;
@@ -210,11 +226,11 @@ class KouiEditor extends iron.Trait {
 			canvasPanX = 0;
 			canvasPanY = 0;
 
-			anchorPane.posX = Std.int(canvasPanX / Koui.uiScale);
-			anchorPane.posY = Std.int(canvasPanY / Koui.uiScale);
-			anchorPane.drawX = Std.int(anchorPane.posX * Koui.uiScale);
-			anchorPane.drawY = Std.int(anchorPane.posY * Koui.uiScale);
-			Koui.anchorPane.elemUpdated(anchorPane);
+			rootPane.posX = Std.int(canvasPanX / Koui.uiScale);
+			rootPane.posY = Std.int(canvasPanY / Koui.uiScale);
+			rootPane.drawX = Std.int(rootPane.posX * Koui.uiScale);
+			rootPane.drawY = Std.int(rootPane.posY * Koui.uiScale);
+			Koui.anchorPane.elemUpdated(rootPane);
 
 			sizeInit = false;
 	}
@@ -229,7 +245,7 @@ class KouiEditor extends iron.Trait {
 			var canvasArea: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize, App.h() - uiBase.getBottomH() - borderSize); // TODO: use a better variable name
 			var hierarchyArea: Vec2 = new Vec2(canvasArea.x + 2 * borderSize, App.h() - uiBase.getSidebarH1() - borderSize); // TODO: use a better variable name
 
-			if (element != null && element != anchorPane) {
+			if (element != null && element != rootPane) {
 				if (element.parent is Button) selectedElement = element.parent;
 				else selectedElement = element;
 				ElementEvents.elementSelected.emit(selectedElement);
@@ -257,8 +273,8 @@ class KouiEditor extends iron.Trait {
 			anchorOffsetY = elemY;
 
 			// Get parent dimensions for anchor calculations
-			var parentWidth: Int = draggedElement.parent != null ? draggedElement.parent.drawWidth : anchorPane.drawWidth;
-			var parentHeight: Int = draggedElement.parent != null ? draggedElement.parent.drawHeight : anchorPane.drawHeight;
+			var parentWidth: Int = draggedElement.parent != null ? draggedElement.parent.drawWidth : rootPane.drawWidth;
+			var parentHeight: Int = draggedElement.parent != null ? draggedElement.parent.drawHeight : rootPane.drawHeight;
 
 			// Adjust position to simulate dragging from the original anchor point
 			switch (dragAnchor) {
@@ -301,16 +317,16 @@ class KouiEditor extends iron.Trait {
 	}
 
 	/**
-	 * Custom method to get elements at a position without clipping to anchorPane bounds.
-	 * This allows selecting elements that are positioned outside the anchorPane's visible area.
+	 * Custom method to get elements at a position without clipping to rootPane bounds.
+	 * This allows selecting elements that are positioned outside the rootPane's visible area.
 	 */
 	function getElementAtPositionUnclipped(x: Int, y: Int): Null<Element> {
-		// Make coords relative to anchorPane layout
-		var relX: Int = x - anchorPane.layoutX;
-		var relY: Int = y - anchorPane.layoutY;
+		// Make coords relative to rootPane layout
+		var relX: Int = x - rootPane.layoutX;
+		var relY: Int = y - rootPane.layoutY;
 
 		// Reverse to ensure that the topmost element is selected
-		var sortedElements: Array<Element> = anchorPane.elements.copy();
+		var sortedElements: Array<Element> = rootPane.elements.copy();
 		sortedElements.reverse();
 
 		for (element in sortedElements) {
@@ -342,14 +358,14 @@ class KouiEditor extends iron.Trait {
 
 	function drawAnchorPane(g2: Graphics) {
 		// Draw border with g2 in screen coordinates using drawX/drawY
-		if (anchorPane != null) {
+		if (rootPane != null) {
 			var thickness: Int = 1;
 			g2.color = 0xffe7e7e7;
 
-			var x: Int = anchorPane.drawX;
-			var y: Int = anchorPane.drawY;
-			var w: Int = anchorPane.drawWidth;
-			var h: Int = anchorPane.drawHeight;
+			var x: Int = rootPane.drawX;
+			var y: Int = rootPane.drawY;
+			var w: Int = rootPane.drawWidth;
+			var h: Int = rootPane.drawHeight;
 
 			g2.fillRect(x, y, w, thickness);
 			g2.fillRect(x, y + h - thickness, w, thickness);
@@ -359,12 +375,12 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function drawSelectedElement(g2: Graphics) {
-		if (selectedElement != null && selectedElement != anchorPane) {
+		if (selectedElement != null && selectedElement != rootPane) {
 			var thickness: Int = 2;
 			g2.color = 0xff469cff;
 
-			var x: Int = draggedElement != selectedElement ? selectedElement.drawX + anchorPane.drawX : Std.int(selectedElement.drawX / Koui.uiScale) + anchorPane.drawX;
-			var y: Int = draggedElement != selectedElement ? selectedElement.drawY + anchorPane.drawY : Std.int(selectedElement.drawY / Koui.uiScale) + anchorPane.drawY;
+			var x: Int = draggedElement != selectedElement ? selectedElement.drawX + rootPane.drawX : Std.int(selectedElement.drawX / Koui.uiScale) + rootPane.drawX;
+			var y: Int = draggedElement != selectedElement ? selectedElement.drawY + rootPane.drawY : Std.int(selectedElement.drawY / Koui.uiScale) + rootPane.drawY;
 			var w: Int = selectedElement.drawWidth;
 			var h: Int = selectedElement.drawHeight;
 
@@ -436,7 +452,7 @@ class KouiEditor extends iron.Trait {
 
 		// Check if dropping as sibling to root AnchorPane (which has no parent)
 		var currentParent: Element = HierarchyUtils.getParentElement(element);
-		if (target == anchorPane) {
+		if (target == rootPane) {
 			var rootFirstElement: Element = cast(target, AnchorPane).elements[0];
 			if (rootFirstElement != element) HierarchyUtils.moveRelativeToTarget(element, rootFirstElement, true);
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
@@ -453,10 +469,13 @@ class KouiEditor extends iron.Trait {
 
 		// Get current name and ensure it's unique in new parent
 		var currentName: String = "";
-		for (entry in elementsData.elements) {
-			if (entry.element == element) {
-				currentName = entry.key;
-				break;
+		var currentScene = SceneData.data.currentScene;
+		if (currentScene != null) {
+			for (entry in currentScene.elements) {
+				if (entry.element == element) {
+					currentName = entry.key;
+					break;
+				}
 			}
 		}
 		var uniqueName: String = NameUtils.ensureUniqueName(currentName, element, newParent);
@@ -464,7 +483,7 @@ class KouiEditor extends iron.Trait {
 		// Perform the mutation
 		switch (zone) {
 			case AsChild:
-				HierarchyUtils.moveAsChild(element, target, anchorPane); // TODO: remove third param?
+				HierarchyUtils.moveAsChild(element, target, rootPane); // TODO: remove third param?
 			case BeforeSibling:
 				HierarchyUtils.moveRelativeToTarget(element, target, true);
 			case AfterSibling:
@@ -474,7 +493,7 @@ class KouiEditor extends iron.Trait {
 
 		// Update name if it changed due to conflict
 		if (uniqueName != currentName) {
-			elementsData.updateElementKey(element, uniqueName);
+			sceneData.updateElementKey(element, uniqueName);
 		}
 
 		uiBase.hwnds[PanelHierarchy].redraws = 2;
@@ -482,19 +501,38 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function onElementAdded(entry: THierarchyEntry): Void {
-		anchorPane.add(entry.element, Anchor.TopLeft);
+		rootPane.add(entry.element, Anchor.TopLeft);
 
 		// Generate unique name based on parent's children
-		var uniqueName: String = NameUtils.generateName(entry.element, anchorPane);
+		var uniqueName: String = NameUtils.generateName(entry.element, rootPane);
 		entry.key = uniqueName;
-		elementsData.updateElementKey(entry.element, uniqueName);
+		sceneData.updateElementKey(entry.element, uniqueName);
 
 		ElementEvents.elementSelected.emit(entry.element);
 	}
 
 	function onElementRemoved(element: Element): Void {
-		anchorPane.remove(element);
+		rootPane.remove(element);
 		selectedElement = null;
 		ElementEvents.elementSelected.emit(null);
+	}
+
+	function onSceneAdded(sceneName: String): Void {
+		SceneManager.addScene(sceneName, setupRootScene);
+		SceneManager.setScene(sceneName);
+		sceneData.currentScene.key = sceneName;
+	}
+
+	function onSceneChanged(sceneName: String): Void {
+		SceneManager.setScene(sceneName);
+		rootPane = SceneManager.activeScene;
+	}
+
+	function onSceneNameChanged(oldKey: String, newKey: String): Void {
+		// TODO
+	}
+
+	function onSceneRemoved(sceneName: String): Void {
+		SceneManager.removeScene(sceneName);
 	}
 }

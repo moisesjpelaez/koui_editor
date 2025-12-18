@@ -1,11 +1,9 @@
 package arm.tools;
 
-import arm.ElementsData;
+import arm.data.SceneData;
 import koui.elements.Element;
 
 class NameUtils {
-	static var elements: Array<THierarchyEntry> = ElementsData.data.elements;
-
 	/**
 	 * Generate a unique name from a base name and a list of existing names.
 	 * Finds the lowest available number suffix (e.g., "Scene_1", "Scene_2", etc.)
@@ -41,13 +39,16 @@ class NameUtils {
 	}
 
 	static function getSiblingNames(element: Element, parent: Element): Array<String> {
+		var currentScene = SceneData.data.currentScene;
+		if (currentScene == null) return [];
+
 		var siblings: Array<Element> = HierarchyUtils.getChildren(parent);
 		var existingNames: Array<String> = [];
 
 		// Collect sibling names (excluding the element itself)
 		for (sibling in siblings) {
 			if (sibling != element) {
-				for (entry in elements) {
+				for (entry in currentScene.elements) {
 					if (entry.element == sibling) {
 						existingNames.push(entry.key);
 						break;

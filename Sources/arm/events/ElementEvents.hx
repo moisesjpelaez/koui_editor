@@ -1,4 +1,4 @@
-package arm;
+package arm.events;
 
 import armory.system.Signal;
 
@@ -7,9 +7,4 @@ class ElementEvents {
     public static var elementSelected: Signal = new Signal(); // args: (element: Element)
 	public static var elementDropped: Signal = new Signal(); // args: (element: Element, target: Element, zone: DropZone)
     public static var elementRemoved: Signal = new Signal(); // args: (element: Element)
-	public static var canvasLoaded: Signal = new Signal();
-
-    public function new() {
-
-    }
 }

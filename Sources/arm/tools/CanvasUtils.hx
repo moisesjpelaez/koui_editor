@@ -1,9 +1,10 @@
 package arm.tools;
 
-import arm.CanvasSettings;
-import arm.ElementsData;
-import arm.ElementsData.THierarchyEntry;
-import arm.ElementEvents;
+import arm.data.CanvasSettings;
+import arm.data.SceneData;
+import arm.data.SceneData.TSceneEntry;
+import arm.events.SceneEvents;
+import arm.events.ElementEvents;
 
 import haxe.Json;
 
@@ -17,7 +18,7 @@ typedef TCanvasData = {
 	var name: String;
 	var version: String;
 	var canvas: TCanvasSettings;
-	var elements: Array<TElementsData>;
+	var scenes: Array<TSceneData>;
 }
 
 typedef TCanvasSettings = {
@@ -32,7 +33,12 @@ typedef TCanvasSettings = {
 	};
 }
 
-typedef TElementsData = {
+typedef TSceneData = {
+	var key: String;
+	var elements: Array<TElementData>;
+}
+
+typedef TElementData = {
 	var key: String;
 	var type: String;
 	var tID: String;
@@ -48,7 +54,7 @@ typedef TElementsData = {
 }
 
 class CanvasUtils {
-	static inline var FORMAT_VERSION: String = "1.0";
+	static inline var FORMAT_VERSION: String = "1.1";
 
 	// Canvas name from command line args (e.g., "MyCanvas")
 	public static var canvasName: String = "UntitledCanvas";
@@ -58,8 +64,7 @@ class CanvasUtils {
 	public static var buildPath: String = "";
 	public static var projectExt: String = "";
 
-	static var elementsData: ElementsData = ElementsData.data;
-    static var elements: Array<THierarchyEntry> = ElementsData.data.elements;
+	static var sceneData: SceneData = SceneData.data;
 
 	/**
 	 * Initializes the canvas name from command line arguments.
@@ -190,7 +195,7 @@ class CanvasUtils {
 
 			deserializeCanvas(canvasData);
 			trace('Canvas loaded: ${canvasName}');
-			ElementEvents.canvasLoaded.emit();
+			SceneEvents.canvasLoaded.emit();
 		} catch (e: Dynamic) {
 			trace('Failed to parse canvas: ${e}');
 		}
@@ -200,24 +205,24 @@ class CanvasUtils {
 	 * Serializes the current canvas state to a TCanvasData structure.
 	 */
 	static function serializeCanvas(): TCanvasData {
-		var root: AnchorPane = elementsData.root;
-		var elementsData: Array<TElementsData> = [];
+		var scenesData: Array<TSceneData> = [];
 
-		// Build a map of element -> key for parent references
-		var elementKeyMap: Map<Element, String> = new Map();
-		for (entry in elements) {
-			elementKeyMap.set(entry.element, entry.key);
+		// Serialize each scene
+		for (scene in sceneData.scenes) {
+			scenesData.push(serializeScene(scene));
 		}
 
-		// Serialize elements in hierarchy order (depth-first traversal)
-		serializeElementsRecursive(root, elementKeyMap, elementsData);
+		// Get canvas dimensions from current scene's root
+		var currentRoot: AnchorPane = sceneData.currentScene != null ? sceneData.currentScene.root : null;
+		var canvasWidth: Int = currentRoot != null ? currentRoot.width : 800;
+		var canvasHeight: Int = currentRoot != null ? currentRoot.height : 600;
 
 		return {
 			name: canvasName,
 			version: FORMAT_VERSION,
 			canvas: {
-				width: root.width,
-				height: root.height,
+				width: canvasWidth,
+				height: canvasHeight,
 				settings: {
 					expandOnResize: CanvasSettings.expandOnResize,
 					scaleOnResize: CanvasSettings.scaleOnResize,
@@ -226,6 +231,27 @@ class CanvasUtils {
 					scaleVertical: CanvasSettings.scaleVertical
 				}
 			},
+			scenes: scenesData
+		};
+	}
+
+	/**
+	 * Serializes a single scene to TSceneData.
+	 */
+	static function serializeScene(scene: TSceneEntry): TSceneData {
+		var elementsData: Array<TElementData> = [];
+
+		// Build a map of element -> key for parent references
+		var elementKeyMap: Map<Element, String> = new Map();
+		for (entry in scene.elements) {
+			elementKeyMap.set(entry.element, entry.key);
+		}
+
+		// Serialize elements in hierarchy order (depth-first traversal)
+		serializeElementsRecursive(scene.root, scene.elements, elementKeyMap, elementsData);
+
+		return {
+			key: scene.key,
 			elements: elementsData
 		};
 	}
@@ -233,7 +259,7 @@ class CanvasUtils {
 	/**
 	 * Recursively serializes elements in hierarchy order.
 	 */
-	static function serializeElementsRecursive(parent: Element, elementKeyMap: Map<Element, String>, output: Array<TElementsData>): Void {
+	static function serializeElementsRecursive(parent: Element, sceneElements: Array<{key: String, element: Element}>, elementKeyMap: Map<Element, String>, output: Array<TElementData>): Void {
 		// Get children of this parent
 		var children: Array<Element> = HierarchyUtils.getChildren(parent);
 
@@ -244,8 +270,8 @@ class CanvasUtils {
 			}
 
 			// Find the entry for this child
-			var entry: THierarchyEntry = null;
-			for (e in elements) {
+			var entry: {key: String, element: Element} = null;
+			for (e in sceneElements) {
 				if (e.element == child) {
 					entry = e;
 					break;
@@ -253,21 +279,21 @@ class CanvasUtils {
 			}
 
 			if (entry != null) {
-				var elementData: TElementsData = serializeElement(entry, elementKeyMap);
+				var elementData: TElementData = serializeElement(entry, elementKeyMap);
 				if (elementData != null) {
 					output.push(elementData);
 				}
 
 				// Recursively serialize children of this element
-				serializeElementsRecursive(child, elementKeyMap, output);
+				serializeElementsRecursive(child, sceneElements, elementKeyMap, output);
 			}
 		}
 	}
 
 	/**
-	 * Serializes a single element to TElementsData.
+	 * Serializes a single element to TElementData.
 	 */
-	static function serializeElement(entry: THierarchyEntry, elementKeyMap: Map<Element, String>): TElementsData {
+	static function serializeElement(entry: {key: String, element: Element}, elementKeyMap: Map<Element, String>): TElementData {
 		var element: Element = entry.element;
 		var type: String = getElementType(element);
 
@@ -347,13 +373,8 @@ class CanvasUtils {
 	 * Deserializes a canvas from TCanvasData and rebuilds the editor state.
 	 */
 	static function deserializeCanvas(canvasData: TCanvasData): Void {
-		var root: AnchorPane = elementsData.root;
-		// Clear existing elements (except root)
+		// Clear existing scenes (and remove from SceneManager/Koui)
 		clearCanvas();
-
-		// Resize canvas if needed
-		root.width = canvasData.canvas.width;
-		root.height = canvasData.canvas.height;
 
 		// Load canvas settings
 		if (canvasData.canvas.settings != null) {
@@ -364,10 +385,36 @@ class CanvasUtils {
 			CanvasSettings.scaleVertical = canvasData.canvas.settings.scaleVertical;
 		}
 
+		// Deserialize each scene by emitting sceneAdded (like the Add Scene button does)
+		var isFirst: Bool = true;
+		for (sceneDataEntry in canvasData.scenes) {
+			deserializeScene(sceneDataEntry, canvasData.canvas.width, canvasData.canvas.height, isFirst);
+			isFirst = false;
+		}
+
+		// If no scenes were loaded, create a default scene
+		if (sceneData.scenes.length == 0) {
+			SceneEvents.sceneAdded.emit("Scene");
+		}
+
+		ElementEvents.elementSelected.emit(null);
+	}
+
+	/**
+	 * Deserializes a single scene from TSceneData.
+	 */
+	static function deserializeScene(sceneDataEntry: TSceneData, canvasWidth: Int, canvasHeight: Int, isFirst: Bool): Void {
+		// Emit sceneAdded - this triggers KouiEditor.onSceneAdded which properly sets up the scene
+		// (just like clicking the Add Scene button does)
+		SceneEvents.sceneAdded.emit(sceneDataEntry.key);
+
+		// Get the scene that was just created by the event handler
+		var scene: TSceneEntry = sceneData.currentScene;
+
 		// First pass: create all elements and store in a map
 		var elementMap: Map<String, Element> = new Map();
 
-		for (elemData in canvasData.elements) {
+		for (elemData in sceneDataEntry.elements) {
 			var element: Element = createElementFromData(elemData);
 			if (element != null) {
 				elementMap.set(elemData.key, element);
@@ -375,7 +422,7 @@ class CanvasUtils {
 		}
 
 		// Second pass: emit elementAdded first, then reparent to correct location
-		for (elemData in canvasData.elements) {
+		for (elemData in sceneDataEntry.elements) {
 			var element: Element = elementMap.get(elemData.key);
 			if (element == null) continue;
 
@@ -384,7 +431,7 @@ class CanvasUtils {
 			ElementEvents.elementAdded.emit({ key: elemData.key, element: element });
 
 			// Now update the key to the loaded value (KouiEditor generated a unique name)
-			for (entry in elements) {
+			for (entry in scene.elements) {
 				if (entry.element == element) {
 					entry.key = elemData.key;
 					break;
@@ -403,15 +450,16 @@ class CanvasUtils {
 				// Update anchor if it's a root-level element (already added by KouiEditor, just update anchor)
 				element.anchor = cast elemData.anchor;
 			}
-		}
 
-        ElementEvents.elementSelected.emit(null);
+			// Update the scene entry map to include this element
+			scene.elements.push({ key: elemData.key, element: element });
+		}
 	}
 
 	/**
-	 * Creates an element from TElementsData.
+	 * Creates an element from TElementData.
 	 */
-	static function createElementFromData(data: TElementsData): Element {
+	static function createElementFromData(data: TElementData): Element {
 		var element: Element = null;
 
 		switch (data.type) {
@@ -466,20 +514,22 @@ class CanvasUtils {
 	}
 
 	/**
-	 * Clears all elements from the canvas (except root AnchorPane).
+	 * Clears all elements from all scenes and removes all scenes.
 	 */
 	public static function clearCanvas(): Void {
-		var root: AnchorPane = elementsData.root;
-		// Remove all elements from root
-		var children: Array<Element> = HierarchyUtils.getChildren(root).copy();
-		for (child in children) {
-			root.remove(child);
+		// Remove all scenes by emitting sceneRemoved (like the Delete Scene button does)
+		var scenesToRemove: Array<TSceneEntry> = sceneData.scenes.copy();
+		for (scene in scenesToRemove) {
+			// Clear element bookkeeping
+			scene.elements.resize(0);
+
+			// Emit scene removed - KouiEditor.onSceneRemoved will call SceneManager.removeScene
+			SceneEvents.sceneRemoved.emit(scene.key);
 		}
 
-		// Clear ElementsData but keep the root - clear in-place to preserve array reference
-		// (HierarchyPanel holds a reference to this array)
-		elements.resize(0);
-		elements.push({ key: "AnchorPane", element: root });
+		// Clear the scenes array and reset current scene
+		sceneData.scenes.resize(0);
+		sceneData.currentScene = null;
 
 		ElementEvents.elementSelected.emit(null);
 	}

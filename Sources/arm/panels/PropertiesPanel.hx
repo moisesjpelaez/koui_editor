@@ -1,8 +1,9 @@
 package arm.panels;
 
-import arm.CanvasSettings;
-import arm.ElementsData;
-import arm.ElementEvents;
+import arm.data.CanvasSettings;
+import arm.data.SceneData;
+import arm.events.SceneEvents;
+import arm.events.ElementEvents;
 import arm.types.Enums;
 import arm.base.UIBase;
 import arm.tools.ImageUtils;
@@ -51,13 +52,12 @@ class PropertiesPanel {
     var buttonIsPressedHandle: Handle;
     var buttonIsToggleHandle: Handle;
 
-    var elementsData: ElementsData = ElementsData.data;
+    var sceneData: SceneData = SceneData.data;
 
     // Initial values for reset functionality
     var elementSizes: Map<Element, Vec2> = new Map();
 
     var icons: Image;
-    var elements: Array<THierarchyEntry> = ElementsData.data.elements;
 
     public function new() {
         tabHandle = new Handle({position: 0});
@@ -89,7 +89,7 @@ class PropertiesPanel {
         ElementEvents.elementAdded.connect(onElementAdded);
         ElementEvents.elementSelected.connect(onElementSelected);
         ElementEvents.elementRemoved.connect(onElementRemoved);
-        ElementEvents.canvasLoaded.connect(onCanvasLoaded);
+        SceneEvents.canvasLoaded.connect(onCanvasLoaded);
     }
 
     public function draw(uiBase: UIBase, params: Dynamic): Void {
@@ -143,12 +143,15 @@ class PropertiesPanel {
     function drawProperties(uiBase: UIBase): Void {
         var ui: Zui = uiBase.ui;
 
-        // Get element name from ElementsData
+        // Get element name from SceneData
         var elemName = "";
-        for (entry in elements) {
-            if (entry.element == selectedElement) {
-                elemName = entry.key;
-                break;
+        var currentScene = SceneData.data.currentScene;
+        if (currentScene != null) {
+            for (entry in currentScene.elements) {
+                if (entry.element == selectedElement) {
+                    elemName = entry.key;
+                    break;
+                }
             }
         }
 
@@ -161,7 +164,7 @@ class PropertiesPanel {
         nameHandle.text = elemName;
         var newName: String = ui.textInput(nameHandle, "Key", Right);
         if (nameHandle.changed) {
-            if (newName != null && newName != "") elementsData.updateElementKey(selectedElement, newName);
+            if (newName != null && newName != "") sceneData.updateElementKey(selectedElement, newName);
         }
 
         // TID - editable text input
@@ -373,10 +376,13 @@ class PropertiesPanel {
         if (element != null) {
             // Find element name
             var elemName: String = "";
-            for (entry in elements) {
-                if (entry.element == element) {
-                    elemName = entry.key;
-                    break;
+            var currentScene = SceneData.data.currentScene;
+            if (currentScene != null) {
+                for (entry in currentScene.elements) {
+                    if (entry.element == element) {
+                        elemName = entry.key;
+                        break;
+                    }
                 }
             }
 
