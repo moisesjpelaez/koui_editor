@@ -85,7 +85,6 @@ class PropertiesPanel {
         // buttonIconSizeHandle = new Handle({text: "16"});
         buttonIsPressedHandle = new Handle({selected: false});
         buttonIsToggleHandle = new Handle({selected: false});
-        // TODO: button events. Use Signals?
 
         ElementEvents.elementAdded.connect(onElementAdded);
         ElementEvents.elementSelected.connect(onElementSelected);
