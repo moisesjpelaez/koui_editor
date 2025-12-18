@@ -140,9 +140,38 @@ class HierarchyPanel {
 			expanded.set(entry.element, !isExpanded);
 		}
 
-		// Item button with selection highlighting
-		drawItemButton(uiBase.ui, name, entry.element);
-		handleItemInteraction(uiBase, entry);
+		// For root element, show scene name as text input for renaming
+		if (entry.element == elementsData.root) {
+			var currentIdx: Int = sceneTabHandle.position;
+			if (currentIdx >= sceneTabs.length) currentIdx = sceneTabs.length - 1;
+			if (currentIdx < 0) currentIdx = 0;
+
+			sceneTabHandle.text = sceneTabs[currentIdx];
+			var newName: String = uiBase.ui.textInput(sceneTabHandle, "Name", zui.Zui.Align.Left);
+
+			if (sceneTabHandle.changed && newName != "") {
+				// Collect other scene names (excluding current)
+				var otherScenes: Array<String> = [];
+				for (i in 0...sceneTabs.length) {
+					if (i != currentIdx) {
+						otherScenes.push(sceneTabs[i]);
+					}
+				}
+
+				// Check for conflicts and ensure uniqueness
+				if (otherScenes.indexOf(newName) != -1) {
+					var parts: Array<String> = newName.split("_");
+					var baseName: String = parts[0];
+					newName = NameUtils.generateUniqueName(baseName, otherScenes, "_");
+				}
+
+				sceneTabs[currentIdx] = newName;
+			}
+		} else {
+			// Item button with selection highlighting
+			drawItemButton(uiBase.ui, name, entry.element);
+			handleItemInteraction(uiBase, entry);
+		}
 
 		// Delete icon button
 		if (entry.element != elementsData.root) {
