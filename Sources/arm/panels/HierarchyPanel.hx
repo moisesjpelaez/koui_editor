@@ -4,8 +4,10 @@ import arm.ElementsData;
 import arm.ElementEvents;
 import arm.base.UIBase;
 import arm.tools.HierarchyUtils;
+import arm.tools.ZuiUtils;
 import arm.types.Enums;
 import haxe.ds.ObjectMap;
+import kha.Image;
 import koui.elements.Element;
 import zui.Zui;
 import zui.Zui.Align;
@@ -41,6 +43,8 @@ class HierarchyPanel {
 	var isDragging: Bool = false;
 	var dragStartX: Float = 0;
 	var dragStartY: Float = 0;
+
+	var icons: Image;
 
 	public function new() {
 		sceneTabHandle = new Handle();
@@ -113,11 +117,19 @@ class HierarchyPanel {
 		// Draw drop zone indicator
 		drawDropIndicator(uiBase.ui, entry.element, localX, localY, winW, rowH, indentWidth);
 
-		// Row layout
-		if (hasChildren) {
-			uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 1]);
+		// Row layout with delete icon column
+		if (entry.element == elementsData.root) {
+			if (hasChildren) {
+				uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 1]);
+			} else {
+				uiBase.ui.row([indentWidth / winW, 1]);
+			}
 		} else {
-			uiBase.ui.row([indentWidth / winW, 1]);
+			if (hasChildren) {
+				uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 5/7, 2/7]);
+			} else {
+				uiBase.ui.row([indentWidth / winW, 5/7, 2/7]);
+			}
 		}
 
 		uiBase.ui.text(""); // Indent spacer
@@ -129,9 +141,18 @@ class HierarchyPanel {
 
 		// Item button with selection highlighting
 		drawItemButton(uiBase.ui, name, entry.element);
-
-		// Handle interactions
 		handleItemInteraction(uiBase, entry);
+
+		// Delete icon button
+		if (entry.element != elementsData.root) {
+			var deleteDisabled = entry.element == elementsData.root;
+			var deleteClicked = ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete", false, deleteDisabled, 0.48);
+			if (deleteClicked) {
+				ElementEvents.elementRemoved.emit(entry.element);
+			}
+			uiBase.ui._y += 4;
+		}
+
 		handleDropDetection(uiBase, entry, winX, winY, localX, localY, winW, rowH);
 
 		// Recursively draw children
@@ -323,5 +344,9 @@ class HierarchyPanel {
 		if (entry.element == elementsData.root) return;
         onElementSelected(entry.element);
         registerChildren(entry.element);
+    }
+
+    public function setIcons(iconsImage: Image): Void {
+        icons = iconsImage;
     }
 }

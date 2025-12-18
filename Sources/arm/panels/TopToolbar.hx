@@ -3,13 +3,13 @@ package arm.panels;
 import arm.base.UIBase;
 import arm.tools.CanvasUtils;
 import arm.tools.ImageUtils;
+import arm.tools.ZuiUtils;
 import armory.system.Signal;
 import iron.App;
 import kha.Image;
 import zui.Id;
 import zui.Zui;
 import zui.Zui.Handle;
-import zui.Zui.State;
 using zui.Ext;
 
 @:access(zui.Zui)
@@ -33,46 +33,9 @@ class TopToolbar {
 		snapHandle.value = snapValue;
 	}
 
-	// Draw an icon button and return true if clicked
+	// Wrapper for ZuiUtils.iconButton with local icons
 	function iconButton(ui: Zui, tileX: Int, tileY: Int, tooltip: String, highlight: Bool = false): Bool {
-		if (icons == null) return ui.button("?");
-
-		var col: Int = ui.t.WINDOW_BG_COL;
-		if (col < 0) col += untyped 4294967296;
-		var light: Bool = col > 0xff666666 + 4294967296;
-
-		// Base color
-		var iconAccent: Int = light ? 0xff666666 : 0xffaaaaaa;
-
-		if (highlight) {
-			iconAccent = ui.t.HIGHLIGHT_COL;
-		}
-
-		// Store position and width before drawing
-		var startX: Float = ui._x;
-		var startY: Float = ui._y;
-		var buttonW: Float = ui._w;
-		var buttonH: Float = ui.ELEMENT_H();
-
-		var rect: TTileRect = ImageUtils.tile(tileX, tileY);
-		ui.g.pipeline = ImageUtils.getPipeline();
-		var state: State = ui.image(icons, iconAccent, null, rect.x, rect.y, rect.w, rect.h);
-		ui.g.pipeline = null;
-
-		// Apply hover and pressed visual feedback on top of the icon
-		if (state == State.Down || state == State.Started) {
-			// Pressed - draw darker overlay
-			ui.g.color = 0x55000000;
-			ui.g.fillRect(startX, startY, buttonW, buttonH);
-		}
-		else if (state == State.Hovered) {
-			// Hovered - draw light overlay
-			ui.g.color = 0x33ffffff;
-			ui.g.fillRect(startX, startY, buttonW, buttonH);
-		}
-
-		if (ui.isHovered) ui.tooltip(tooltip);
-		return state == State.Released;
+		return ZuiUtils.iconButton(ui, icons, tileX, tileY, tooltip, highlight);
 	}
 
 	function hSeparator(ui: Zui, w: Float = 1, spacing: Float = 8): Void {

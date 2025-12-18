@@ -6,7 +6,9 @@ import arm.ElementEvents;
 import arm.types.Enums;
 import arm.base.UIBase;
 import arm.tools.ImageUtils;
+import arm.tools.ZuiUtils;
 
+import iron.math.Vec2;
 import kha.Image;
 import koui.elements.Button;
 import koui.elements.Element;
@@ -15,7 +17,6 @@ import koui.elements.layouts.Layout.Anchor;
 
 import zui.Zui;
 import zui.Zui.Handle;
-import zui.Zui.State;
 
 @:access(koui.elements.Element, zui.Zui)
 class PropertiesPanel {
@@ -53,10 +54,7 @@ class PropertiesPanel {
     var elementsData: ElementsData = ElementsData.data;
 
     // Initial values for reset functionality
-    var initialPosX: Int = 0;
-    var initialPosY: Int = 0;
-    var initialWidth: Int = 0;
-    var initialHeight: Int = 0;
+    var elementSizes: Map<Element, Vec2> = new Map();
 
     var icons: Image;
     var elements: Array<THierarchyEntry> = ElementsData.data.elements;
@@ -89,7 +87,9 @@ class PropertiesPanel {
         buttonIsToggleHandle = new Handle({selected: false});
         // TODO: button events. Use Signals?
 
+        ElementEvents.elementAdded.connect(onElementAdded);
         ElementEvents.elementSelected.connect(onElementSelected);
+        ElementEvents.elementRemoved.connect(onElementRemoved);
         ElementEvents.canvasLoaded.connect(onCanvasLoaded);
     }
 
@@ -211,12 +211,14 @@ class PropertiesPanel {
                 posYHandle.text = Std.string(selectedElement.posY);
             }
         }
-        if (iconButton(ui, 6, 2, "Reset Position")) {
-            selectedElement.posX = initialPosX;
-            selectedElement.posY = initialPosY;
-            posXHandle.text = Std.string(initialPosX);
-            posYHandle.text = Std.string(initialPosY);
+        if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Position", false, false, 0.4)) {
+            selectedElement.posX = 0;
+            selectedElement.posY = 0;
+            posXHandle.text = Std.string(0);
+            posYHandle.text = Std.string(0);
+            selectedElement.invalidateElem();
         }
+        ui._y += 4;
 
         // Size - label, reset button, and Width/Height inputs in one row
         ui.row([1/4, 5/16, 5/16, 1/8]);
@@ -243,12 +245,15 @@ class PropertiesPanel {
                 heightHandle.text = Std.string(selectedElement.height);
             }
         }
-        if (iconButton(ui, 6, 2, "Reset Size")) {
-            selectedElement.width = initialWidth;
-            selectedElement.height = initialHeight;
-            widthHandle.text = Std.string(initialWidth);
-            heightHandle.text = Std.string(initialHeight);
+        if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.4)) {
+            var originalSize: Vec2 = elementSizes.get(selectedElement);
+            selectedElement.width = Std.int(originalSize.x);
+            selectedElement.height = Std.int(originalSize.y);
+            widthHandle.text = Std.string(selectedElement.width);
+            heightHandle.text = Std.string(selectedElement.height);
+            selectedElement.invalidateElem();
         }
+        ui._y += 4;
 
         // Visible checkbox
         visibleHandle.selected = selectedElement.visible;
@@ -257,61 +262,6 @@ class PropertiesPanel {
         // Disabled checkbox
         disabledHandle.selected = selectedElement.disabled;
         selectedElement.disabled = ui.check(disabledHandle, "Disabled");
-    }
-
-    // Draw an icon button and return true if clicked
-    function iconButton(ui: Zui, tileX: Int, tileY: Int, tooltip: String): Bool {
-        if (icons == null) return ui.button("↻");
-
-        var col: Int = ui.t.WINDOW_BG_COL;
-        if (col < 0) col += untyped 4294967296;
-        var light: Bool = col > 0xff666666 + 4294967296;
-
-        // Base color
-        var iconAccent: Int = light ? 0xff666666 : 0xffaaaaaa;
-
-        // Store position and width before drawing
-        var startX: Float = ui._x;
-        var startY: Float = ui._y;
-        var buttonW: Float = ui._w;
-        var buttonH: Float = ui.ELEMENT_H();
-
-        var rect: TTileRect = ImageUtils.tile(tileX, tileY);
-
-        // Draw invisible button to maintain layout and capture clicks
-        // Force the hit area to ELEMENT_H square to avoid row stretching
-        var state: State = ui.image(icons, 0x00000000, null, rect.x, rect.y, Std.int(buttonH), Std.int(buttonH));
-
-        // Scale down the icon to 40% of original size and center it
-        var iconScale: Float = 0.4;
-        var scaledW: Float = rect.w * iconScale;
-        var scaledH: Float = rect.h * iconScale;
-
-        // Calculate centered position
-        var centerX: Float = startX + (buttonW - scaledW) / 2;
-        var centerY: Float = startY + (buttonH - scaledH) / 2;
-
-        // Draw the scaled icon centered
-        ui.g.pipeline = ImageUtils.getPipeline();
-        ui.g.color = iconAccent;
-        ui.g.drawScaledSubImage(icons, rect.x, rect.y, rect.w, rect.h, centerX, centerY, scaledW, scaledH);
-        ui.g.pipeline = null;
-
-        // Apply hover and pressed visual feedback on top of the icon
-        if (state == State.Down || state == State.Started) {
-            // Pressed - draw darker overlay
-            ui.g.color = 0x55000000;
-            ui.g.fillRect(startX, startY, buttonW, buttonH);
-        }
-        else if (state == State.Hovered) {
-            // Hovered - draw light overlay
-            ui.g.color = 0x33ffffff;
-            ui.g.fillRect(startX, startY, buttonW, buttonH);
-        }
-
-        if (ui.isHovered) ui.tooltip(tooltip);
-        ui._y += 4;
-        return state == State.Released;
     }
 
     function drawAnchorGrid(ui: Zui, element: Element) {
@@ -410,6 +360,10 @@ class PropertiesPanel {
         }
     }
 
+    public function onElementAdded(entry: THierarchyEntry): Void {
+        elementSizes.set(entry.element, new Vec2(entry.element.width, entry.element.height));
+    }
+
     public function onElementSelected(element: Element): Void {
         selectedElement = element;
 
@@ -433,13 +387,11 @@ class PropertiesPanel {
             visibleHandle.selected = element.visible;
             disabledHandle.selected = element.disabled;
             anchorHandle.position = element.anchor;
-
-            // Store initial values for reset functionality
-            initialPosX = element.posX;
-            initialPosY = element.posY;
-            initialWidth = element.width;
-            initialHeight = element.height;
         }
+    }
+
+    public function onElementRemoved(element: Element): Void {
+        elementSizes.remove(element);
     }
 
     public function onCanvasLoaded(): Void {

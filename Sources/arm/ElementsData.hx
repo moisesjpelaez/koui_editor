@@ -1,7 +1,8 @@
 package arm;
 
-import koui.elements.layouts.AnchorPane;
 import arm.ElementEvents;
+import haxe.macro.Type.AbstractType;
+import koui.elements.layouts.AnchorPane;
 import koui.elements.Element;
 
 typedef THierarchyEntry = {
@@ -16,10 +17,7 @@ class ElementsData {
 
     public function new() {
         ElementEvents.elementAdded.connect(onElementAdded);
-    }
-
-    public function onElementAdded(entry: THierarchyEntry): Void {
-        elements.push({ key: entry.key, element: entry.element });
+        ElementEvents.elementRemoved.connect(onElementRemoved);
     }
 
     public function updateElementKey(element: Element, newKey: String): Void {
@@ -27,6 +25,19 @@ class ElementsData {
             if (entry.element == element) {
                 entry.key = newKey;
                 return;
+            }
+        }
+    }
+
+    public function onElementAdded(entry: THierarchyEntry): Void {
+        elements.push({ key: entry.key, element: entry.element });
+    }
+
+    public function onElementRemoved(element: Element): Void {
+        for (i in 0...elements.length) {
+            if (elements[i].element == element) {
+                elements.splice(i, 1);
+                break;
             }
         }
     }

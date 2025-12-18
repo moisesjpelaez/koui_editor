@@ -122,8 +122,10 @@ class KouiEditor extends iron.Trait {
 			ElementEvents.elementAdded.connect(onElementAdded);
 			ElementEvents.elementSelected.connect(onElementSelected);
 			ElementEvents.elementDropped.connect(onElementDropped);
+			ElementEvents.elementRemoved.connect(onElementRemoved);
 
 			topToolbar.setIcons(Assets.images.icons);
+			hierarchyPanel.setIcons(Assets.images.icons);
 			propertiesPanel.setIcons(Assets.images.icons);
 		});
 
@@ -143,15 +145,7 @@ class KouiEditor extends iron.Trait {
 
 		var keyboard: Keyboard = Input.getKeyboard();
 		if (keyboard.started("delete") && selectedElement != null && selectedElement != anchorPane) {
-			anchorPane.remove(selectedElement);
-			for (i in 0...elements.length) {
-				if (elements[i].element == selectedElement) {
-					elements.splice(i, 1);
-					break;
-				}
-			}
-			selectedElement = null;
-			ElementEvents.elementSelected.emit(null);
+			ElementEvents.elementRemoved.emit(selectedElement);
 		}
 	}
 
@@ -298,6 +292,9 @@ class KouiEditor extends iron.Trait {
 				draggedElement.anchor = dragAnchor; // Restore original anchor
 				draggedElement.setPosition(Std.int(anchorOffsetX / Koui.uiScale), Std.int(anchorOffsetY / Koui.uiScale));
 				draggedElement.invalidateElem();
+
+				uiBase.hwnds[PanelHierarchy].redraws = 2;
+				uiBase.hwnds[PanelProperties].redraws = 2;
 			}
 			draggedElement = null;
 		}
@@ -493,5 +490,11 @@ class KouiEditor extends iron.Trait {
 		elementsData.updateElementKey(entry.element, uniqueName);
 
 		ElementEvents.elementSelected.emit(entry.element);
+	}
+
+	function onElementRemoved(element: Element): Void {
+		anchorPane.remove(element);
+		selectedElement = null;
+		ElementEvents.elementSelected.emit(null);
 	}
 }
