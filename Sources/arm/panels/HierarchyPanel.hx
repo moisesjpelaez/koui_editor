@@ -71,13 +71,13 @@ class HierarchyPanel {
 
 		sceneTabHandle.position = uiBase.ui.combo(sceneTabHandle, sceneTabs, "", true);
 
-		if (uiBase.ui.button("+")) {
+		if (ZuiUtils.iconButton(uiBase.ui, icons, 1, 2, "Add Scene", false, false, 0.4)) {
 			sceneCounter++;
 			sceneTabs.push("Scene " + sceneCounter);
 			sceneTabHandle.position = sceneTabs.length - 1;
 		}
 
-		if (uiBase.ui.button("-") && sceneTabs.length > 1) {
+		if (ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete Scene", false, sceneTabs.length <= 1, 0.4)) {
 			var idx: Int = sceneTabHandle.position;
 			sceneTabs.splice(idx, 1);
 			if (idx >= sceneTabs.length) {
@@ -146,7 +146,7 @@ class HierarchyPanel {
 		// Delete icon button
 		if (entry.element != elementsData.root) {
 			var deleteDisabled = entry.element == elementsData.root;
-			var deleteClicked = ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete", false, deleteDisabled, 0.48);
+			var deleteClicked = ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete", false, deleteDisabled, 0.4);
 			if (deleteClicked) {
 				ElementEvents.elementRemoved.emit(entry.element);
 			}
