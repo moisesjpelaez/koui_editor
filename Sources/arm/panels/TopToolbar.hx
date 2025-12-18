@@ -114,7 +114,7 @@ class TopToolbar {
 				BUTTON_SIZE / TOOLBAR_WIDTH, (BUTTON_SIZE * 4) / TOOLBAR_WIDTH]);
 
 			ui._x += 8; // Small padding on the left
-			if (iconButton(ui, 3, 1, "Clear Canvas")) {
+			if (iconButton(ui, 1, 2, "Clear Canvas")) {
 				CanvasUtils.clearCanvas();
 			}
 			if (iconButton(ui, 2, 2, "Load Canvas")) {

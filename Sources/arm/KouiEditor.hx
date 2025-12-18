@@ -26,7 +26,6 @@ import koui.Koui;
 import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.Layout;
 import koui.elements.layouts.Layout.Anchor;
 
 @:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane)
@@ -125,6 +124,7 @@ class KouiEditor extends iron.Trait {
 			ElementEvents.elementDropped.connect(onElementDropped);
 
 			topToolbar.setIcons(Assets.images.icons);
+			propertiesPanel.setIcons(Assets.images.icons);
 		});
 
 		notifyOnUpdate(update);
