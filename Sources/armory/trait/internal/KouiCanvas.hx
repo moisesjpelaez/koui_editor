@@ -51,7 +51,7 @@ private typedef TElementsData = {
 // KouiCanvas types
 // TODO: Add more element typedefs as needed
 typedef TButton = {
-	var button: Button;
+	var element: Button;
 	var onPressed: Signal;
 	var onHold: Signal;
 	var onReleased: Signal;
@@ -248,7 +248,7 @@ class KouiCanvas extends Trait {
 			case "Button":
 				var button: Button = new Button(data.properties.text != null ? data.properties.text : "");
 				var btn: TButton = {
-					button: button,
+					element: button,
 					onPressed: new Signal(),
 					onHold: new Signal(),
 					onReleased: new Signal()
