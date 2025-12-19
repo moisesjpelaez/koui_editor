@@ -34,6 +34,9 @@ typedef TCanvasSettings = {
 		var scaleHorizontal: Bool;
 		var scaleVertical: Bool;
 	};
+	@:optional var editor: {
+		var undoStackSize: Int;
+	};
 }
 
 typedef TSceneData = {
@@ -233,6 +236,9 @@ class CanvasUtils {
 					autoScale: CanvasSettings.autoScale,
 					scaleHorizontal: CanvasSettings.scaleHorizontal,
 					scaleVertical: CanvasSettings.scaleVertical
+				},
+				editor: {
+					undoStackSize: CanvasSettings.undoStackSize
 				}
 			},
 			scenes: scenesData
@@ -358,6 +364,11 @@ class CanvasUtils {
 			CanvasSettings.autoScale = canvasData.canvas.settings.autoScale;
 			CanvasSettings.scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
 			CanvasSettings.scaleVertical = canvasData.canvas.settings.scaleVertical;
+		}
+
+		// Load editor-only settings
+		if (canvasData.canvas.editor != null) {
+			CanvasSettings.undoStackSize = canvasData.canvas.editor.undoStackSize;
 		}
 
 		// Deserialize each scene by emitting sceneAdded (like the Add Scene button does)

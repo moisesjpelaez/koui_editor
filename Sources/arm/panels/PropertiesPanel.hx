@@ -29,6 +29,7 @@ class PropertiesPanel {
     var expandOnResizeHandle: Handle;
     var scaleOnResizeHandle: Handle;
     var scaleOnResizeGroup: Handle;
+    var undoStackSizeHandle: Handle;
 
     // Properties
     var selectedElement: Element = null;
@@ -68,6 +69,7 @@ class PropertiesPanel {
         expandOnResizeHandle = new Handle({selected: true});
         scaleOnResizeHandle = new Handle({selected: true});
         scaleOnResizeGroup = new Handle({position: 0});
+        undoStackSizeHandle = new Handle({text: "50"});
 
         // Initialize property handles
         nameHandle = new Handle({text: ""});
@@ -105,7 +107,23 @@ class PropertiesPanel {
             }
 
             if (uiBase.ui.tab(tabHandle, "Settings")) {
-                uiBase.ui.text("On Window Size Changed", Center);
+                uiBase.ui.text("Undo and Redo", Center);
+                uiBase.ui.separator();
+
+                // Undo stack size input (25-256)
+                undoStackSizeHandle.text = Std.string(CanvasSettings.undoStackSize);
+                var stackSizeStr: String = uiBase.ui.textInput(undoStackSizeHandle, "Steps", Right);
+                if (undoStackSizeHandle.changed) {
+                    var val: Null<Int> = Std.parseInt(stackSizeStr);
+                    if (val != null) {
+                        // Clamp to valid range
+                        val = Std.int(Math.max(25, Math.min(256, val)));
+                        CanvasSettings.undoStackSize = val;
+                        undoStackSizeHandle.text = Std.string(val);
+                    }
+                }
+
+                uiBase.ui.text("On Window Resize", Center);
                 uiBase.ui.separator();
 
                 CanvasSettings.expandOnResize = uiBase.ui.check(expandOnResizeHandle, "Expand");

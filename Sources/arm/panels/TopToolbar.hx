@@ -2,6 +2,7 @@ package arm.panels;
 
 import arm.base.UIBase;
 import arm.tools.CanvasUtils;
+import arm.tools.EditorUtils;
 import arm.tools.ImageUtils;
 import arm.tools.ZuiUtils;
 import armory.system.Signal;
@@ -89,10 +90,10 @@ class TopToolbar {
 			hSeparator(ui);
 
 			if (iconButton(ui, 6, 2, "Undo")) {
-				// CanvasUtils.undo();
+				EditorUtils.undo();
 			}
 			if (iconButton(ui, 7, 2, "Redo")) {
-				// CanvasUtils.redo();
+				EditorUtils.redo();
 			}
 			hSeparator(ui);
 

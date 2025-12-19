@@ -39,6 +39,16 @@ class SceneData {
         }
     }
 
+    public function getElementKey(element: Element): String {
+        if (currentScene == null) return null;
+        for (entry in currentScene.elements) {
+            if (entry.element == element) {
+                return entry.key;
+            }
+        }
+        return null;
+    }
+
     public function onElementAdded(entry: TElementEntry): Void {
         if (currentScene == null) return;
         currentScene.elements.push({ key: entry.key, element: entry.element });

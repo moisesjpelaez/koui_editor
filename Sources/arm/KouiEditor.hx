@@ -11,6 +11,7 @@ import arm.panels.PropertiesPanel;
 import arm.panels.ElementsPanel;
 import arm.panels.TopToolbar;
 import arm.tools.CanvasUtils;
+import arm.tools.EditorUtils;
 import arm.tools.HierarchyUtils;
 import arm.tools.NameUtils;
 import arm.types.Enums;
@@ -91,6 +92,9 @@ class KouiEditor extends iron.Trait {
 
 			// Initialize canvas utilities
 			CanvasUtils.init();
+
+			// Initialize undo/redo system
+			EditorUtils.init();
 
 			// Create UIBase with the loaded font
 			uiBase = new UIBase(Assets.fonts.font_default);
