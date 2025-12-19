@@ -12,6 +12,8 @@ import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.Label;
 import koui.elements.layouts.AnchorPane;
+import koui.elements.layouts.ColLayout;
+import koui.elements.layouts.RowLayout;
 
 // JSON structure typedefs
 typedef TCanvasData = {
@@ -331,11 +333,10 @@ class CanvasUtils {
 	static function getElementType(element: Element): String {
 		if (Std.isOfType(element, Button)) return "Button";
 		if (Std.isOfType(element, Label)) return "Label";
+		// Check RowLayout/ColLayout before AnchorPane since they're more specific
+		if (Std.isOfType(element, RowLayout)) return "RowLayout";
+		if (Std.isOfType(element, ColLayout)) return "ColLayout";
 		if (Std.isOfType(element, AnchorPane)) return "AnchorPane";
-		// Add more types here as needed:
-		// if (Std.isOfType(element, Checkbox)) return "Checkbox";
-		// if (Std.isOfType(element, Slider)) return "Slider";
-		// if (Std.isOfType(element, Panel)) return "Panel";
 		return "Unknown";
 	}
 
@@ -361,7 +362,12 @@ class CanvasUtils {
 				};
 
 			case "AnchorPane":
-				// AnchorPane doesn't have special properties beyond base Element
+				return {};
+
+			case "RowLayout":
+				return {};
+
+			case "ColLayout":
 				return {};
 
 			default:
@@ -405,50 +411,51 @@ class CanvasUtils {
 	 */
 	static function deserializeScene(sceneDataEntry: TSceneData, canvasWidth: Int, canvasHeight: Int, isFirst: Bool): Void {
 		// Emit sceneAdded - this triggers KouiEditor.onSceneAdded which properly sets up the scene
-		// (just like clicking the Add Scene button does)
 		SceneEvents.sceneAdded.emit(sceneDataEntry.key);
 
 		// Get the scene that was just created by the event handler
 		var scene: TSceneEntry = sceneData.currentScene;
 
-		// First pass: create all elements and store in a map
-		var elementMap: Map<String, Element> = new Map();
-
+		// First pass: create all elements in order (use array to handle duplicate keys)
+		var createdElements: Array<Element> = [];
 		for (elemData in sceneDataEntry.elements) {
 			var element: Element = createElementFromData(elemData);
-			if (element != null) {
-				elementMap.set(elemData.key, element);
+			createdElements.push(element);
+		}
+
+		// Build a map for parent lookup (parents are serialized before children)
+		var elementMap: Map<String, Element> = new Map();
+		for (i in 0...sceneDataEntry.elements.length) {
+			if (createdElements[i] != null) {
+				elementMap.set(sceneDataEntry.elements[i].key, createdElements[i]);
 			}
 		}
 
-		// Second pass: emit elementAdded first, then reparent to correct location
-		for (elemData in sceneDataEntry.elements) {
-			var element: Element = elementMap.get(elemData.key);
+		// Second pass: add elements to correct parents with correct anchors
+		// Use index to pair each elemData with its created element (handles duplicate keys)
+		for (i in 0...sceneDataEntry.elements.length) {
+			var elemData = sceneDataEntry.elements[i];
+			var element = createdElements[i];
 			if (element == null) continue;
 
-			// Emit elementAdded FIRST - this registers the element and adds it to canvas at default position
-			// (KouiEditor.onElementAdded adds to root at TopLeft)
-			ElementEvents.elementAdded.emit({ key: elemData.key, element: element });
+			// Register element in scene data with the loaded key
+			scene.elements.push({ key: elemData.key, element: element });
 
-			// Now update the key to the loaded value (KouiEditor generated a unique name)
-			for (entry in scene.elements) {
-				if (entry.element == element) {
-					entry.key = elemData.key;
-					break;
-				}
-			}
-
-			// THEN reparent to correct parent/anchor from the saved data
+			// Find the parent element
 			var parent: Element = null;
 			if (elemData.parentKey != null && elementMap.exists(elemData.parentKey)) {
 				parent = elementMap.get(elemData.parentKey);
 			}
 
+			// Set the anchor before adding to parent
+			element.anchor = cast elemData.anchor;
+
+			// Add to parent (or root if no parent)
 			if (parent != null) {
 				HierarchyUtils.moveAsChild(element, parent);
 			} else {
-				// Update anchor if it's a root-level element (already added by KouiEditor, just update anchor)
-				element.anchor = cast elemData.anchor;
+				// Root-level element - add to scene root
+				scene.root.add(element, cast elemData.anchor);
 			}
 		}
 	}
@@ -484,9 +491,13 @@ class CanvasUtils {
 				var pane: AnchorPane = new AnchorPane(data.posX, data.posY, data.width, data.height);
 				element = pane;
 
-			// Add more types here as needed:
-			// case "Checkbox": ...
-			// case "Slider": ...
+			case "RowLayout":
+				var row: RowLayout = new RowLayout(data.posX, data.posY, data.width, data.height, 0);
+				element = row;
+
+			case "ColLayout":
+				var col: ColLayout = new ColLayout(data.posX, data.posY, data.width, data.height, 0);
+				element = col;
 
 			default:
 				trace('Unknown element type: ${data.type}');
