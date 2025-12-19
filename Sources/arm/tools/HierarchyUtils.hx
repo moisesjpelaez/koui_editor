@@ -134,43 +134,148 @@ class HierarchyUtils {
 		return -1; // No empty slot
 	}
 
+	static function findRowIndex(grid: GridLayout, element: Element): Int {
+		for (i in 0...grid.amountRows) {
+			if (grid.elements[i][0] == element) return i;
+		}
+		return -1;
+	}
+
+	static function findColIndex(grid: GridLayout, element: Element): Int {
+		if (grid.amountRows == 0) return -1;
+		for (i in 0...grid.amountCols) {
+			if (grid.elements[0][i] == element) return i;
+		}
+		return -1;
+	}
+
 	public static function moveRelativeToTarget(element: Element, target: Element, before: Bool): Void {
 		var parent: Element = getParentElement(target);
 		if (parent == null) return;
 
-		detachFromCurrentParent(element);
-
-		// RowLayout/ColLayout don't support relative positioning in the same way
-		// Just add to the next available slot (or create new one)
+		// Handle RowLayout reordering
 		if (parent is RowLayout) {
-			var row: RowLayout = cast parent;
-			var grid: GridLayout = cast row;
-			var slot: Int = findFirstEmptyRowSlot(row);
-			if (slot < 0) {
+			var grid: GridLayout = cast parent;
+			var targetIdx: Int = findRowIndex(grid, target);
+			if (targetIdx < 0) return;
+
+			var elementIdx: Int = findRowIndex(grid, element);
+			var sameParent: Bool = elementIdx >= 0;
+
+			if (sameParent) {
+				// Reorder within same parent - shift elements
+				var insertIdx: Int = before ? targetIdx : targetIdx + 1;
+				if (elementIdx < insertIdx) insertIdx--; // Adjust for removal
+
+				// Remove from current position
+				grid.elements[elementIdx][0] = null;
+
+				// Shift elements to fill gap and make room
+				if (elementIdx < insertIdx) {
+					// Moving down - shift elements up
+					for (i in elementIdx...insertIdx) {
+						grid.elements[i][0] = grid.elements[i + 1][0];
+						if (grid.elements[i][0] != null) grid.recalcElement(i, 0);
+					}
+				} else {
+					// Moving up - shift elements down
+					var i = elementIdx;
+					while (i > insertIdx) {
+						grid.elements[i][0] = grid.elements[i - 1][0];
+						if (grid.elements[i][0] != null) grid.recalcElement(i, 0);
+						i--;
+					}
+				}
+
+				// Insert at new position
+				grid.elements[insertIdx][0] = element;
+				element.layout = cast grid;
+				grid.recalcElement(insertIdx, 0);
+			} else {
+				// Moving from different parent
+				detachFromCurrentParent(element);
+				var insertIdx: Int = before ? targetIdx : targetIdx + 1;
+
+				// Need to add a row and shift elements down from insertIdx
 				addRowToGrid(grid);
-				slot = grid.amountRows - 1;
+				var i = grid.amountRows - 1;
+				while (i > insertIdx) {
+					grid.elements[i][0] = grid.elements[i - 1][0];
+					if (grid.elements[i][0] != null) grid.recalcElement(i, 0);
+					i--;
+				}
+				grid.elements[insertIdx][0] = element;
+				element.layout = cast grid;
+				grid.recalcElement(insertIdx, 0);
 			}
-			row.addToRow(element, slot);
-			grid.recalcElement(slot, 0);
-			grid.resize(grid.layoutWidth, grid.layoutHeight);
-			grid.invalidateElem();
-			grid.onResize();
-			return;
-		} else if (parent is ColLayout) {
-			var col: ColLayout = cast parent;
-			var grid: GridLayout = cast col;
-			var slot: Int = findFirstEmptyColSlot(col);
-			if (slot < 0) {
-				addColumnToGrid(grid);
-				slot = grid.amountCols - 1;
-			}
-			col.addToColumn(element, slot);
-			grid.recalcElement(0, slot);
 			grid.resize(grid.layoutWidth, grid.layoutHeight);
 			grid.invalidateElem();
 			grid.onResize();
 			return;
 		}
+
+		// Handle ColLayout reordering
+		if (parent is ColLayout) {
+			var grid: GridLayout = cast parent;
+			var targetIdx: Int = findColIndex(grid, target);
+			if (targetIdx < 0) return;
+
+			var elementIdx: Int = findColIndex(grid, element);
+			var sameParent: Bool = elementIdx >= 0;
+
+			if (sameParent) {
+				// Reorder within same parent - shift elements
+				var insertIdx: Int = before ? targetIdx : targetIdx + 1;
+				if (elementIdx < insertIdx) insertIdx--; // Adjust for removal
+
+				// Remove from current position
+				grid.elements[0][elementIdx] = null;
+
+				// Shift elements to fill gap and make room
+				if (elementIdx < insertIdx) {
+					// Moving right - shift elements left
+					for (i in elementIdx...insertIdx) {
+						grid.elements[0][i] = grid.elements[0][i + 1];
+						if (grid.elements[0][i] != null) grid.recalcElement(0, i);
+					}
+				} else {
+					// Moving left - shift elements right
+					var i = elementIdx;
+					while (i > insertIdx) {
+						grid.elements[0][i] = grid.elements[0][i - 1];
+						if (grid.elements[0][i] != null) grid.recalcElement(0, i);
+						i--;
+					}
+				}
+
+				// Insert at new position
+				grid.elements[0][insertIdx] = element;
+				element.layout = cast grid;
+				grid.recalcElement(0, insertIdx);
+			} else {
+				// Moving from different parent
+				detachFromCurrentParent(element);
+				var insertIdx: Int = before ? targetIdx : targetIdx + 1;
+
+				// Need to add a column and shift elements right from insertIdx
+				addColumnToGrid(grid);
+				var i = grid.amountCols - 1;
+				while (i > insertIdx) {
+					grid.elements[0][i] = grid.elements[0][i - 1];
+					if (grid.elements[0][i] != null) grid.recalcElement(0, i);
+					i--;
+				}
+				grid.elements[0][insertIdx] = element;
+				element.layout = cast grid;
+				grid.recalcElement(0, insertIdx);
+			}
+			grid.resize(grid.layoutWidth, grid.layoutHeight);
+			grid.invalidateElem();
+			grid.onResize();
+			return;
+		}
+
+		detachFromCurrentParent(element);
 
 		var elements: Array<Element>;
 		if (parent is AnchorPane || parent is ScrollPane || parent is Expander) {
