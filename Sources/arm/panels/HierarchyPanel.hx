@@ -154,7 +154,7 @@ class HierarchyPanel {
 			}
 		} else {
 			if (hasChildren) {
-				uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 0.8 - (indentWidth * 0.5 + EXPAND_BUTTON_WIDTH * 0.5) / winW, 0.2 - (indentWidth * 0.5 + EXPAND_BUTTON_WIDTH * 0.5) / winW]); // TODO: needs testing for nested children
+				uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 0.8 - (indentWidth * 0.5 + EXPAND_BUTTON_WIDTH * 0.5) / winW, 0.2 - (indentWidth * 0.5 + EXPAND_BUTTON_WIDTH * 0.5) / winW]);
 			} else {
 				uiBase.ui.row([indentWidth / winW, 0.8 - indentWidth * 0.5 / winW, 0.2 - indentWidth * 0.5 / winW]);
 			}
