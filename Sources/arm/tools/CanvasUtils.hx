@@ -137,7 +137,7 @@ class CanvasUtils {
 	 * Reloads the theme from the project's Assets/ui_override.ksn file.
 	 */
 	public static function refreshTheme(): Void {
-		var assetsPath: String = projectDir + "/Assets/ui_override.ksn";
+		var assetsPath: String = projectDir + "/Assets/koui_canvas/ui_override.ksn";
 		var blob: js.lib.ArrayBuffer = Krom.loadBlob(assetsPath);
 
 		if (blob != null) {

@@ -333,7 +333,8 @@ class KouiEditor extends iron.Trait {
 	 * This allows selecting elements that are positioned outside the rootPane's visible area.
 	 */
 	function getElementAtPositionUnclipped(x: Int, y: Int): Null<Element> {
-		// Make coords relative to rootPane layout
+		// Transform screen coordinates to rootPane space (accounting for pan and scale)
+		// rootPane.layoutX/layoutY already include the pan offset and are in screen coordinates
 		var relX: Int = x - rootPane.layoutX;
 		var relY: Int = y - rootPane.layoutY;
 
@@ -348,7 +349,7 @@ class KouiEditor extends iron.Trait {
 
 			// For GridLayout/RowLayout/ColLayout, check bounds manually since they may be empty
 			if (Std.isOfType(element, GridLayout) || Std.isOfType(element, RowLayout) || Std.isOfType(element, ColLayout)) {
-				// Check if mouse is within the layout's bounds (relative coords)
+				// Check if mouse is within the layout's bounds (relative to rootPane)
 				if (relX >= element.layoutX && relX <= element.layoutX + element.drawWidth &&
 					relY >= element.layoutY && relY <= element.layoutY + element.drawHeight) {
 					return element;
@@ -356,12 +357,16 @@ class KouiEditor extends iron.Trait {
 				continue;
 			}
 
-			// Check if element has children (recursively check them)
+			// Check if element has children (recursively check them with relative coords)
 			var hit: Null<Element> = element.getElementAtPosition(relX, relY);
 			if (hit != null) return hit;
 
-			// Check the element itself using isAtPosition (which uses drawX/drawY)
-			if (element.isAtPosition(x, y)) return element;
+			// Check the element itself - element.layoutX/Y are relative to rootPane
+			// So we need to check against relX/relY (mouse position relative to rootPane)
+			if (relX >= element.layoutX && relX <= element.layoutX + element.drawWidth &&
+				relY >= element.layoutY && relY <= element.layoutY + element.drawHeight) {
+				return element;
+			}
 		}
 
 		return null;

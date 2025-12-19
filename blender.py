@@ -45,13 +45,19 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
             print(f"Koui Editor: Using SDK build at {koui_editor_path}")
 
             project_path = arm.utils.get_fp()
+
             assets_dir = os.path.join(project_path, 'Assets')
             if not os.path.exists(assets_dir):
                 os.makedirs(assets_dir)
                 print(f"Koui Editor: Created Assets directory")
 
+            theme_dir = os.path.join(project_path, assets_dir, 'koui_canvas')
+            if not os.path.exists(theme_dir):
+                os.makedirs(theme_dir)
+                print(f"Koui Editor: Created Assets/koui_canvas directory")
+
             # Ensure ui_override.ksn exists in project Assets directory
-            ui_override_project = os.path.join(assets_dir, 'ui_override.ksn')
+            ui_override_project = os.path.join(theme_dir, 'ui_override.ksn')
             if not os.path.exists(ui_override_project):
                 # Copy default from library
                 ui_override_default = os.path.join(this_dir, 'Assets', 'ui_override.ksn')
