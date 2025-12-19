@@ -77,6 +77,7 @@ private typedef TKouiScene = {
 	var root: AnchorPane;
 	var elements: Map<String, Element>;
 	var buttons: Map<String, TButton>;
+	var elementKeys: Map<Element, String>; // Reverse lookup for path traversal
 }
 
 /**
@@ -225,7 +226,8 @@ class KouiCanvas extends Trait {
 			key: sceneKey,
 			root: null,
 			elements: new Map(),
-			buttons: new Map()
+			buttons: new Map(),
+			elementKeys: new Map()
 		};
 
 		// Use SceneManager to create the scene
@@ -249,6 +251,8 @@ class KouiCanvas extends Trait {
 					elementMap.set(key, createdElements[i]);
 					// Also store in kouiScene.elements for runtime access
 					kouiScene.elements.set(key, createdElements[i]);
+					// Store reverse lookup for path traversal
+					kouiScene.elementKeys.set(createdElements[i], key);
 				}
 			}
 
@@ -301,8 +305,7 @@ class KouiCanvas extends Trait {
 			}
 
 			// Final pass: resize all RowLayout/ColLayout elements
-			for (elemData in sceneData.elements) {
-				var element: Element = kouiScene.elements.get(elemData.key);
+			for (element in createdElements) {
 				if (element == null) continue;
 				if (Std.isOfType(element, RowLayout) || Std.isOfType(element, ColLayout)) {
 					var grid: GridLayout = cast element;
@@ -485,9 +488,14 @@ class KouiCanvas extends Trait {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Get an element by its key from the current scene.
+	 * Get an element by its key or hierarchical path from the current scene.
 	 *
-	 * @param key The element's unique key
+	 * Supports both simple keys and paths:
+	 * - "player_ui" (simple key - only works for root-level elements)
+	 * - "player_ui/health_bar" (path - for nested elements)
+	 * - "menu/buttons/play_button" (nested path)
+	 *
+	 * @param key The element's key or path
 	 * @return The element, or null if not found
 	 */
 	public function getElement(key: String): Null<Element> {
@@ -495,26 +503,48 @@ class KouiCanvas extends Trait {
 			trace('[KouiCanvas] No scene active');
 			return null;
 		}
+
+		// Check if it's a path (contains "/")
+		if (key.indexOf("/") >= 0) {
+			return getElementByPath(key);
+		}
+
+		// Simple key lookup - only allowed for root-level elements
 		var element: Element = currentScene.elements.get(key);
-		if (element == null) trace('[KouiCanvas] Element not found: "$key" in scene "${currentScene.key}"');
+		if (element == null) {
+			trace('[KouiCanvas] Element not found: "$key" in scene "${currentScene.key}"');
+			return null;
+		}
+
+		// Verify it's a direct child of root (root's elements have root as their layout)
+		if (element.layout != currentScene.root) {
+			trace('[KouiCanvas] Element "$key" is nested and must be accessed via path (e.g., "parent/$key")');
+			return null;
+		}
+
 		return element;
 	}
 
 	/**
-	 * Get an element by its key from the current scene, cast to a specific type.
+	 * Get an element by its key or path from the current scene, cast to a specific type.
 	 * Returns null if the element doesn't exist or isn't of the requested type.
+	 *
+	 * Supports both simple keys (root-level only) and paths:
+	 * - "MyButton" (root-level button)
+	 * - "menu/buttons/MyButton" (nested button)
 	 *
 	 * Example:
 	 * ```haxe
-	 * var button = canvas.getElementAs(Button, "MyButton");
+	 * var button = canvas.getElementAs(Button, "menu/buttons/play_button");
 	 * if (button != null) button.text = "Clicked!";
 	 * ```
 	 *
 	 * @param cls The class type to cast to
-	 * @param key The element's unique key
+	 * @param key The element's key or path
 	 * @return The element cast to type T, or null
 	 */
 	public function getElementAs<T: Element>(cls: Class<T>, key: String): Null<T> {
+		// getElement handles both key and path, and enforces root-level for simple keys
 		var element: Element = getElement(key);
 		if (element == null) return null;
 		var casted = Std.downcast(element, cls);
@@ -525,7 +555,9 @@ class KouiCanvas extends Trait {
 	/**
 	 * Get a button from the current scene with its signal handlers.
 	 *
-	 * @param key The button's unique key
+	 * Supports both simple keys and hierarchical paths (like getElement).
+	 *
+	 * @param key The button's key or path
 	 * @return The TButton with signals, or null if not found
 	 */
 	public function getButton(key: String): Null<TButton> {
@@ -533,22 +565,124 @@ class KouiCanvas extends Trait {
 			trace('[KouiCanvas] No scene active');
 			return null;
 		}
-		var btn: TButton = currentScene.buttons.get(key);
-		if (btn == null) {
-			trace('[KouiCanvas] Button not found: "$key" in scene "${currentScene.key}"');
-			return null;
+
+		// Get the element (handles both key and path)
+		var element = getElement(key);
+		if (element == null) return null;
+
+		// Find the button in the buttons map by matching the element
+		for (btn in currentScene.buttons) {
+			if (btn.element == element) {
+				return btn;
+			}
 		}
-		return btn;
+
+		trace('[KouiCanvas] Element "$key" is not a button or button not registered');
+		return null;
 	}
 
 	/**
-	 * Get all element keys in the current scene.
+	 * Get all element paths in the current scene.
+	 * Returns absolute paths for all elements (e.g., "player_ui/health_bar").
+	 * Root-level elements return just their key.
 	 *
-	 * @return Iterator over all element keys
+	 * @return Array of all element paths
 	 */
-	public function getElementKeys(): Iterator<String> {
-		if (currentScene == null) return [].iterator();
-		return currentScene.elements.keys();
+	public function getElementKeys(): Array<String> {
+		if (currentScene == null) return [];
+		var paths: Array<String> = [];
+		collectElementPaths(currentScene.root, "", paths);
+		return paths;
+	}
+
+	/**
+	 * Internal helper to recursively collect element paths.
+	 */
+	private function collectElementPaths(parent: Element, parentPath: String, output: Array<String>): Void {
+		var children = getChildrenOf(parent);
+		for (child in children) {
+			var childKey = currentScene.elementKeys.get(child);
+			if (childKey == null) continue;
+
+			// Build the full path
+			var fullPath = parentPath == "" ? childKey : parentPath + "/" + childKey;
+			output.push(fullPath);
+
+			// Recursively collect from this child's children
+			collectElementPaths(child, fullPath, output);
+		}
+	}
+
+	/**
+	 * Internal helper to traverse hierarchy by path.
+	 */
+	private function getElementByPath(path: String): Null<Element> {
+		var parts = path.split("/");
+		var current: Element = currentScene.root;
+
+		for (i in 0...parts.length) {
+			var key = parts[i];
+			var found = false;
+
+			// Get children of current element
+			var children = getChildrenOf(current);
+			for (child in children) {
+				// Look up this child's key
+				var childKey = currentScene.elementKeys.get(child);
+				if (childKey == key) {
+					current = child;
+					found = true;
+					break;
+				}
+			}
+
+			if (!found) {
+				trace('[KouiCanvas] Path not found: "$path" (failed at "$key")');
+				return null;
+			}
+		}
+
+		return current;
+	}
+
+	/**
+	 * Internal helper to get children of an element.
+	 */
+	private function getChildrenOf(parent: Element): Array<Element> {
+		if (parent == null) return [];
+		if (Std.isOfType(parent, AnchorPane)) return untyped parent.elements;
+		// GridLayout/RowLayout/ColLayout use 2D Vector, need to flatten
+		if (Std.isOfType(parent, GridLayout) || Std.isOfType(parent, RowLayout) || Std.isOfType(parent, ColLayout)) {
+			var grid: GridLayout = cast parent;
+			var flattened = new Array<Element>();
+			for (row in grid.elements) {
+				for (element in row) {
+					if (element != null) flattened.push(element);
+				}
+			}
+			return flattened;
+		}
+		return parent.children;
+	}
+
+	/**
+	 * Internal helper to get children of an element in a specific scene.
+	 */
+	private function getChildrenOfInScene(scene: TKouiScene, parent: Element): Array<Element> {
+		if (parent == null) return [];
+		if (Std.isOfType(parent, AnchorPane)) return untyped parent.elements;
+		// GridLayout/RowLayout/ColLayout use 2D Vector, need to flatten
+		if (Std.isOfType(parent, GridLayout) || Std.isOfType(parent, RowLayout) || Std.isOfType(parent, ColLayout)) {
+			var grid: GridLayout = cast parent;
+			var flattened = new Array<Element>();
+			for (row in grid.elements) {
+				for (element in row) {
+					if (element != null) flattened.push(element);
+				}
+			}
+			return flattened;
+		}
+		return parent.children;
 	}
 
 	// -------------------------------------------------------------------------
@@ -558,9 +692,10 @@ class KouiCanvas extends Trait {
 	/**
 	 * Get an element by its key from a specific scene.
 	 * Use this for cross-scene element access.
+	 * Supports path-based access (e.g., "parent/child/element").
 	 *
 	 * @param sceneName The scene to look in
-	 * @param key The element's unique key
+	 * @param key The element's unique key or path
 	 * @return The element, or null if not found
 	 */
 	public function getElementFromScene(sceneName: String, key: String): Null<Element> {
@@ -569,16 +704,55 @@ class KouiCanvas extends Trait {
 			trace('[KouiCanvas] Scene not found: "$sceneName"');
 			return null;
 		}
+
+		// Support path-based access
+		if (key.indexOf('/') != -1) {
+			var parts: Array<String> = key.split('/');
+			var current: Element = scene.root;
+
+			for (i in 0...parts.length) {
+				var part: String = parts[i];
+				if (part == '') continue;
+
+				var children: Array<Element> = getChildrenOfInScene(scene, current);
+				var found: Bool = false;
+				for (child in children) {
+					var childKey: String = scene.elementKeys.get(child);
+					if (childKey == part) {
+						current = child;
+						found = true;
+						break;
+					}
+				}
+
+				if (!found) {
+					trace('[KouiCanvas] Path element not found: "$part" in path "$key" (scene "$sceneName")');
+					return null;
+				}
+			}
+
+			return current;
+		}
+
+		// Simple key - must be root-level
 		var element: Element = scene.elements.get(key);
-		if (element == null) trace('[KouiCanvas] Element not found: "$key" in scene "$sceneName"');
+		if (element == null) {
+			trace('[KouiCanvas] Element not found: "$key" in scene "$sceneName"');
+			return null;
+		}
+		if (element.layout != scene.root) {
+			trace('[KouiCanvas] Element "$key" exists in scene "$sceneName" but is not at root level. Use path instead: "${scene.elementKeys.get(element)}"');
+			return null;
+		}
 		return element;
 	}
 
 	/**
 	 * Get a button from a specific scene with its signal handlers.
+	 * Supports path-based access (e.g., "parent/child/button").
 	 *
 	 * @param sceneName The scene to look in
-	 * @param key The button's unique key
+	 * @param key The button's unique key or path
 	 * @return The TButton with signals, or null if not found
 	 */
 	public function getButtonFromScene(sceneName: String, key: String): Null<TButton> {
@@ -587,12 +761,47 @@ class KouiCanvas extends Trait {
 			trace('[KouiCanvas] Scene not found: "$sceneName"');
 			return null;
 		}
-		var btn: TButton = scene.buttons.get(key);
-		if (btn == null) {
+
+		// Support path-based access
+		if (key.indexOf('/') != -1) {
+			var parts: Array<String> = key.split('/');
+			var current: Element = scene.root;
+
+			for (i in 0...parts.length) {
+				var part: String = parts[i];
+				if (part == '') continue;
+
+				var children: Array<Element> = getChildrenOfInScene(scene, current);
+				var found: Bool = false;
+				for (child in children) {
+					var childKey: String = scene.elementKeys.get(child);
+					if (childKey == part) {
+						current = child;
+						found = true;
+						break;
+					}
+				}
+
+				if (!found) {
+					trace('[KouiCanvas] Path element not found: "$part" in path "$key" (scene "$sceneName")');
+					return null;
+				}
+			}
+
+			return scene.buttons.get(scene.elementKeys.get(current));
+		}
+
+		// Simple key - must be root-level
+		var element: Element = scene.elements.get(key);
+		if (element == null) {
 			trace('[KouiCanvas] Button not found: "$key" in scene "$sceneName"');
 			return null;
 		}
-		return btn;
+		if (element.layout != scene.root) {
+			trace('[KouiCanvas] Button "$key" exists in scene "$sceneName" but is not at root level. Use path instead: "${scene.elementKeys.get(element)}"');
+			return null;
+		}
+		return scene.buttons.get(key);
 	}
 
 	// -------------------------------------------------------------------------
@@ -691,17 +900,7 @@ class KouiCanvas extends Trait {
 	 * Creates a new column at the end with null elements.
 	 */
 	private static function addColumnToGrid(grid: GridLayout): Void {
-		for (row in grid.elements) {
-			var newRow = new haxe.ds.Vector<Element>(grid.amountCols + 1);
-			for (i in 0...grid.amountCols) {
-				newRow[i] = row[i];
-			}
-			newRow[grid.amountCols] = null;
-			// Replace in-place by copying values back
-			// Note: This only works because we're iterating and grid.elements is a Vector
-		}
-
-		// Actually need to rebuild the elements Vector with new columns
+		// Rebuild the elements Vector with an additional column
 		var newElements = new haxe.ds.Vector<haxe.ds.Vector<Element>>(grid.amountRows);
 		for (i in 0...grid.amountRows) {
 			var newRow = new haxe.ds.Vector<Element>(grid.amountCols + 1);

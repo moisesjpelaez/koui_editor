@@ -246,8 +246,8 @@ class KouiEditor extends iron.Trait {
 		var mouse: Mouse = Input.getMouse();
 		if (mouse.started()) {
 			var element: Element = getElementAtPositionUnclipped(Std.int(mouse.x), Std.int(mouse.y));
-			var canvasArea: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize, App.h() - uiBase.getBottomH() - borderSize); // TODO: use a better variable name
-			var hierarchyArea: Vec2 = new Vec2(canvasArea.x + 2 * borderSize, App.h() - uiBase.getSidebarH1() - borderSize); // TODO: use a better variable name
+			var canvasArea: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize, App.h() - uiBase.getBottomH() - borderSize); // TODO: use a more accurate variable name
+			var hierarchyArea: Vec2 = new Vec2(canvasArea.x + 2 * borderSize, App.h() - uiBase.getSidebarH1() - borderSize); // TODO: use a more accurate variable name
 
 			if (element != null && element != rootPane) {
 				if (element.parent is Button) selectedElement = element.parent;
@@ -553,7 +553,7 @@ class KouiEditor extends iron.Trait {
 		// Perform the mutation
 		switch (zone) {
 			case AsChild:
-				HierarchyUtils.moveAsChild(element, target, rootPane); // TODO: remove third param?
+				HierarchyUtils.moveAsChild(element, target, rootPane);
 			case BeforeSibling:
 				HierarchyUtils.moveRelativeToTarget(element, target, true);
 			case AfterSibling:
