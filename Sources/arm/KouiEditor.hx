@@ -120,6 +120,9 @@ class KouiEditor extends iron.Trait {
 
 				SceneManager.addScene("Scene_1", setupRootScene);
 				CanvasUtils.refreshTheme();
+
+				// Set snap max value based on canvas size
+				topToolbar.snapMaxValue = Math.min(canvasWidth, canvasHeight) * 0.5;
 			});
 
 			App.onResize = onResized;
@@ -395,6 +398,62 @@ class KouiEditor extends iron.Trait {
 		propertiesPanel.draw(uiBase, {tabx: tabx, h0: h0, w: w, h1: h1});
 	}
 
+	function drawGrid(g2: Graphics) {
+		if (!topToolbar.snappingEnabled || rootPane == null) return;
+
+		var cellSize: Float = topToolbar.snapValue * currentScale;
+		if (cellSize < 4) return; // Don't draw if cells are too small
+
+		// Visible area (canvas area only, excluding sidebar)
+		var viewWidth: Float = App.w() - uiBase.getSidebarW();
+		var viewHeight: Float = App.h() - uiBase.getBottomH();
+
+		// Calculate grid offset based on rootPane's actual screen position
+		// This ensures grid aligns with the rootPane regardless of its anchor
+		var offsetX: Float = rootPane.drawX % cellSize;
+		var offsetY: Float = rootPane.drawY % cellSize;
+
+		// Minor grid lines (every cell)
+		var minorAlpha: Int = 0x30; // ~19% opacity
+		g2.color = (minorAlpha << 24) | 0xffffff;
+
+		// Vertical lines
+		var x: Float = offsetX;
+		while (x < viewWidth) {
+			g2.drawLine(x, 0, x, viewHeight, 1);
+			x += cellSize;
+		}
+
+		// Horizontal lines
+		var y: Float = offsetY;
+		while (y < viewHeight) {
+			g2.drawLine(0, y, viewWidth, y, 1);
+			y += cellSize;
+		}
+
+		// Major grid lines (every 4 cells)
+		var majorCellSize: Float = cellSize * 4;
+		var majorOffsetX: Float = rootPane.drawX % majorCellSize;
+		var majorOffsetY: Float = rootPane.drawY % majorCellSize;
+
+		var majorAlpha: Int = 0x50; // ~31% opacity
+		g2.color = (majorAlpha << 24) | 0xffffff;
+
+		// Vertical major lines
+		x = majorOffsetX;
+		while (x < viewWidth) {
+			g2.drawLine(x, 0, x, viewHeight, 1);
+			x += majorCellSize;
+		}
+
+		// Horizontal major lines
+		y = majorOffsetY;
+		while (y < viewHeight) {
+			g2.drawLine(0, y, viewWidth, y, 1);
+			y += majorCellSize;
+		}
+	}
+
 	function drawAnchorPane(g2: Graphics) {
 		// Draw border with g2 in screen coordinates using drawX/drawY
 		if (rootPane != null) {
@@ -478,6 +537,7 @@ class KouiEditor extends iron.Trait {
 
 		Koui.render(g2);
 		g2.begin(false);
+		drawGrid(g2);
 		drawAnchorPane(g2);
 		drawLayoutElements(g2);
 		drawSelectedElement(g2);

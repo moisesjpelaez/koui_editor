@@ -19,7 +19,8 @@ class TopToolbar {
 	public var snapValueChanged: Signal = new Signal(); // args: (snapValue: Float)
 
     public var snappingEnabled: Bool = false;
-	public var snapValue: Float = 1.0;
+	public var snapValue: Float = 8.0;
+	public var snapMaxValue: Float = 288.0;
 
 	static inline var TOOLBAR_WIDTH: Int = 378;
 	static inline var TOOLBAR_HEIGHT: Int = 32;
@@ -32,7 +33,7 @@ class TopToolbar {
 
 	public function new() {
 		snapHandle = new Handle();
-		snapHandle.value = snapValue;
+		snapHandle.value = 64.0;
 		windowHandle = Id.handle();
 
 		// Subscribe to stack changes to refresh button states
@@ -112,9 +113,14 @@ class TopToolbar {
                 snappingToggled.emit(snappingEnabled, snapValue);
 			}
 			ui._x += 4; // Small padding on the left
-			snapValue = ui.slider(snapHandle, "Snap", 0.5, 10.0, false, 2, true, Align.Right, false);
+			snapValue = ui.slider(snapHandle, "Snap", 4, snapMaxValue, false, 1, true, Align.Right, false);
+			// Round to nearest multiple of 4
+			if (snapHandle.changed) {
+				snapValue = Math.round(snapValue / 8) * 8;
+				snapHandle.value = snapValue; // Update handle to match rounded value
+			}
 			if (ui.isHovered) ui.tooltip("Grid Snap Value");
-			if (snapHandle.changed && snappingEnabled) {
+			if (snapHandle.changed) {
 				snapValueChanged.emit(snapValue);
 			}
 
