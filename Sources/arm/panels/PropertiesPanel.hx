@@ -6,6 +6,7 @@ import arm.events.SceneEvents;
 import arm.events.ElementEvents;
 import arm.types.Enums;
 import arm.base.UIBase;
+import arm.tools.CanvasUtils;
 import arm.tools.ImageUtils;
 import arm.tools.ZuiUtils;
 
@@ -156,11 +157,13 @@ class PropertiesPanel {
             }
         }
 
+		var elementType = CanvasUtils.getElementType(selectedElement);
+		ui.text(elementType, Right);
+
         drawElementProperties(uiBase);
 
-        ui.text("Element", Center);
+        ui.text("Element Properties", Center);
         ui.separator();
-
         // Key (Name) - editable text input
         nameHandle.text = elemName;
         var newName: String = ui.textInput(nameHandle, "Key", Right);
@@ -349,7 +352,7 @@ class PropertiesPanel {
         var ui: Zui = uiBase.ui;
 
         if (selectedElement is Label) {
-            ui.text("Label", Center);
+            ui.text("Label Properties", Center);
             ui.separator();
 
             var label: Label = cast(selectedElement, Label);
@@ -359,7 +362,7 @@ class PropertiesPanel {
                 if (newText != null && newText != "") label.text = newText;
             }
         } else if (selectedElement is Button) {
-            ui.text("Button", Center);
+            ui.text("Button Properties", Center);
             ui.separator();
 
             var button: Button = cast(selectedElement, Button);

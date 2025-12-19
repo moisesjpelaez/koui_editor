@@ -330,7 +330,7 @@ class CanvasUtils {
 	/**
 	 * Returns the type string for an element.
 	 */
-	static function getElementType(element: Element): String {
+	public static function getElementType(element: Element): String {
 		if (Std.isOfType(element, Button)) return "Button";
 		if (Std.isOfType(element, Label)) return "Label";
 		// Check RowLayout/ColLayout before AnchorPane since they're more specific
