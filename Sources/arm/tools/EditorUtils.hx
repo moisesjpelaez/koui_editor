@@ -10,6 +10,7 @@ import arm.tools.CanvasUtils.TElementData;
 import arm.tools.ElementUtils;
 import arm.tools.HierarchyUtils;
 import arm.types.Enums.DropZone;
+import armory.system.Signal;
 
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
@@ -34,6 +35,8 @@ typedef TUndoAction = {
 
 @:access(koui.elements.Element)
 class EditorUtils {
+	public static var stackChanged: Signal = new Signal(); // Emitted when undo/redo stack state changes
+
 	static var undoStack: Array<TUndoAction> = [];
 	static var redoStack: Array<TUndoAction> = [];
 	static var sceneData: SceneData = SceneData.data;
@@ -75,6 +78,8 @@ class EditorUtils {
 		while (undoStack.length > CanvasSettings.undoStackSize) {
 			undoStack.shift();
 		}
+
+		stackChanged.emit();
 	}
 
 	/**
@@ -88,6 +93,7 @@ class EditorUtils {
 		applyAction(action, true);
 		redoStack.push(action);
 		isUndoingOrRedoing = false;
+		stackChanged.emit();
 	}
 
 	/**
@@ -101,6 +107,7 @@ class EditorUtils {
 		applyAction(action, false);
 		undoStack.push(action);
 		isUndoingOrRedoing = false;
+		stackChanged.emit();
 	}
 
 	/**
@@ -109,6 +116,7 @@ class EditorUtils {
 	public static function clearStacks(): Void {
 		undoStack = [];
 		redoStack = [];
+		stackChanged.emit();
 	}
 
 	/**

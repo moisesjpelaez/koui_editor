@@ -27,16 +27,21 @@ class TopToolbar {
 	static inline var ICON_SIZE: Int = 50; // Icon tile size in atlas
 
 	var snapHandle: Handle;
+	var windowHandle: Handle;
 	var icons: Image;
 
 	public function new() {
 		snapHandle = new Handle();
 		snapHandle.value = snapValue;
+		windowHandle = Id.handle();
+
+		// Subscribe to stack changes to refresh button states
+		EditorUtils.stackChanged.connect(onStackChanged);
 	}
 
 	// Wrapper for ZuiUtils.iconButton with local icons
-	function iconButton(ui: Zui, tileX: Int, tileY: Int, tooltip: String, highlight: Bool = false): Bool {
-		return ZuiUtils.iconButton(ui, icons, tileX, tileY, tooltip, highlight);
+	function iconButton(ui: Zui, tileX: Int, tileY: Int, tooltip: String, highlight: Bool = false, disabled: Bool = false): Bool {
+		return ZuiUtils.iconButton(ui, icons, tileX, tileY, tooltip, highlight, disabled);
 	}
 
 	function hSeparator(ui: Zui, w: Float = 1, spacing: Float = 8): Void {
@@ -66,7 +71,7 @@ class TopToolbar {
 		var savedFillBg: Bool = ui.t.FILL_WINDOW_BG;
 		ui.t.FILL_WINDOW_BG = false;
 
-		if (ui.window(Id.handle(), centerX, topY, TOOLBAR_WIDTH, TOOLBAR_HEIGHT, false)) {
+		if (ui.window(windowHandle, centerX, topY, TOOLBAR_WIDTH, TOOLBAR_HEIGHT, false)) {
 			// Center elements vertically within the toolbar
 			var yOffset: Float = (TOOLBAR_HEIGHT - BUTTON_SIZE) / 2;
 			ui._y += yOffset;
@@ -89,10 +94,10 @@ class TopToolbar {
 			}
 			hSeparator(ui);
 
-			if (iconButton(ui, 6, 2, "Undo")) {
+			if (iconButton(ui, 6, 2, "Undo", false, !EditorUtils.canUndo())) {
 				EditorUtils.undo();
 			}
-			if (iconButton(ui, 7, 2, "Redo")) {
+			if (iconButton(ui, 7, 2, "Redo", false, !EditorUtils.canRedo())) {
 				EditorUtils.redo();
 			}
 			hSeparator(ui);
@@ -119,7 +124,11 @@ class TopToolbar {
 		ui.t.FILL_WINDOW_BG = savedFillBg;
 	}
 
-    public function setIcons(iconsImage: Image): Void {
+	public function setIcons(iconsImage: Image): Void {
         icons = iconsImage;
     }
+
+	function onStackChanged(): Void {
+		windowHandle.redraws = 2;
+	}
 }
