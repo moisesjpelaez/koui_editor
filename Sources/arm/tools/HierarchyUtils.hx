@@ -63,26 +63,32 @@ class HierarchyUtils {
 		if (element == null) return;
 		if (element.layout != null) {
 			var layout: Layout = element.layout;
-			if (layout is AnchorPane || layout is ScrollPane || layout is Expander || layout is GridLayout || layout is RowLayout || layout is ColLayout) {
+			// Handle RowLayout/ColLayout/GridLayout - they have remove() method
+			if (layout is RowLayout) {
+				var grid: GridLayout = cast layout;
+				grid.remove(element);
+				// Compact and shrink
+				compactRows(grid);
+				while (removeLastRowIfEmpty(grid)) {}
+				return;
+			} else if (layout is ColLayout) {
+				var grid: GridLayout = cast layout;
+				grid.remove(element);
+				// Compact and shrink
+				compactColumns(grid);
+				while (removeLastColumnIfEmpty(grid)) {}
+				return;
+			} else if (layout is GridLayout) {
+				var grid: GridLayout = cast layout;
+				grid.remove(element);
+				return;
+			} else if (layout is AnchorPane || layout is ScrollPane || layout is Expander) {
 				untyped layout.remove(element);
-				// Compact and shrink RowLayout/ColLayout
-				if (layout is RowLayout) {
-					var grid: GridLayout = cast layout;
-					compactRows(grid);
-					while (removeLastRowIfEmpty(grid)) {}
-					grid.resize(grid.layoutWidth, grid.layoutHeight);
-					grid.invalidateElem();
-					grid.onResize();
-				} else if (layout is ColLayout) {
-					var grid: GridLayout = cast layout;
-					compactColumns(grid);
-					while (removeLastColumnIfEmpty(grid)) {}
-					grid.resize(grid.layoutWidth, grid.layoutHeight);
-					grid.invalidateElem();
-					grid.onResize();
-				}
 				return;
 			}
+			layout.resize(layout.layoutWidth, layout.layoutHeight);
+			layout.invalidateElem();
+			layout.onResize();
 		}
 		if (element.parent != null) element.parent.removeChild(element);
 	}
@@ -100,9 +106,6 @@ class HierarchyUtils {
 				slot = grid.amountRows - 1;
 			}
 			row.addToRow(element, slot);
-			grid.resize(grid.layoutWidth, grid.layoutHeight);
-			grid.invalidateElem();
-			grid.onResize();
 		} else if (target is ColLayout) {
 			var col: ColLayout = cast target;
 			var grid: GridLayout = cast col;
@@ -113,15 +116,18 @@ class HierarchyUtils {
 				slot = grid.amountCols - 1;
 			}
 			col.addToColumn(element, slot);
-			grid.resize(grid.layoutWidth, grid.layoutHeight);
-			grid.invalidateElem();
-			grid.onResize();
 		} else if (target is Layout && (target is AnchorPane || target is ScrollPane || target is Expander)) {
 			untyped cast(target, Layout).add(element);
 		} else if (target is Panel) {
 			target.addChild(element);
 		}
 
+		if (target is Layout) {
+			var layout: Layout = cast(target, Layout);
+			layout.resize(layout.layoutWidth, layout.layoutHeight);
+			layout.invalidateElem();
+			layout.onResize();
+		}
 	}
 
 	static function findFirstEmptyRowSlot(row: RowLayout): Int {

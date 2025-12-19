@@ -383,7 +383,7 @@ class PropertiesPanel {
         }
     }
 
-    public function onElementAdded(entry: THierarchyEntry): Void {
+    public function onElementAdded(entry: TElementEntry): Void {
         elementSizes.set(entry.element, new Vec2(entry.element.width, entry.element.height));
     }
 

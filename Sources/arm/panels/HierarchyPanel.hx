@@ -38,7 +38,7 @@ class HierarchyPanel {
 
 	// Drag-drop state - use Element references instead of indices
     var selectedElement: Element = null;
-	var draggedItem: THierarchyEntry = null;
+	var draggedItem: TElementEntry = null;
 	var dropTargetElement: Element = null;
 	var dropZone: DropZone = None;
 	var isDragging: Bool = false;
@@ -112,7 +112,7 @@ class HierarchyPanel {
 		}
 	}
 
-	function drawItem(uiBase: UIBase, entry: THierarchyEntry, depth: Int) {
+	function drawItem(uiBase: UIBase, entry: TElementEntry, depth: Int) {
 		if (entry == null) return;
 
 		var name: String = entry.key;
@@ -253,7 +253,7 @@ class HierarchyPanel {
 		ui.t.BUTTON_PRESSED_COL = savedPressed;
 	}
 
-	function handleItemInteraction(uiBase: UIBase, entry: THierarchyEntry) {
+	function handleItemInteraction(uiBase: UIBase, entry: TElementEntry) {
 		var isRoot: Bool = sceneData.currentScene.root != null && entry.element == sceneData.currentScene.root;
 
 		// Selection on click start
@@ -341,7 +341,7 @@ class HierarchyPanel {
 		ui.g.color = 0xFFFFFFFF;
 	}
 
-	function handleDropDetection(uiBase: UIBase, item: THierarchyEntry, winX: Float, winY: Float, localX: Float, localY: Float, winW: Float, rowH: Float) {
+	function handleDropDetection(uiBase: UIBase, item: TElementEntry, winX: Float, winY: Float, localX: Float, localY: Float, winW: Float, rowH: Float) {
 		if (!isDragging || draggedItem == null || draggedItem.element == item.element) return;
 
 		var absX: Float = winX + localX;
@@ -403,7 +403,7 @@ class HierarchyPanel {
 		if (selectedElement == null) draggedItem = null;
     }
 
-    public function onElementAdded(entry: THierarchyEntry): Void {
+    public function onElementAdded(entry: TElementEntry): Void {
 		if (entry.element == sceneData.currentScene.root) return;
         onElementSelected(entry.element);
         registerChildren(entry.element);

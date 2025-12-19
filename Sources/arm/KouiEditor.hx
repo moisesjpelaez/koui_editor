@@ -43,7 +43,7 @@ class KouiEditor extends iron.Trait {
 
 	// Created elements
 	var sceneData: SceneData = SceneData.data;
-	// var elements: Array<THierarchyEntry> = SceneData.data.elements;
+	// var elements: Array<TElementEntry> = SceneData.data.elements;
 
 	// Drag and drop state
 	var selectedElement: Element = null;
@@ -565,7 +565,7 @@ class KouiEditor extends iron.Trait {
 		uiBase.hwnds[PanelProperties].redraws = 2;
 	}
 
-	function onElementAdded(entry: THierarchyEntry): Void {
+	function onElementAdded(entry: TElementEntry): Void {
 		rootPane.add(entry.element, Anchor.TopLeft);
 
 		// Generate unique name based on parent's children

@@ -8,6 +8,9 @@ import koui.elements.Element;
 import koui.elements.Button;
 import koui.elements.Label;
 import koui.elements.layouts.AnchorPane;
+import koui.elements.layouts.ColLayout;
+import koui.elements.layouts.GridLayout;
+import koui.elements.layouts.RowLayout;
 import koui.elements.layouts.Layout.Anchor;
 import koui.events.MouseEvent.MouseClickEvent;
 import koui.utils.SceneManager;
@@ -91,7 +94,7 @@ private typedef TKouiScene = {
  * Note: Koui.init() is automatically called in Main.hx via the armory_hooks.py
  * library hook system. The game startup is wrapped inside Koui.init() callback.
  */
-@:access(koui.Koui, koui.elements.Element)
+@:access(koui.Koui, koui.elements.Element, koui.elements.layouts.GridLayout)
 class KouiCanvas extends Trait {
 
 	/** The canvas name (without .json extension) */
@@ -239,6 +242,9 @@ class KouiCanvas extends Trait {
 				}
 			}
 
+			// Track row/column indices for RowLayout/ColLayout
+			var layoutIndices: Map<Element, Int> = new Map();
+
 			// Second pass: parent elements correctly
 			for (elemData in sceneData.elements) {
 				var element: Element = kouiScene.elements.get(elemData.key);
@@ -250,12 +256,42 @@ class KouiCanvas extends Trait {
 				}
 
 				// Add to parent with correct anchor
-				if (Std.isOfType(parent, AnchorPane)) {
+				if (Std.isOfType(parent, RowLayout)) {
+					var row: RowLayout = cast parent;
+					var grid: GridLayout = cast row;
+					var idx: Int = layoutIndices.exists(parent) ? layoutIndices.get(parent) : 0;
+					// Add a new row if needed
+					while (grid.amountRows <= idx) {
+						addRowToGrid(grid);
+					}
+					row.addToRow(element, idx);
+					layoutIndices.set(parent, idx + 1);
+				} else if (Std.isOfType(parent, ColLayout)) {
+					var col: ColLayout = cast parent;
+					var grid: GridLayout = cast col;
+					var idx: Int = layoutIndices.exists(parent) ? layoutIndices.get(parent) : 0;
+					// Add a new column if needed
+					while (grid.amountCols <= idx) {
+						addColumnToGrid(grid);
+					}
+					col.addToColumn(element, idx);
+					layoutIndices.set(parent, idx + 1);
+				} else if (Std.isOfType(parent, AnchorPane)) {
 					var anchorPane: AnchorPane = cast parent;
 					anchorPane.add(element, cast elemData.anchor);
 				} else {
 					element.parent = parent;
 					parent.children.push(element);
+				}
+			}
+
+			// Final pass: resize all RowLayout/ColLayout elements
+			for (elemData in sceneData.elements) {
+				var element: Element = kouiScene.elements.get(elemData.key);
+				if (element == null) continue;
+				if (Std.isOfType(element, RowLayout) || Std.isOfType(element, ColLayout)) {
+					var grid: GridLayout = cast element;
+					grid.resize(grid.layoutWidth, grid.layoutHeight);
 				}
 			}
 		});
@@ -319,6 +355,12 @@ class KouiCanvas extends Trait {
 
 			case "AnchorPane":
 				element = new AnchorPane(data.posX, data.posY, data.width, data.height);
+
+			case "RowLayout":
+				element = new RowLayout(data.posX, data.posY, data.width, data.height, 0);
+
+			case "ColLayout":
+				element = new ColLayout(data.posX, data.posY, data.width, data.height, 0);
 
 			// TODO: Add more element types as needed:
 			// case "Checkbox": ...
@@ -604,4 +646,58 @@ class KouiCanvas extends Trait {
 	// TODO: Consider adding hot-reload support in the future
 	// This would allow reloading the canvas JSON at runtime for development
 	// public function reloadCanvas(): Void { ... }
+
+	// =========================================================================
+	// GridLayout Helpers (for RowLayout/ColLayout deserialization)
+	// =========================================================================
+
+	/**
+	 * Add a row to a GridLayout (used for RowLayout deserialization).
+	 * Creates a new row at the end with null elements.
+	 */
+	private static function addRowToGrid(grid: GridLayout): Void {
+		var newRow = new haxe.ds.Vector<Element>(grid.amountCols);
+		for (i in 0...grid.amountCols) {
+			newRow[i] = null;
+		}
+
+		var newElements = new haxe.ds.Vector<haxe.ds.Vector<Element>>(grid.amountRows + 1);
+		for (i in 0...grid.amountRows) {
+			newElements[i] = grid.elements[i];
+		}
+		newElements[grid.amountRows] = newRow;
+
+		grid.elements = newElements;
+		grid.amountRows++;
+	}
+
+	/**
+	 * Add a column to a GridLayout (used for ColLayout deserialization).
+	 * Creates a new column at the end with null elements.
+	 */
+	private static function addColumnToGrid(grid: GridLayout): Void {
+		for (row in grid.elements) {
+			var newRow = new haxe.ds.Vector<Element>(grid.amountCols + 1);
+			for (i in 0...grid.amountCols) {
+				newRow[i] = row[i];
+			}
+			newRow[grid.amountCols] = null;
+			// Replace in-place by copying values back
+			// Note: This only works because we're iterating and grid.elements is a Vector
+		}
+
+		// Actually need to rebuild the elements Vector with new columns
+		var newElements = new haxe.ds.Vector<haxe.ds.Vector<Element>>(grid.amountRows);
+		for (i in 0...grid.amountRows) {
+			var newRow = new haxe.ds.Vector<Element>(grid.amountCols + 1);
+			for (j in 0...grid.amountCols) {
+				newRow[j] = grid.elements[i][j];
+			}
+			newRow[grid.amountCols] = null;
+			newElements[i] = newRow;
+		}
+
+		grid.elements = newElements;
+		grid.amountCols++;
+	}
 }

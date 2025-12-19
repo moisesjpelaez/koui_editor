@@ -8,10 +8,10 @@ import koui.elements.Element;
 typedef TSceneEntry = {
     var key: String;
     var root: AnchorPane;
-    var elements: Array<THierarchyEntry>;
+    var elements: Array<TElementEntry>;
 }
 
-typedef THierarchyEntry = {
+typedef TElementEntry = {
     var key: String;
     var element: Element;
 }
@@ -38,7 +38,7 @@ class SceneData {
         }
     }
 
-    public function onElementAdded(entry: THierarchyEntry): Void {
+    public function onElementAdded(entry: TElementEntry): Void {
         if (currentScene == null) return;
         currentScene.elements.push({ key: entry.key, element: entry.element });
     }
