@@ -385,7 +385,7 @@ class EditorUtils {
 
 	// ========== Scene Operations ==========
 
-	static var lastSceneKey: String = null;
+	static var lastSceneKey: String = "Scene_1";
 
 	static function onSceneAdded(sceneKey: String): Void {
 		if (isUndoingOrRedoing) return;
