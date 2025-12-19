@@ -65,13 +65,21 @@ class HierarchyUtils {
 			var layout: Layout = element.layout;
 			if (layout is AnchorPane || layout is ScrollPane || layout is Expander || layout is GridLayout || layout is RowLayout || layout is ColLayout) {
 				untyped layout.remove(element);
-				// Shrink RowLayout/ColLayout if last row/column is now empty
+				// Compact and shrink RowLayout/ColLayout
 				if (layout is RowLayout) {
 					var grid: GridLayout = cast layout;
+					compactRows(grid);
 					while (removeLastRowIfEmpty(grid)) {}
+					grid.resize(grid.layoutWidth, grid.layoutHeight);
+					grid.invalidateElem();
+					grid.onResize();
 				} else if (layout is ColLayout) {
 					var grid: GridLayout = cast layout;
+					compactColumns(grid);
 					while (removeLastColumnIfEmpty(grid)) {}
+					grid.resize(grid.layoutWidth, grid.layoutHeight);
+					grid.invalidateElem();
+					grid.onResize();
 				}
 				return;
 			}
@@ -430,5 +438,43 @@ class HierarchyUtils {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Compacts rows by shifting elements up to fill gaps.
+	 * Used for RowLayout (single column).
+	 */
+	static function compactRows(grid: GridLayout): Void {
+		if (grid.amountRows == 0) return;
+
+		var writeIdx: Int = 0;
+		for (readIdx in 0...grid.amountRows) {
+			if (grid.elements[readIdx][0] != null) {
+				if (writeIdx != readIdx) {
+					grid.elements[writeIdx][0] = grid.elements[readIdx][0];
+					grid.elements[readIdx][0] = null;
+				}
+				writeIdx++;
+			}
+		}
+	}
+
+	/**
+	 * Compacts columns by shifting elements left to fill gaps.
+	 * Used for ColLayout (single row).
+	 */
+	static function compactColumns(grid: GridLayout): Void {
+		if (grid.amountCols == 0 || grid.amountRows == 0) return;
+
+		var writeIdx: Int = 0;
+		for (readIdx in 0...grid.amountCols) {
+			if (grid.elements[0][readIdx] != null) {
+				if (writeIdx != readIdx) {
+					grid.elements[0][writeIdx] = grid.elements[0][readIdx];
+					grid.elements[0][readIdx] = null;
+				}
+				writeIdx++;
+			}
+		}
 	}
 }
