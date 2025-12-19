@@ -397,7 +397,7 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function drawSelectedElement(g2: Graphics) {
-		if (selectedElement != null && selectedElement != rootPane && selectedElement.layout != null && selectedElement.layout == rootPane) { // FIXME: skip elements inside layouts for now since they are not properly drawn yet
+		if (selectedElement != null && selectedElement != rootPane) {
 			var thickness: Int = 2;
 			g2.color = 0xff469cff;
 
@@ -406,10 +406,24 @@ class KouiEditor extends iron.Trait {
 			var w: Int = selectedElement.drawWidth;
 			var h: Int = selectedElement.drawHeight;
 
+			var finalPos: Vec2 = sumLayout(selectedElement, 0, 0);
+			if (selectedElement.layout != rootPane) {
+				x += Std.int(finalPos.x);
+				y += Std.int(finalPos.y);
+			}
+
 			g2.fillRect(x, y, w, thickness);
 			g2.fillRect(x, y + h - thickness, w, thickness);
 			g2.fillRect(x, y + thickness, thickness, h - thickness * 2);
 			g2.fillRect(x + w - thickness, y + thickness, thickness, h - thickness * 2);
+		}
+	}
+
+	function sumLayout(elem: Element, x: Int, y: Int): Vec2 {
+		if (elem.layout != null && elem.layout != rootPane) {
+			return sumLayout(elem.layout, x + elem.layout.drawX, y + elem.layout.drawY);
+		} else {
+			return new Vec2(x, y);
 		}
 	}
 
@@ -427,6 +441,11 @@ class KouiEditor extends iron.Trait {
 				var y: Int = elem.drawY + rootPane.drawY;
 				var w: Int = elem.drawWidth;
 				var h: Int = elem.drawHeight;
+
+				if (elem.layout != rootPane) {
+					x += elem.layout.drawX;
+					y += elem.layout.drawY;
+				}
 
 				g2.fillRect(x, y, w, thickness);
 				g2.fillRect(x, y + h - thickness, w, thickness);
