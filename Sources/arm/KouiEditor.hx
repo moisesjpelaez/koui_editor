@@ -401,18 +401,10 @@ class KouiEditor extends iron.Trait {
 			var thickness: Int = 2;
 			g2.color = 0xff469cff;
 
-			var x: Int;
-			var y: Int;
+			var x: Int = draggedElement != selectedElement || selectedElement is Layout ? selectedElement.drawX + rootPane.drawX : Std.int(selectedElement.drawX / Koui.uiScale) + rootPane.drawX;
+			var y: Int = draggedElement != selectedElement || selectedElement is Layout ? selectedElement.drawY + rootPane.drawY : Std.int(selectedElement.drawY / Koui.uiScale) + rootPane.drawY;
 			var w: Int = selectedElement.drawWidth;
 			var h: Int = selectedElement.drawHeight;
-
-			if (selectedElement is Layout) {
-				x = selectedElement.drawX + rootPane.drawX;
-				y = selectedElement.drawY + rootPane.drawY;
-			} else {
-				x = draggedElement != selectedElement ? selectedElement.drawX + rootPane.drawX : Std.int(selectedElement.drawX / Koui.uiScale) + rootPane.drawX;
-				y = draggedElement != selectedElement ? selectedElement.drawY + rootPane.drawY : Std.int(selectedElement.drawY / Koui.uiScale) + rootPane.drawY;
-			}
 
 			g2.fillRect(x, y, w, thickness);
 			g2.fillRect(x, y + h - thickness, w, thickness);
