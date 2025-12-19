@@ -234,11 +234,21 @@ class KouiCanvas extends Trait {
 			kouiScene.root = scenePane;
 			kouiScene.elements.set(sceneKey, scenePane);
 
-			// First pass: create all elements
+			// First pass: create all elements in order (use array to handle duplicate keys)
+			var createdElements: Array<Element> = [];
 			for (elemData in sceneData.elements) {
 				var element: Element = createElementFromData(elemData, kouiScene);
-				if (element != null) {
-					kouiScene.elements.set(elemData.key, element);
+				createdElements.push(element);
+			}
+
+			// Build a map for parent lookup (parents are serialized before children)
+			var elementMap: Map<String, Element> = new Map();
+			for (i in 0...sceneData.elements.length) {
+				if (createdElements[i] != null) {
+					var key = sceneData.elements[i].key;
+					elementMap.set(key, createdElements[i]);
+					// Also store in kouiScene.elements for runtime access
+					kouiScene.elements.set(key, createdElements[i]);
 				}
 			}
 
@@ -246,13 +256,18 @@ class KouiCanvas extends Trait {
 			var layoutIndices: Map<Element, Int> = new Map();
 
 			// Second pass: parent elements correctly
-			for (elemData in sceneData.elements) {
-				var element: Element = kouiScene.elements.get(elemData.key);
+			// Use index to pair each elemData with its created element (handles duplicate keys)
+			for (i in 0...sceneData.elements.length) {
+				var elemData = sceneData.elements[i];
+				var element = createdElements[i];
 				if (element == null) continue;
 
+				// Set the anchor before adding to parent
+				element.anchor = cast elemData.anchor;
+
 				var parent: Element = scenePane;
-				if (elemData.parentKey != null && kouiScene.elements.exists(elemData.parentKey)) {
-					parent = kouiScene.elements.get(elemData.parentKey);
+				if (elemData.parentKey != null && elementMap.exists(elemData.parentKey)) {
+					parent = elementMap.get(elemData.parentKey);
 				}
 
 				// Add to parent with correct anchor
