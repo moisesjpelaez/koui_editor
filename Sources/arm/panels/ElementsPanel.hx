@@ -61,10 +61,6 @@ class ElementsPanel {
 			if (uiBase.ui.panel(Id.handle({selected: true}), "Layout")) {
 				uiBase.ui.indent();
 
-				if (uiBase.ui.button("GridLayout")) {
-					trace("GridLayout");
-				}
-
 				if (uiBase.ui.button("ColLayout")) {
 					var key: String = "ColLayout";
 					var colLayout: ColLayout = new ColLayout(0, 0, 200, 100, 0);

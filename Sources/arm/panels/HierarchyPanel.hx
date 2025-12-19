@@ -154,7 +154,7 @@ class HierarchyPanel {
 			}
 		} else {
 			if (hasChildren) {
-				uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 0.8 - (indentWidth * 0.5 + EXPAND_BUTTON_WIDTH) / winW, 0.2 - (indentWidth * 0.5 + EXPAND_BUTTON_WIDTH) / winW]); // TODO: needs testing for nested children
+				uiBase.ui.row([indentWidth / winW, EXPAND_BUTTON_WIDTH / winW, 0.8 - (indentWidth * 0.5 + EXPAND_BUTTON_WIDTH * 0.5) / winW, 0.2 - (indentWidth * 0.5 + EXPAND_BUTTON_WIDTH * 0.5) / winW]); // TODO: needs testing for nested children
 			} else {
 				uiBase.ui.row([indentWidth / winW, 0.8 - indentWidth * 0.5 / winW, 0.2 - indentWidth * 0.5 / winW]);
 			}
@@ -217,6 +217,7 @@ class HierarchyPanel {
 
 		// Recursively draw children
 		if (hasChildren && isExpanded) {
+			// Add vertical spacing before children
 			for (child in children) {
 				var currentScene = SceneData.data.currentScene;
 				if (currentScene == null) continue;
