@@ -37,6 +37,7 @@ typedef TCanvasSettings = {
 
 typedef TSceneData = {
 	var key: String;
+	var active: Bool;
 	var elements: Array<TElementData>;
 }
 
@@ -254,6 +255,7 @@ class CanvasUtils {
 
 		return {
 			key: scene.key,
+			active: scene.active,
 			elements: elementsData
 		};
 	}
@@ -392,15 +394,20 @@ class CanvasUtils {
 		}
 
 		// Deserialize each scene by emitting sceneAdded (like the Add Scene button does)
-		var isFirst: Bool = true;
+		var activeSceneKey: String = null;
 		for (sceneDataEntry in canvasData.scenes) {
-			deserializeScene(sceneDataEntry, canvasData.canvas.width, canvasData.canvas.height, isFirst);
-			isFirst = false;
+			deserializeScene(sceneDataEntry, canvasData.canvas.width, canvasData.canvas.height);
+			if (sceneDataEntry.active) {
+				activeSceneKey = sceneDataEntry.key;
+			}
 		}
 
 		// If no scenes were loaded, create a default scene
 		if (sceneData.scenes.length == 0) {
 			SceneEvents.sceneAdded.emit("Scene");
+		} else if (activeSceneKey != null) {
+			// Switch to the active scene
+			SceneEvents.sceneChanged.emit(activeSceneKey);
 		}
 
 		ElementEvents.elementSelected.emit(null);
@@ -409,7 +416,7 @@ class CanvasUtils {
 	/**
 	 * Deserializes a single scene from TSceneData.
 	 */
-	static function deserializeScene(sceneDataEntry: TSceneData, canvasWidth: Int, canvasHeight: Int, isFirst: Bool): Void {
+	static function deserializeScene(sceneDataEntry: TSceneData, canvasWidth: Int, canvasHeight: Int): Void {
 		// Emit sceneAdded - this triggers KouiEditor.onSceneAdded which properly sets up the scene
 		SceneEvents.sceneAdded.emit(sceneDataEntry.key);
 

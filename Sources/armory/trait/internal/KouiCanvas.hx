@@ -39,6 +39,7 @@ private typedef TSettings = {
 
 private typedef TSceneData = {
 	var key: String;
+	var active: Bool;
 	var elements: Array<TElementData>;
 }
 
@@ -208,17 +209,23 @@ class KouiCanvas extends Trait {
 		}
 
 		// Build each scene
-		var isFirst: Bool = true;
 		for (sceneData in canvasData.scenes) {
-			buildScene(sceneData, canvasData.canvas.width, canvasData.canvas.height, isFirst);
-			isFirst = false;
+			buildScene(sceneData, canvasData.canvas.width, canvasData.canvas.height);
+		}
+
+		// Activate the scene marked as active (if any)
+		for (sceneData in canvasData.scenes) {
+			if (sceneData.active) {
+				setScene(sceneData.key);
+				break;
+			}
 		}
 	}
 
 	/**
 	 * Build a single scene from JSON data.
 	 */
-	private function buildScene(sceneData: TSceneData, canvasWidth: Int, canvasHeight: Int, isFirst: Bool): Void {
+	private function buildScene(sceneData: TSceneData, canvasWidth: Int, canvasHeight: Int): Void {
 		var sceneKey: String = sceneData.key;
 
 		// Create scene storage
@@ -316,11 +323,6 @@ class KouiCanvas extends Trait {
 
 		// Store scene
 		scenes.set(sceneKey, kouiScene);
-
-		// First scene becomes active
-		if (isFirst) {
-			currentScene = kouiScene;
-		}
 	}
 
 	/**

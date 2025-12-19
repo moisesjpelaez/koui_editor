@@ -54,6 +54,7 @@ class HierarchyPanel {
 		ElementEvents.elementSelected.connect(onElementSelected);
 
 		SceneEvents.sceneAdded.connect(onSceneAdded);
+		SceneEvents.sceneChanged.connect(onSceneChanged);
 		SceneEvents.sceneRemoved.connect(onSceneRemoved);
 
 		// Initialize tabs from existing scenes
@@ -418,6 +419,13 @@ class HierarchyPanel {
 			sceneTabs.push(sceneName);
 		}
 		sceneTabHandle.position = sceneTabs.indexOf(sceneName);
+	}
+
+	function onSceneChanged(sceneName: String): Void {
+		var idx: Int = sceneTabs.indexOf(sceneName);
+		if (idx >= 0) {
+			sceneTabHandle.position = idx;
+		}
 	}
 
 	function onSceneRemoved(sceneName: String): Void {

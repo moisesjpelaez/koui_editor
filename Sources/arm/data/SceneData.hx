@@ -9,6 +9,7 @@ typedef TSceneEntry = {
     var key: String;
     var root: AnchorPane;
     var elements: Array<TElementEntry>;
+    var active: Bool;
 }
 
 typedef TElementEntry = {
@@ -54,9 +55,11 @@ class SceneData {
     }
 
     function onSceneChanged(sceneKey: String): Void {
+        currentScene.active = false;
         for (i in 0...scenes.length) {
             if (scenes[i].key == sceneKey) {
                 currentScene = scenes[i];
+                currentScene.active = true;
                 return;
             }
         }
@@ -65,11 +68,13 @@ class SceneData {
     function onSceneRemoved(sceneKey: String): Void {
         for (i in 0...scenes.length) {
             if (scenes[i].key == sceneKey) {
+                scenes[i].active = false;
                 scenes.splice(i, 1);
                 // If the removed scene was the current scene, switch to another scene if available
                 if (currentScene != null && currentScene.key == sceneKey) {
                     if (scenes.length > 0) {
                         currentScene = scenes[i > 0 ? i - 1 : 0];
+                        currentScene.active = true;
                     } else {
                         currentScene = null;
                     }

@@ -145,7 +145,8 @@ class KouiEditor extends iron.Trait {
 		var s: TSceneEntry = {
 		    key: "Scene_1",
 		    root: scene,
-		    elements: []
+		    elements: [],
+		    active: true
 		};
 		sceneData.scenes.push(s);
 		sceneData.currentScene = s;

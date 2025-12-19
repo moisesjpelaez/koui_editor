@@ -229,7 +229,8 @@ def register():
                     "scenes": [
                         {
                             "key": "Scene_1",
-                            "elements": []
+                            "elements": [],
+                            "active": True
                         }
                     ]
                 }
