@@ -5,13 +5,15 @@ import koui.elements.Element;
 import koui.elements.Panel;
 
 import koui.elements.layouts.AnchorPane;
+import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.Expander;
 import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.Layout;
 import koui.elements.layouts.Layout.Anchor;
+import koui.elements.layouts.RowLayout;
 import koui.elements.layouts.ScrollPane;
 
-@:access(koui.elements.Element, koui.elements.layouts.Layout, koui.elements.layouts.AnchorPane, koui.elements.layouts.ScrollPane, koui.elements.layouts.Expander, koui.elements.layouts.GridLayout)
+@:access(koui.elements.Element, koui.elements.layouts.Layout, koui.elements.layouts.AnchorPane, koui.elements.layouts.ScrollPane, koui.elements.layouts.Expander, koui.elements.layouts.GridLayout, koui.elements.layouts.RowLayout, koui.elements.layouts.ColLayout)
 class HierarchyUtils {
 	public static function canAcceptChild(target: Element): Bool {
 		return target != null && (target is Layout || target is Panel);
@@ -39,7 +41,18 @@ class HierarchyUtils {
 
 	public static function getChildren(parent: Element): Array<Element> {
 		if (parent == null) return [];
-		if (parent is AnchorPane || parent is ScrollPane || parent is Expander || parent is GridLayout) return untyped parent.elements;
+		if (parent is AnchorPane || parent is ScrollPane || parent is Expander) return untyped parent.elements;
+		// GridLayout/RowLayout/ColLayout use 2D Vector<Vector<Element>>, need to flatten
+		if (parent is GridLayout || parent is RowLayout || parent is ColLayout) {
+			var grid: GridLayout = cast parent;
+			var flattened = new Array<Element>();
+			for (row in grid.elements) {
+				for (element in row) {
+					if (element != null) flattened.push(element);
+				}
+			}
+			return flattened;
+		}
 		return parent.children;
 	}
 
@@ -47,7 +60,7 @@ class HierarchyUtils {
 		if (element == null) return;
 		if (element.layout != null) {
 			var layout: Layout = element.layout;
-			if (layout is AnchorPane || layout is ScrollPane || layout is Expander || layout is GridLayout) {
+			if (layout is AnchorPane || layout is ScrollPane || layout is Expander || layout is GridLayout || layout is RowLayout || layout is ColLayout) {
 				untyped layout.remove(element);
 				return;
 			}
@@ -58,7 +71,7 @@ class HierarchyUtils {
 	public static function moveAsChild(element: Element, target: Element, ?fallbackParent: AnchorPane): Void { // TODO: remove third arg?
 		detachFromCurrentParent(element);
 
-		if (target is Layout && (target is AnchorPane || target is ScrollPane || target is Expander)) {
+		if (target is Layout && (target is AnchorPane || target is ScrollPane || target is Expander || target is GridLayout || target is RowLayout || target is ColLayout)) {
 			untyped cast(target, Layout).add(element);
 		} else if (target is Panel) {
 			target.addChild(element);
@@ -81,7 +94,7 @@ class HierarchyUtils {
 		detachFromCurrentParent(element);
 
 		var elements: Array<Element>;
-		if (parent is AnchorPane || parent is ScrollPane || parent is Expander || parent is GridLayout) {
+		if (parent is AnchorPane || parent is ScrollPane || parent is Expander || parent is GridLayout || parent is RowLayout || parent is ColLayout) {
 			untyped cast(parent, Layout).add(element);
 			elements = untyped cast(parent, Layout).elements;
 		} else {

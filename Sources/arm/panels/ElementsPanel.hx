@@ -5,6 +5,8 @@ import arm.base.UIBase;
 import iron.App;
 import koui.elements.Button;
 import koui.elements.Label;
+import koui.elements.layouts.ColLayout;
+import koui.elements.layouts.RowLayout;
 import zui.Id;
 
 class ElementsPanel {
@@ -64,11 +66,15 @@ class ElementsPanel {
 				}
 
 				if (uiBase.ui.button("ColLayout")) {
-					trace("ColLayout");
+					var key: String = "ColLayout";
+					var colLayout: ColLayout = new ColLayout(0, 0, 200, 150, 4);
+					ElementEvents.elementAdded.emit({ key: key, element: colLayout });
 				}
 
 				if (uiBase.ui.button("RowLayout")) {
-					trace("RowLayout");
+					var key: String = "RowLayout";
+					var rowLayout: RowLayout = new RowLayout(0, 0, 200, 150, 4);
+					ElementEvents.elementAdded.emit({ key: key, element: rowLayout });
 				}
 
 				if (uiBase.ui.button("Expander")) {

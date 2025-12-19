@@ -27,7 +27,11 @@ import koui.Koui;
 import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
+import koui.elements.layouts.ColLayout;
+import koui.elements.layouts.GridLayout;
+import koui.elements.layouts.Layout;
 import koui.elements.layouts.Layout.Anchor;
+import koui.elements.layouts.RowLayout;
 import koui.utils.SceneManager;
 
 @:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane)
@@ -269,6 +273,7 @@ class KouiEditor extends iron.Trait {
 			// Calculate new position in TopLeft space
 			var elemX = Std.int(mouse.x - dragOffsetX);
 			var elemY = Std.int(mouse.y - dragOffsetY);
+
 			anchorOffsetX = elemX;
 			anchorOffsetY = elemY;
 
@@ -301,8 +306,15 @@ class KouiEditor extends iron.Trait {
 				default: // TopLeft - no adjustment
 			}
 
-			draggedElement.setPosition(Std.int(elemX), Std.int(elemY));
-			draggedElement.invalidateElem();
+			if (draggedElement is Layout) {
+				draggedElement.setPosition(Std.int(elemX / Koui.uiScale), Std.int(elemY / Koui.uiScale));
+				draggedElement.drawX = Std.int(draggedElement.posX * Koui.uiScale);
+				draggedElement.drawY = Std.int(draggedElement.posY * Koui.uiScale);
+				draggedElement.layout.elemUpdated(draggedElement);
+			} else {
+				draggedElement.setPosition(Std.int(elemX), Std.int(elemY));
+				draggedElement.invalidateElem();
+			}
 		} else {
 			if (draggedElement != null) {
 				draggedElement.anchor = dragAnchor; // Restore original anchor
@@ -331,6 +343,16 @@ class KouiEditor extends iron.Trait {
 
 		for (element in sortedElements) {
 			if (!element.visible) {
+				continue;
+			}
+
+			// For GridLayout/RowLayout/ColLayout, check bounds manually since they may be empty
+			if (Std.isOfType(element, GridLayout) || Std.isOfType(element, RowLayout) || Std.isOfType(element, ColLayout)) {
+				// Check if mouse is within the layout's bounds (relative coords)
+				if (relX >= element.layoutX && relX <= element.layoutX + element.drawWidth &&
+					relY >= element.layoutY && relY <= element.layoutY + element.drawHeight) {
+					return element;
+				}
 				continue;
 			}
 
@@ -379,15 +401,46 @@ class KouiEditor extends iron.Trait {
 			var thickness: Int = 2;
 			g2.color = 0xff469cff;
 
-			var x: Int = draggedElement != selectedElement ? selectedElement.drawX + rootPane.drawX : Std.int(selectedElement.drawX / Koui.uiScale) + rootPane.drawX;
-			var y: Int = draggedElement != selectedElement ? selectedElement.drawY + rootPane.drawY : Std.int(selectedElement.drawY / Koui.uiScale) + rootPane.drawY;
+			var x: Int;
+			var y: Int;
 			var w: Int = selectedElement.drawWidth;
 			var h: Int = selectedElement.drawHeight;
+
+			if (selectedElement is Layout) {
+				x = selectedElement.drawX + rootPane.drawX;
+				y = selectedElement.drawY + rootPane.drawY;
+			} else {
+				x = draggedElement != selectedElement ? selectedElement.drawX + rootPane.drawX : Std.int(selectedElement.drawX / Koui.uiScale) + rootPane.drawX;
+				y = draggedElement != selectedElement ? selectedElement.drawY + rootPane.drawY : Std.int(selectedElement.drawY / Koui.uiScale) + rootPane.drawY;
+			}
 
 			g2.fillRect(x, y, w, thickness);
 			g2.fillRect(x, y + h - thickness, w, thickness);
 			g2.fillRect(x, y + thickness, thickness, h - thickness * 2);
 			g2.fillRect(x + w - thickness, y + thickness, thickness, h - thickness * 2);
+		}
+	}
+
+	function drawLayoutElements(g2: Graphics) {
+		// Draw thin borders around layout elements (RowLayout, ColLayout) since they're invisible
+		if (sceneData.currentScene == null) return;
+
+		var thickness: Int = 1;
+		g2.color = 0xff808080; // Gray color to distinguish from canvas border
+
+		for (entry in sceneData.currentScene.elements) {
+			var elem: Element = entry.element;
+			if (Std.isOfType(elem, RowLayout) || Std.isOfType(elem, ColLayout)) {
+				var x: Int = elem.drawX + rootPane.drawX;
+				var y: Int = elem.drawY + rootPane.drawY;
+				var w: Int = elem.drawWidth;
+				var h: Int = elem.drawHeight;
+
+				g2.fillRect(x, y, w, thickness);
+				g2.fillRect(x, y + h - thickness, w, thickness);
+				g2.fillRect(x, y + thickness, thickness, h - thickness * 2);
+				g2.fillRect(x + w - thickness, y + thickness, thickness, h - thickness * 2);
+			}
 		}
 	}
 
@@ -398,6 +451,7 @@ class KouiEditor extends iron.Trait {
 		Koui.render(g2);
 		g2.begin(false);
 		drawAnchorPane(g2);
+		drawLayoutElements(g2);
 		drawSelectedElement(g2);
 		g2.end();
 
