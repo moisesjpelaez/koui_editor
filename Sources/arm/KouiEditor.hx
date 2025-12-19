@@ -397,7 +397,7 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function drawSelectedElement(g2: Graphics) {
-		if (selectedElement != null && selectedElement != rootPane) {
+		if (selectedElement != null && selectedElement != rootPane && selectedElement.layout != null && selectedElement.layout == rootPane) { // FIXME: skip elements inside layouts for now since they are not properly drawn yet
 			var thickness: Int = 2;
 			g2.color = 0xff469cff;
 

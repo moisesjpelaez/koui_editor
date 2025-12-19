@@ -67,13 +67,13 @@ class ElementsPanel {
 
 				if (uiBase.ui.button("ColLayout")) {
 					var key: String = "ColLayout";
-					var colLayout: ColLayout = new ColLayout(0, 0, 200, 150, 4);
+					var colLayout: ColLayout = new ColLayout(0, 0, 200, 100, 0);
 					ElementEvents.elementAdded.emit({ key: key, element: colLayout });
 				}
 
 				if (uiBase.ui.button("RowLayout")) {
 					var key: String = "RowLayout";
-					var rowLayout: RowLayout = new RowLayout(0, 0, 200, 150, 4);
+					var rowLayout: RowLayout = new RowLayout(0, 0, 200, 100, 0);
 					ElementEvents.elementAdded.emit({ key: key, element: rowLayout });
 				}
 

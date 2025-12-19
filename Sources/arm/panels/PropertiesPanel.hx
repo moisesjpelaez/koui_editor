@@ -14,6 +14,7 @@ import kha.Image;
 import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.Label;
+import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.Layout.Anchor;
 
 import zui.Zui;
@@ -236,6 +237,12 @@ class PropertiesPanel {
             var val: Int = Std.parseInt(widthStr);
             if (val != null) {
                 selectedElement.width = val;
+                if (selectedElement is GridLayout) {
+                    var grid: GridLayout = cast(selectedElement, GridLayout);
+                    grid.resize(grid.layoutWidth, grid.layoutHeight);
+                    grid.invalidateElem();
+                    grid.onResize();
+                }
             } else {
                 // Reject non-numeric input, reset to current value
                 widthHandle.text = Std.string(selectedElement.width);
@@ -247,6 +254,12 @@ class PropertiesPanel {
             var val: Int = Std.parseInt(heightStr);
             if (val != null) {
                 selectedElement.height = val;
+                if (selectedElement is GridLayout) {
+                    var grid: GridLayout = cast(selectedElement, GridLayout);
+                    grid.resize(grid.layoutWidth, grid.layoutHeight);
+                    grid.invalidateElem();
+                    grid.onResize();
+                }
             } else {
                 // Reject non-numeric input, reset to current value
                 heightHandle.text = Std.string(selectedElement.height);
