@@ -28,7 +28,6 @@ class HierarchyPanel {
 
 	// Scene management
 	 var sceneTabHandle: Handle;
-	var sceneTabs: Array<String> = [];
 	var sceneCounter: Int = 1;
 
 	var sceneData: SceneData = SceneData.data;
@@ -57,28 +56,28 @@ class HierarchyPanel {
 		SceneEvents.sceneChanged.connect(onSceneChanged);
 		SceneEvents.sceneRemoved.connect(onSceneRemoved);
 
-		// Initialize tabs from existing scenes
-		if (sceneData.scenes.length > 0) {
-			for (scene in sceneData.scenes) {
-				sceneTabs.push(scene.key);
-			}
-			// set combo to currentScene if present
-			if (sceneData.currentScene != null) {
-				var idx = sceneTabs.indexOf(sceneData.currentScene.key);
-				sceneTabHandle.position = idx >= 0 ? idx : 0;
-			} else {
-				sceneTabHandle.position = 0;
-			}
+		// Initialize handle position to current scene
+		updateTabPosition();
+	}
+
+	/** Get scene keys from SceneData - single source of truth */
+	function getSceneTabs(): Array<String> {
+		return [for (scene in sceneData.scenes) scene.key];
+	}
+
+	/** Update tab handle position to match current scene */
+	function updateTabPosition(): Void {
+		if (sceneData.currentScene != null) {
+			var tabs = getSceneTabs();
+			var idx = tabs.indexOf(sceneData.currentScene.key);
+			sceneTabHandle.position = idx >= 0 ? idx : 0;
+		} else {
+			sceneTabHandle.position = 0;
 		}
 	}
 
 	public function draw(uiBase: UIBase, params: Dynamic): Void {
 		if (uiBase.ui.window(uiBase.hwnds[PanelHierarchy], params.tabx, 0, params.w, params.h0)) {
-			// Ensure tabs have at least the current scene
-			if (sceneTabs.length == 0 && sceneData.currentScene != null) {
-				sceneTabs.push(sceneData.currentScene.key);
-				sceneTabHandle.position = 0;
-			}
 			drawSceneSelector(uiBase);
 			uiBase.ui.separator();
 
@@ -95,6 +94,7 @@ class HierarchyPanel {
 	function drawSceneSelector(uiBase: UIBase) {
 		uiBase.ui.row([0.7, 0.15, 0.15]);
 
+		var sceneTabs = getSceneTabs();
 		sceneTabHandle.position = uiBase.ui.combo(sceneTabHandle, sceneTabs, "", true);
 
 		if (sceneTabHandle.changed) {
@@ -170,6 +170,7 @@ class HierarchyPanel {
 
 		// For root element, show scene name as text input for renaming
 		if (entry.element == sceneData.currentScene.root) {
+			var sceneTabs = getSceneTabs();
 			if (sceneTabs.length == 0) return; // nothing to edit
 			var currentIdx: Int = sceneTabHandle.position;
 			if (currentIdx >= sceneTabs.length) currentIdx = sceneTabs.length - 1;
@@ -195,7 +196,6 @@ class HierarchyPanel {
 				}
 
 				var oldName: String = sceneTabs[currentIdx];
-				sceneTabs[currentIdx] = newName;
 				SceneEvents.sceneNameChanged.emit(oldName, newName);
 			}
 		} else {
@@ -382,7 +382,7 @@ class HierarchyPanel {
     function registerChildren(parent: Element): Void {
         var children: Array<Element> = HierarchyUtils.getChildren(parent);
 
-        if (children != null &&children.length > 0) {
+        if (children != null && children.length > 0) {
             expanded.set(parent, false);
         }
 
@@ -392,9 +392,7 @@ class HierarchyPanel {
                 continue;
             }
 
-            // Generate a key based on the class name, then add via centralized data
-            var childKey: String = Type.getClassName(Type.getClass(child)).split(".").pop();
-            ElementEvents.elementAdded.emit({ key: childKey, element: child });
+            // Recursively register expand state for nested children
             registerChildren(child);
         }
     }
@@ -415,27 +413,14 @@ class HierarchyPanel {
     }
 
 	function onSceneAdded(sceneName: String): Void {
-		if (!sceneTabs.contains(sceneName)) {
-			sceneTabs.push(sceneName);
-		}
-		sceneTabHandle.position = sceneTabs.indexOf(sceneName);
+		updateTabPosition();
 	}
 
 	function onSceneChanged(sceneName: String): Void {
-		var idx: Int = sceneTabs.indexOf(sceneName);
-		if (idx >= 0) {
-			sceneTabHandle.position = idx;
-		}
+		updateTabPosition();
 	}
 
 	function onSceneRemoved(sceneName: String): Void {
-		var idx = sceneTabs.indexOf(sceneName);
-		if (idx >= 0) {
-			sceneTabs.splice(idx, 1);
-			if (sceneTabHandle.position >= sceneTabs.length) {
-				sceneTabHandle.position = Std.int(Math.max(0, sceneTabs.length - 1));
-				SceneEvents.sceneChanged.emit(sceneTabs[sceneTabHandle.position]);
-			}
-		}
+		updateTabPosition();
 	}
 }

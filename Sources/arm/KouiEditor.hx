@@ -53,6 +53,8 @@ class KouiEditor extends iron.Trait {
 	var dragOffsetY: Int = 0;
 	var anchorOffsetX: Int = 0;
 	var anchorOffsetY: Int = 0;
+	var dragStartX: Float = 0;
+	var dragStartY: Float = 0;
 
 	// Canvas controls
 	var isPanning: Bool = false;
@@ -265,6 +267,9 @@ class KouiEditor extends iron.Trait {
 				// Now calculate offset using TopLeft-based posX/posY
 				dragOffsetX = Std.int(mouse.x - draggedElement.posX * Koui.uiScale);
 				dragOffsetY = Std.int(mouse.y - draggedElement.posY * Koui.uiScale);
+
+				dragStartX = draggedElement.posX;
+				dragStartY = draggedElement.posY;
 			} else if (mouse.x < canvasArea.x && mouse.y < canvasArea.y || mouse.x > hierarchyArea.x && mouse.y < hierarchyArea.y) {
 				selectedElement = null;
 				draggedElement = null;
@@ -324,6 +329,8 @@ class KouiEditor extends iron.Trait {
 
 				uiBase.hwnds[PanelHierarchy].redraws = 2;
 				uiBase.hwnds[PanelProperties].redraws = 2;
+
+				ElementEvents.propertyChanged.emit(draggedElement, ["posX", "posY"], [dragStartX, dragStartY], [draggedElement.posX, draggedElement.posY]);
 			}
 			draggedElement = null;
 		}

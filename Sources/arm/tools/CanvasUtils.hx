@@ -5,6 +5,7 @@ import arm.data.SceneData;
 import arm.data.SceneData.TSceneEntry;
 import arm.events.SceneEvents;
 import arm.events.ElementEvents;
+import arm.tools.ElementUtils;
 
 import haxe.Json;
 
@@ -333,48 +334,14 @@ class CanvasUtils {
 	 * Returns the type string for an element.
 	 */
 	public static function getElementType(element: Element): String {
-		if (Std.isOfType(element, Button)) return "Button";
-		if (Std.isOfType(element, Label)) return "Label";
-		// Check RowLayout/ColLayout before AnchorPane since they're more specific
-		if (Std.isOfType(element, RowLayout)) return "RowLayout";
-		if (Std.isOfType(element, ColLayout)) return "ColLayout";
-		if (Std.isOfType(element, AnchorPane)) return "AnchorPane";
-		return "Unknown";
+		return ElementUtils.getElementType(element);
 	}
 
 	/**
 	 * Serializes type-specific properties.
 	 */
 	static function serializeTypeProperties(element: Element, type: String): Dynamic {
-		switch (type) {
-			case "Label":
-				var label: Label = cast element;
-				return {
-					text: label.text,
-					alignmentHor: cast label.alignmentHor,
-					alignmentVert: cast label.alignmentVert
-				};
-
-			case "Button":
-				var button: Button = cast element;
-				return {
-					text: button.text,
-					isToggle: button.isToggle,
-					isPressed: button.isPressed
-				};
-
-			case "AnchorPane":
-				return {};
-
-			case "RowLayout":
-				return {};
-
-			case "ColLayout":
-				return {};
-
-			default:
-				return {};
-		}
+		return ElementUtils.serializeProperties(element, type);
 	}
 
 	/**
@@ -471,61 +438,18 @@ class CanvasUtils {
 	 * Creates an element from TElementData.
 	 */
 	static function createElementFromData(data: TElementData): Element {
-		var element: Element = null;
-
-		switch (data.type) {
-			case "Label":
-				var label: Label = new Label(data.properties.text != null ? data.properties.text : "");
-				if (data.properties.alignmentHor != null) {
-					label.alignmentHor = cast data.properties.alignmentHor;
-				}
-				if (data.properties.alignmentVert != null) {
-					label.alignmentVert = cast data.properties.alignmentVert;
-				}
-				element = label;
-
-			case "Button":
-				var button: Button = new Button(data.properties.text != null ? data.properties.text : "");
-				if (data.properties.isToggle != null) {
-					button.isToggle = data.properties.isToggle;
-				}
-				if (data.properties.isPressed != null) {
-					button.isPressed = data.properties.isPressed;
-				}
-				element = button;
-
-			case "AnchorPane":
-				var pane: AnchorPane = new AnchorPane(data.posX, data.posY, data.width, data.height);
-				element = pane;
-
-			case "RowLayout":
-				var row: RowLayout = new RowLayout(data.posX, data.posY, data.width, data.height, 0);
-				element = row;
-
-			case "ColLayout":
-				var col: ColLayout = new ColLayout(data.posX, data.posY, data.width, data.height, 0);
-				element = col;
-
-			default:
-				trace('Unknown element type: ${data.type}');
-				return null;
-		}
-
-		// Apply common properties
-		if (element != null) {
-			element.posX = data.posX;
-			element.posY = data.posY;
-			element.width = data.width;
-			element.height = data.height;
-			element.anchor = cast data.anchor;
-			element.visible = data.visible;
-			element.disabled = data.disabled;
-			if (data.tID != null && data.tID != "") {
-				element.setTID(data.tID);
-			}
-		}
-
-		return element;
+		return ElementUtils.createElement(
+			data.type,
+			data.posX,
+			data.posY,
+			data.width,
+			data.height,
+			data.anchor,
+			data.visible,
+			data.disabled,
+			data.tID,
+			data.properties
+		);
 	}
 
 	/**

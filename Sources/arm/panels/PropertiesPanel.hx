@@ -181,6 +181,7 @@ class PropertiesPanel {
             if (newTID != null && newTID != "") {
                 // Check if TID exists in theme
                 if (koui.theme.Style.getStyle(newTID) != null) {
+                    ElementEvents.propertyChanged.emit(selectedElement, "TID", originalTID, newTID);
                     selectedElement.setTID(newTID);
                 } else {
                     // TID not found in theme, show error and revert
@@ -205,6 +206,7 @@ class PropertiesPanel {
         if (posXHandle.changed) {
             var val: Int = Std.parseInt(posXStr);
             if (val != null) {
+                ElementEvents.propertyChanged.emit(selectedElement, "posX", selectedElement.posX, val);
                 selectedElement.posX = val;
             } else {
                 // Reject non-numeric input, reset to current value
@@ -216,6 +218,7 @@ class PropertiesPanel {
         if (posYHandle.changed) {
             var val: Int = Std.parseInt(posYStr);
             if (val != null) {
+                ElementEvents.propertyChanged.emit(selectedElement, "posY", selectedElement.posY, val);
                 selectedElement.posY = val;
             } else {
                 // Reject non-numeric input, reset to current value
@@ -223,6 +226,7 @@ class PropertiesPanel {
             }
         }
         if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Position", false, false, 0.4)) {
+            ElementEvents.propertyChanged.emit(selectedElement, ["posX", "posY"], [selectedElement.posX, selectedElement.posY], [0, 0]);
             selectedElement.posX = 0;
             selectedElement.posY = 0;
             posXHandle.text = Std.string(0);
@@ -239,6 +243,7 @@ class PropertiesPanel {
         if (widthHandle.changed) {
             var val: Int = Std.parseInt(widthStr);
             if (val != null) {
+                ElementEvents.propertyChanged.emit(selectedElement, "width", selectedElement.width, val);
                 selectedElement.width = val;
                 if (selectedElement is GridLayout) {
                     var grid: GridLayout = cast(selectedElement, GridLayout);
@@ -256,6 +261,7 @@ class PropertiesPanel {
         if (heightHandle.changed) {
             var val: Int = Std.parseInt(heightStr);
             if (val != null) {
+                ElementEvents.propertyChanged.emit(selectedElement, "height", selectedElement.height, val);
                 selectedElement.height = val;
                 if (selectedElement is GridLayout) {
                     var grid: GridLayout = cast(selectedElement, GridLayout);
@@ -270,6 +276,7 @@ class PropertiesPanel {
         }
         if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.4)) {
             var originalSize: Vec2 = elementSizes.get(selectedElement);
+            ElementEvents.propertyChanged.emit(selectedElement, ["width", "height"], [selectedElement.width, selectedElement.height], [Std.int(originalSize.x), Std.int(originalSize.y)]);
             selectedElement.width = Std.int(originalSize.x);
             selectedElement.height = Std.int(originalSize.y);
             widthHandle.text = Std.string(selectedElement.width);
@@ -280,11 +287,19 @@ class PropertiesPanel {
 
         // Visible checkbox
         visibleHandle.selected = selectedElement.visible;
-        selectedElement.visible = ui.check(visibleHandle, "Visible");
+        var newVisible = ui.check(visibleHandle, "Visible");
+        if (newVisible != selectedElement.visible) {
+            ElementEvents.propertyChanged.emit(selectedElement, "visible", selectedElement.visible, newVisible);
+            selectedElement.visible = newVisible;
+        }
 
         // Disabled checkbox
         disabledHandle.selected = selectedElement.disabled;
-        selectedElement.disabled = ui.check(disabledHandle, "Disabled");
+        var newDisabled = ui.check(disabledHandle, "Disabled");
+        if (newDisabled != selectedElement.disabled) {
+            ElementEvents.propertyChanged.emit(selectedElement, "disabled", selectedElement.disabled, newDisabled);
+            selectedElement.disabled = newDisabled;
+        }
     }
 
     function drawAnchorGrid(ui: Zui, element: Element) {
@@ -328,6 +343,7 @@ class PropertiesPanel {
 
                 // Use simple icon representation
                 if (ui.button("")) {
+                    ElementEvents.propertyChanged.emit(element, "anchor", currentAnchor, anchor);
                     element.anchor = anchor;
                     element.invalidateElem();
                 }
@@ -359,7 +375,10 @@ class PropertiesPanel {
             labelTextHandle.text = label.text;
             var newText: String = ui.textInput(labelTextHandle, "Text", Right);
             if (labelTextHandle.changed) {
-                if (newText != null && newText != "") label.text = newText;
+                if (newText != null && newText != "") {
+                    ElementEvents.propertyChanged.emit(label, "text", label.text, newText);
+                    label.text = newText;
+                }
             }
         } else if (selectedElement is Button) {
             ui.text("Button Properties", Center);
@@ -369,17 +388,28 @@ class PropertiesPanel {
             buttonTextHandle.text = button.text;
             var newText: String = ui.textInput(buttonTextHandle, "Text", Right);
             if (buttonTextHandle.changed) {
-                if (newText != null && newText != "") button.text = newText;
+                if (newText != null && newText != "") {
+                    ElementEvents.propertyChanged.emit(button, "text", button.text, newText);
+                    button.text = newText;
+                }
             }
 
             // TODO: Icon
             // TODO: Icon Size
 
             buttonIsPressedHandle.selected = button.isToggle && button.isPressed;
-            button.isPressed = ui.check(buttonIsPressedHandle, "Is Pressed");
+            var newPressed = ui.check(buttonIsPressedHandle, "Is Pressed");
+            if (newPressed != button.isPressed) {
+                ElementEvents.propertyChanged.emit(button, "isPressed", button.isPressed, newPressed);
+                button.isPressed = newPressed;
+            }
 
             buttonIsToggleHandle.selected = button.isToggle;
-            button.isToggle = ui.check(buttonIsToggleHandle, "Is Toggle");
+            var newToggle = ui.check(buttonIsToggleHandle, "Is Toggle");
+            if (newToggle != button.isToggle) {
+                ElementEvents.propertyChanged.emit(button, "isToggle", button.isToggle, newToggle);
+                button.isToggle = newToggle;
+            }
         }
     }
 
