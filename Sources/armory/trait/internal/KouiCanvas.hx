@@ -60,26 +60,11 @@ private typedef TElementData = {
 	var properties: Dynamic;
 }
 
-// KouiCanvas types
-typedef TButton = {
-	var element: Button;
-	var onPressed: Signal;
-	var onHold: Signal;
-	var onReleased: Signal;
-}
-
-enum abstract ButtonEvent(Int) from Int to Int {
-	var Pressed = 0;
-	var Hold = 1;
-	var Released = 2;
-}
-
 // Runtime scene storage
 private typedef TKouiScene = {
 	var key: String;
 	var root: AnchorPane;
 	var elements: Map<String, Element>;
-	var buttons: Map<String, TButton>;
 	var elementKeys: Map<Element, String>; // Reverse lookup for path traversal
 }
 
@@ -100,7 +85,6 @@ private typedef TKouiScene = {
  */
 @:access(koui.Koui, koui.elements.Element, koui.elements.layouts.GridLayout)
 class KouiCanvas extends Trait {
-
 	/** The canvas name (without .json extension) */
 	public var cnvName: String;
 
@@ -235,7 +219,6 @@ class KouiCanvas extends Trait {
 			key: sceneKey,
 			root: null,
 			elements: new Map(),
-			buttons: new Map(),
 			elementKeys: new Map()
 		};
 
@@ -346,33 +329,12 @@ class KouiCanvas extends Trait {
 
 			case "Button":
 				var button: Button = new Button(data.properties.text != null ? data.properties.text : "");
-				var btn: TButton = {
-					element: button,
-					onPressed: new Signal(),
-					onHold: new Signal(),
-					onReleased: new Signal()
-				}
-				kouiScene.buttons.set(data.key, btn);
-
 				if (data.properties.isToggle != null) {
 					button.isToggle = data.properties.isToggle;
 				}
 				if (data.properties.isPressed != null) {
 					button.isPressed = data.properties.isPressed;
 				}
-
-				button.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
-					switch (e.getState()) {
-						case ClickStart:
-							btn.onPressed.emit();
-						case ClickHold:
-							btn.onHold.emit();
-						case ClickEnd:
-							btn.onReleased.emit();
-						default:
-					}
-				});
-
 				element = button;
 
 			case "Checkbox":
@@ -566,35 +528,6 @@ class KouiCanvas extends Trait {
 	}
 
 	/**
-	 * Get a button from the current scene with its signal handlers.
-	 *
-	 * Supports both simple keys and hierarchical paths (like getElement).
-	 *
-	 * @param key The button's key or path
-	 * @return The TButton with signals, or null if not found
-	 */
-	public function getButton(key: String): Null<TButton> {
-		if (currentScene == null) {
-			trace('[KouiCanvas] No scene active');
-			return null;
-		}
-
-		// Get the element (handles both key and path)
-		var element = getElement(key);
-		if (element == null) return null;
-
-		// Find the button in the buttons map by matching the element
-		for (btn in currentScene.buttons) {
-			if (btn.element == element) {
-				return btn;
-			}
-		}
-
-		trace('[KouiCanvas] Element "$key" is not a button or button not registered');
-		return null;
-	}
-
-	/**
 	 * Get all element paths in the current scene.
 	 * Returns absolute paths for all elements (e.g., "player_ui/health_bar").
 	 * Root-level elements return just their key.
@@ -761,60 +694,31 @@ class KouiCanvas extends Trait {
 	}
 
 	/**
-	 * Get a button from a specific scene with its signal handlers.
-	 * Supports path-based access (e.g., "parent/child/button").
+	 * Get an element by its key from a specific scene, cast to a specific type.
+	 * Use this for cross-scene element access with type safety.
+	 * Returns null if the element doesn't exist or isn't of the requested type.
 	 *
+	 * Supports both simple keys (root-level only) and paths:
+	 * - "MyButton" (root-level button)
+	 * - "menu/buttons/MyButton" (nested button)
+	 *
+	 * Example:
+	 * ```haxe
+	 * var button = canvas.getElementFromSceneAs(Button, "hud", "menu/buttons/play_button");
+	 * if (button != null) button.text = "Clicked!";
+	 * ```
+	 *
+	 * @param cls The class type to cast to
 	 * @param sceneName The scene to look in
-	 * @param key The button's unique key or path
-	 * @return The TButton with signals, or null if not found
+	 * @param key The element's unique key or path
+	 * @return The element cast to type T, or null
 	 */
-	public function getButtonFromScene(sceneName: String, key: String): Null<TButton> {
-		var scene: TKouiScene = scenes.get(sceneName);
-		if (scene == null) {
-			trace('[KouiCanvas] Scene not found: "$sceneName"');
-			return null;
-		}
-
-		// Support path-based access
-		if (key.indexOf('/') != -1) {
-			var parts: Array<String> = key.split('/');
-			var current: Element = scene.root;
-
-			for (i in 0...parts.length) {
-				var part: String = parts[i];
-				if (part == '') continue;
-
-				var children: Array<Element> = getChildrenOfInScene(scene, current);
-				var found: Bool = false;
-				for (child in children) {
-					var childKey: String = scene.elementKeys.get(child);
-					if (childKey == part) {
-						current = child;
-						found = true;
-						break;
-					}
-				}
-
-				if (!found) {
-					trace('[KouiCanvas] Path element not found: "$part" in path "$key" (scene "$sceneName")');
-					return null;
-				}
-			}
-
-			return scene.buttons.get(scene.elementKeys.get(current));
-		}
-
-		// Simple key - must be root-level
-		var element: Element = scene.elements.get(key);
-		if (element == null) {
-			trace('[KouiCanvas] Button not found: "$key" in scene "$sceneName"');
-			return null;
-		}
-		if (element.layout != scene.root) {
-			trace('[KouiCanvas] Button "$key" exists in scene "$sceneName" but is not at root level. Use path instead: "${scene.elementKeys.get(element)}"');
-			return null;
-		}
-		return scene.buttons.get(key);
+	public function getElementFromSceneAs<T: Element>(cls: Class<T>, sceneName: String, key: String): Null<T> {
+		var element: Element = getElementFromScene(sceneName, key);
+		if (element == null) return null;
+		var casted = Std.downcast(element, cls);
+		if (casted == null) trace('[KouiCanvas] Element "$key" in scene "$sceneName" is not of type ${Type.getClassName(cls)}');
+		return casted;
 	}
 
 	// -------------------------------------------------------------------------
@@ -926,5 +830,25 @@ class KouiCanvas extends Trait {
 
 		grid.elements = newElements;
 		grid.amountCols++;
+	}
+}
+
+class ButtonExt {
+	public static inline function onPressed(button: Button, callback: Void->Void) {
+		button.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
+			if (e.getState() == ClickStart) callback();
+		});
+	}
+
+	public static inline function onHold(button: Button, callback: Void->Void) {
+		button.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
+			if (e.getState() == ClickHold) callback();
+		});
+	}
+
+	public static inline function onReleased(button: Button, callback: Void->Void) {
+		button.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
+			if (e.getState() == ClickEnd) callback();
+		});
 	}
 }
