@@ -295,19 +295,6 @@ class KouiEditor extends iron.Trait {
 			// Apply position snapping if enabled
 			if (topToolbar.snappingEnabled && rootPane != null) {
 				var snapValue = topToolbar.snapValue;
-
-				// Convert to relative position from rootPane
-				var relX = elemX - rootPane.drawX;
-				var relY = elemY - rootPane.drawY;
-
-				// Snap to grid
-				var snappedRelX = Math.round(relX / snapValue) * snapValue * Koui.uiScale;
-				var snappedRelY = Math.round(relY / snapValue) * snapValue * Koui.uiScale;
-
-				// Convert back to screen coordinates
-
-				elemX = Std.int(snappedRelX + rootPane.drawX);
-				elemY = Std.int(snappedRelY + rootPane.drawY);
 				elemX -= Std.int(elemX % (snapValue * Koui.uiScale));
 				elemY -= Std.int(elemY % (snapValue * Koui.uiScale));
 			}
