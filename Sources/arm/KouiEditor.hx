@@ -50,6 +50,7 @@ class KouiEditor extends iron.Trait {
 	var selectedElement: Element = null;
 	var draggedElement: Element = null;
 	var dragAnchor: Anchor = TopLeft;
+	var wasMouseDown: Bool = false;
 	var dragOffsetX: Int = 0;
 	var dragOffsetY: Int = 0;
 	var anchorOffsetX: Int = 0;
@@ -171,7 +172,6 @@ class KouiEditor extends iron.Trait {
 		}
 		uiBase.update();
 		canvasControl();
-		updateDragAndDrop();
 
 		var keyboard: Keyboard = Input.getKeyboard();
 		if (keyboard.started("delete") && selectedElement != null && selectedElement != rootPane) {
@@ -254,7 +254,10 @@ class KouiEditor extends iron.Trait {
 
 		// FIXME: elements flicker on mouse start and release
 		var mouse: Mouse = Input.getMouse();
-		if (mouse.started()) {
+		var mouseDown: Bool = mouse.down();
+		var mouseJustPressed: Bool = mouseDown && !wasMouseDown;
+
+		if (mouseJustPressed) {
 			var element: Element = getElementAtPositionUnclipped(Std.int(mouse.x), Std.int(mouse.y));
 			var canvasArea: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize, App.h() - uiBase.getBottomH() - borderSize); // TODO: use a more accurate variable name
 			var hierarchyArea: Vec2 = new Vec2(canvasArea.x + 2 * borderSize, App.h() - uiBase.getSidebarH1() - borderSize); // TODO: use a more accurate variable name
@@ -271,7 +274,7 @@ class KouiEditor extends iron.Trait {
 				draggedElement.anchor = TopLeft;
 				draggedElement.invalidateElem();
 
-				// Now calculate offset using TopLeft-based posX/posY
+				// Now calculate offset using the element's screen position (drawX/drawY)
 				dragOffsetX = Std.int(mouse.x - draggedElement.posX * Koui.uiScale);
 				dragOffsetY = Std.int(mouse.y - draggedElement.posY * Koui.uiScale);
 
@@ -282,10 +285,30 @@ class KouiEditor extends iron.Trait {
 				draggedElement = null;
 				ElementEvents.elementSelected.emit(null);
 			}
-		} else if (mouse.down() && draggedElement != null) {
+		} else if (mouseDown && draggedElement != null) {
 			// Calculate new position in TopLeft space
 			var elemX = Std.int(mouse.x - dragOffsetX);
 			var elemY = Std.int(mouse.y - dragOffsetY);
+
+			// Apply position snapping if enabled
+			if (topToolbar.snappingEnabled && rootPane != null) {
+				var snapValue = topToolbar.snapValue;
+
+				// Convert to relative position from rootPane
+				var relX = elemX - rootPane.drawX;
+				var relY = elemY - rootPane.drawY;
+
+				// Snap to grid
+				var snappedRelX = Math.round(relX / snapValue) * snapValue * Koui.uiScale;
+				var snappedRelY = Math.round(relY / snapValue) * snapValue * Koui.uiScale;
+
+				// Convert back to screen coordinates
+
+				elemX = Std.int(snappedRelX + rootPane.drawX);
+				elemY = Std.int(snappedRelY + rootPane.drawY);
+				elemX -= Std.int(elemX % (snapValue * Koui.uiScale));
+				elemY -= Std.int(elemY % (snapValue * Koui.uiScale));
+			}
 
 			anchorOffsetX = elemX;
 			anchorOffsetY = elemY;
@@ -332,6 +355,7 @@ class KouiEditor extends iron.Trait {
 			if (draggedElement != null) {
 				draggedElement.anchor = dragAnchor; // Restore original anchor
 				draggedElement.setPosition(Std.int(anchorOffsetX / Koui.uiScale), Std.int(anchorOffsetY / Koui.uiScale));
+				if (draggedElement is Layout) draggedElement.layout.elemUpdated(draggedElement);
 				draggedElement.invalidateElem();
 
 				uiBase.hwnds[PanelHierarchy].redraws = 2;
@@ -341,6 +365,8 @@ class KouiEditor extends iron.Trait {
 			}
 			draggedElement = null;
 		}
+
+		wasMouseDown = mouseDown;
 	}
 
 	/**
@@ -535,6 +561,7 @@ class KouiEditor extends iron.Trait {
 		if (uiBase == null) return;
 		g2.end();
 
+		updateDragAndDrop();
 		Koui.render(g2);
 		g2.begin(false);
 		drawGrid(g2);
