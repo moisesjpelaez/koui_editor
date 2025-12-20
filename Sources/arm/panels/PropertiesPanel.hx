@@ -7,16 +7,18 @@ import arm.events.ElementEvents;
 import arm.types.Enums;
 import arm.base.UIBase;
 import arm.tools.CanvasUtils;
-import arm.tools.ImageUtils;
 import arm.tools.ZuiUtils;
 
 import iron.math.Vec2;
 import kha.Image;
 import koui.elements.Button;
+import koui.elements.Checkbox;
 import koui.elements.Element;
 import koui.elements.Label;
+import koui.elements.Panel;
 import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.Layout.Anchor;
+import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
 
 import zui.Zui;
 import zui.Zui.Handle;
@@ -55,6 +57,10 @@ class PropertiesPanel {
     var buttonIsPressedHandle: Handle;
     var buttonIsToggleHandle: Handle;
 
+    // Checkbox handles
+    var checkboxIsCheckedHandle: Handle;
+    var checkboxTextHandle: Handle;
+
     var sceneData: SceneData = SceneData.data;
 
     // Initial values for reset functionality
@@ -89,6 +95,9 @@ class PropertiesPanel {
         // buttonIconSizeHandle = new Handle({text: "16"});
         buttonIsPressedHandle = new Handle({selected: false});
         buttonIsToggleHandle = new Handle({selected: false});
+
+        checkboxTextHandle = new Handle({text: ""});
+        checkboxIsCheckedHandle = new Handle({selected: false});
 
         ElementEvents.elementAdded.connect(onElementAdded);
         ElementEvents.elementSelected.connect(onElementSelected);
@@ -427,6 +436,30 @@ class PropertiesPanel {
             if (newToggle != button.isToggle) {
                 ElementEvents.propertyChanged.emit(button, "isToggle", button.isToggle, newToggle);
                 button.isToggle = newToggle;
+            }
+        } else if (selectedElement is koui.elements.Checkbox) {
+            ui.text("Checkbox Properties", Center);
+            ui.separator();
+
+            var checkbox: Checkbox = cast(selectedElement, Checkbox);
+
+            checkboxTextHandle.text = checkbox.text;
+            var newText: String = ui.textInput(checkboxTextHandle, "Text", Right);
+            if (checkboxTextHandle.changed) {
+                if (newText != null && newText != "") {
+                    ElementEvents.propertyChanged.emit(checkbox, "text", checkbox.text, newText);
+                    checkbox.text = newText;
+                }
+            }
+
+            checkboxIsCheckedHandle.selected = checkbox.isChecked;
+            var newChecked = ui.check(checkboxIsCheckedHandle, "Is Checked");
+            if (newChecked != checkbox.isChecked) {
+                ElementEvents.propertyChanged.emit(checkbox, "isChecked", checkbox.isChecked, newChecked);
+                checkbox.isChecked = newChecked;
+                // Update the internal Panel's visual state
+                var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
+                checkSquare.setContextElement(newChecked ? "checked" : "");
             }
         }
     }

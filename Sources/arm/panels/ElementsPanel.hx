@@ -4,6 +4,7 @@ import arm.events.ElementEvents;
 import arm.base.UIBase;
 import iron.App;
 import koui.elements.Button;
+import koui.elements.Checkbox;
 import koui.elements.Label;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
@@ -48,7 +49,9 @@ class ElementsPanel {
 				}
 
 				if (uiBase.ui.button("Checkbox")) {
-					trace("Checkbox");
+					var key: String = "Checkbox";
+					var checkbox: Checkbox = new Checkbox("New Checkbox");
+					ElementEvents.elementAdded.emit({ key: key, element: checkbox });
 				}
 
 				if (uiBase.ui.button("Radio")) {

@@ -1,22 +1,27 @@
 package arm.tools;
 
 import koui.elements.Button;
+import koui.elements.Checkbox;
 import koui.elements.Element;
 import koui.elements.Label;
+import koui.elements.Panel;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
+import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
 
 /**
  * Shared utilities for element creation and type detection.
  * Used by both the editor (CanvasUtils) and can be referenced by other tools.
  */
+@:access(koui.elements.Panel)
 class ElementUtils {
 	/**
 	 * Returns the type string for an element.
 	 */
 	public static function getElementType(element: Element): String {
 		if (Std.isOfType(element, Button)) return "Button";
+		if (Std.isOfType(element, Checkbox)) return "Checkbox";
 		if (Std.isOfType(element, Label)) return "Label";
 		// Check RowLayout/ColLayout before AnchorPane since they're more specific
 		if (Std.isOfType(element, RowLayout)) return "RowLayout";
@@ -80,6 +85,19 @@ class ElementUtils {
 				}
 				element = button;
 
+			case "Checkbox":
+				var text: String = properties != null && properties.text != null ? properties.text : "";
+				var checkbox: Checkbox = new Checkbox(text);
+				if (properties != null) {
+					if (properties.isChecked != null) {
+						checkbox.isChecked = properties.isChecked;
+						// Update the internal Panel's visual state
+						var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
+						checkSquare.setContextElement(checkbox.isChecked ? "checked" : "");
+					}
+				}
+				element = checkbox;
+
 			case "AnchorPane":
 				var pane: AnchorPane = new AnchorPane(posX, posY, width, height);
 				element = pane;
@@ -133,6 +151,13 @@ class ElementUtils {
 					text: button.text,
 					isToggle: button.isToggle,
 					isPressed: button.isPressed
+				};
+
+			case "Checkbox":
+				var checkbox: Checkbox = cast element;
+				return {
+					text: checkbox.text,
+					isChecked: checkbox.isChecked
 				};
 
 			case "AnchorPane", "RowLayout", "ColLayout":

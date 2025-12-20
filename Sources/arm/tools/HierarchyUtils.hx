@@ -4,7 +4,9 @@ import haxe.ds.Vector;
 
 import koui.Koui;
 import koui.elements.Button;
+import koui.elements.Checkbox;
 import koui.elements.Element;
+import koui.elements.Label;
 import koui.elements.Panel;
 
 import koui.elements.layouts.AnchorPane;
@@ -306,14 +308,8 @@ class HierarchyUtils {
 	}
 
 	public static function shouldSkipInternalChild(parent: Element, child: Element): Bool {
-        // Skip Button's internal label
-        if (parent is Button) {
-            return true;
-        }
-		// TODO: Add more cases as needed. Return single line once ready.
-
-        return false;
-    }
+		return parent is Button || parent is Checkbox;
+	}
 
 	/**
 	 * Adds a new row to the grid layout.

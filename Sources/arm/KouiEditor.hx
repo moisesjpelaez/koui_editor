@@ -26,6 +26,7 @@ import kha.graphics2.Graphics;
 
 import koui.Koui;
 import koui.elements.Button;
+import koui.elements.Checkbox;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
@@ -263,7 +264,8 @@ class KouiEditor extends iron.Trait {
 			var hierarchyArea: Vec2 = new Vec2(canvasArea.x + 2 * borderSize, App.h() - uiBase.getSidebarH1() - borderSize); // TODO: use a more accurate variable name
 
 			if (element != null && element != rootPane) {
-				if (element.parent is Button) selectedElement = element.parent;
+				// Select parent element instead of internal children
+				if (element.parent is Button || element.parent is Checkbox) selectedElement = element.parent;
 				else selectedElement = element;
 				ElementEvents.elementSelected.emit(selectedElement);
 

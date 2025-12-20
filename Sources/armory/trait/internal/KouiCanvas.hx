@@ -6,13 +6,15 @@ import iron.Trait;
 import koui.Koui;
 import koui.elements.Element;
 import koui.elements.Button;
+import koui.elements.Checkbox;
 import koui.elements.Label;
+import koui.elements.Panel;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.RowLayout;
-import koui.elements.layouts.Layout.Anchor;
 import koui.events.MouseEvent.MouseClickEvent;
+import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
 import koui.utils.SceneManager;
 
 // JSON structure typedefs (matching CanvasUtils format)
@@ -373,6 +375,16 @@ class KouiCanvas extends Trait {
 
 				element = button;
 
+			case "Checkbox":
+				var checkbox: Checkbox = new Checkbox(data.properties.text != null ? data.properties.text : "");
+				if (data.properties.isChecked != null) {
+					checkbox.isChecked = data.properties.isChecked;
+					// Update the internal Panel's visual state
+					var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
+					checkSquare.setContextElement(checkbox.isChecked ? "checked" : "");
+				}
+				element = checkbox;
+
 			case "AnchorPane":
 				element = new AnchorPane(data.posX, data.posY, data.width, data.height);
 
@@ -383,7 +395,6 @@ class KouiCanvas extends Trait {
 				element = new ColLayout(data.posX, data.posY, data.width, data.height, 0);
 
 			// TODO: Add more element types as needed:
-			// case "Checkbox": ...
 			// case "Slider": ...
 			// case "TextInput": ...
 			// case "Dropdown": ...
