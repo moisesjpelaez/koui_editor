@@ -7,6 +7,7 @@ import koui.elements.Button;
 import koui.elements.Checkbox;
 import koui.elements.Label;
 import koui.elements.Progressbar;
+import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
 import zui.Id;
@@ -65,6 +66,13 @@ class ElementsPanel {
 			if (uiBase.ui.panel(Id.handle({selected: true}), "Layout")) {
 				uiBase.ui.indent();
 
+				if (uiBase.ui.button("AnchorPane")) {
+					var key: String = "AnchorPane";
+					var anchorPane: AnchorPane = new AnchorPane(0, 0, 200, 200);
+					anchorPane.setTID("fixed_anchorpane");
+					ElementEvents.elementAdded.emit({ key: key, element: anchorPane });
+				}
+
 				if (uiBase.ui.button("ColLayout")) {
 					var key: String = "ColLayout";
 					var colLayout: ColLayout = new ColLayout(0, 0, 200, 100, 0);
@@ -76,10 +84,6 @@ class ElementsPanel {
 					var rowLayout: RowLayout = new RowLayout(0, 0, 200, 100, 0);
 					ElementEvents.elementAdded.emit({ key: key, element: rowLayout });
 				}
-
-				// if (uiBase.ui.button("Expander")) {
-				// 	trace("Expander");
-				// }
 
 				uiBase.ui.unindent();
 			}

@@ -276,53 +276,64 @@ class PropertiesPanel {
         }
         ui._y += 4;
 
+        // Check if element is dynamically sized based on theme's minWidth/minHeight
+        var isDynamicWidth: Bool = selectedElement.style != null && selectedElement.style.size.minWidth != 0;
+        var isDynamicHeight: Bool = selectedElement.style != null && selectedElement.style.size.minHeight != 0;
+        var isDynamicallySized: Bool = isDynamicWidth || isDynamicHeight;
+
         // Size - label, reset button, and Width/Height inputs in one row
-        ui.row([1/4, 5/16, 5/16, 1/8]);
-        ui.text("Size", Left);
-        widthHandle.text = Std.string(selectedElement.width);
-        var widthStr: String = ui.textInput(widthHandle, "W", Right);
-        if (widthHandle.changed) {
-            var val: Int = Std.parseInt(widthStr);
-            if (val != null) {
-                ElementEvents.propertyChanged.emit(selectedElement, "width", selectedElement.width, val);
-                selectedElement.width = val;
-                if (selectedElement is GridLayout) {
-                    var grid: GridLayout = cast(selectedElement, GridLayout);
-                    grid.resize(grid.layoutWidth, grid.layoutHeight);
-                    grid.invalidateElem();
-                    grid.onResize();
-                }
-            } else {
-                // Reject non-numeric input, reset to current value
-                widthHandle.text = Std.string(selectedElement.width);
-            }
-        }
-        heightHandle.text = Std.string(selectedElement.height);
-        var heightStr: String = ui.textInput(heightHandle, "H", Right);
-        if (heightHandle.changed) {
-            var val: Int = Std.parseInt(heightStr);
-            if (val != null) {
-                ElementEvents.propertyChanged.emit(selectedElement, "height", selectedElement.height, val);
-                selectedElement.height = val;
-                if (selectedElement is GridLayout) {
-                    var grid: GridLayout = cast(selectedElement, GridLayout);
-                    grid.resize(grid.layoutWidth, grid.layoutHeight);
-                    grid.invalidateElem();
-                    grid.onResize();
-                }
-            } else {
-                // Reject non-numeric input, reset to current value
-                heightHandle.text = Std.string(selectedElement.height);
-            }
-        }
-        if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.4)) {
-            var originalSize: Vec2 = elementSizes.get(selectedElement);
-            ElementEvents.propertyChanged.emit(selectedElement, ["width", "height"], [selectedElement.width, selectedElement.height], [Std.int(originalSize.x), Std.int(originalSize.y)]);
-            selectedElement.width = Std.int(originalSize.x);
-            selectedElement.height = Std.int(originalSize.y);
+        if (isDynamicallySized) {
+            ui.row([1/4, 3/4]);
+            ui.text("Size", Left);
+            ui.text("Dynamically Sized", Left);
+        } else {
+            ui.row([1/4, 5/16, 5/16, 1/8]);
+            ui.text("Size", Left);
             widthHandle.text = Std.string(selectedElement.width);
+            var widthStr: String = ui.textInput(widthHandle, "W", Right);
+            if (widthHandle.changed) {
+                var val: Int = Std.parseInt(widthStr);
+                if (val != null) {
+                    ElementEvents.propertyChanged.emit(selectedElement, "width", selectedElement.width, val);
+                    selectedElement.width = val;
+                    if (selectedElement is GridLayout) {
+                        var grid: GridLayout = cast(selectedElement, GridLayout);
+                        grid.resize(grid.layoutWidth, grid.layoutHeight);
+                        grid.invalidateElem();
+                        grid.onResize();
+                    }
+                } else {
+                    // Reject non-numeric input, reset to current value
+                    widthHandle.text = Std.string(selectedElement.width);
+                }
+            }
             heightHandle.text = Std.string(selectedElement.height);
-            selectedElement.invalidateElem();
+            var heightStr: String = ui.textInput(heightHandle, "H", Right);
+            if (heightHandle.changed) {
+                var val: Int = Std.parseInt(heightStr);
+                if (val != null) {
+                    ElementEvents.propertyChanged.emit(selectedElement, "height", selectedElement.height, val);
+                    selectedElement.height = val;
+                    if (selectedElement is GridLayout) {
+                        var grid: GridLayout = cast(selectedElement, GridLayout);
+                        grid.resize(grid.layoutWidth, grid.layoutHeight);
+                        grid.invalidateElem();
+                        grid.onResize();
+                    }
+                } else {
+                    // Reject non-numeric input, reset to current value
+                    heightHandle.text = Std.string(selectedElement.height);
+                }
+            }
+            if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.4)) {
+                var originalSize: Vec2 = elementSizes.get(selectedElement);
+                ElementEvents.propertyChanged.emit(selectedElement, ["width", "height"], [selectedElement.width, selectedElement.height], [Std.int(originalSize.x), Std.int(originalSize.y)]);
+                selectedElement.width = Std.int(originalSize.x);
+                selectedElement.height = Std.int(originalSize.y);
+                widthHandle.text = Std.string(selectedElement.width);
+                heightHandle.text = Std.string(selectedElement.height);
+                selectedElement.invalidateElem();
+            }
         }
         ui._y += 4;
 

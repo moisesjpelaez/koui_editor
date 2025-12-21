@@ -470,7 +470,7 @@ class KouiEditor extends iron.Trait {
 		}
 	}
 
-	function drawAnchorPane(g2: Graphics) {
+	function drawRootPane(g2: Graphics) {
 		// Draw border with g2 in screen coordinates using drawX/drawY
 		if (rootPane != null) {
 			var thickness: Int = 1;
@@ -520,7 +520,7 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function drawLayoutElements(g2: Graphics) {
-		// Draw thin borders around layout elements (RowLayout, ColLayout) since they're invisible
+		// Draw thin borders around layout elements (RowLayout, ColLayout, child AnchorPanes) since they're invisible
 		if (sceneData.currentScene == null) return;
 
 		var thickness: Int = 1;
@@ -528,15 +528,21 @@ class KouiEditor extends iron.Trait {
 
 		for (entry in sceneData.currentScene.elements) {
 			var elem: Element = entry.element;
-			if (Std.isOfType(elem, RowLayout) || Std.isOfType(elem, ColLayout)) {
+			// Skip rootPane - it has its own drawing in drawRootPane
+			if (elem == rootPane) continue;
+
+			// Draw borders for child AnchorPanes, RowLayout, and ColLayout
+			if (elem is AnchorPane || elem is RowLayout || elem is ColLayout) {
 				var x: Int = elem.drawX + rootPane.drawX;
 				var y: Int = elem.drawY + rootPane.drawY;
 				var w: Int = elem.drawWidth;
 				var h: Int = elem.drawHeight;
 
+				// Use sumLayout for proper nested layout position calculation
+				var finalPos: Vec2 = sumLayout(elem, 0, 0);
 				if (elem.layout != rootPane) {
-					x += elem.layout.drawX;
-					y += elem.layout.drawY;
+					x += Std.int(finalPos.x);
+					y += Std.int(finalPos.y);
 				}
 
 				g2.fillRect(x, y, w, thickness);
@@ -555,7 +561,7 @@ class KouiEditor extends iron.Trait {
 		Koui.render(g2);
 		g2.begin(false);
 		drawGrid(g2);
-		drawAnchorPane(g2);
+		drawRootPane(g2);
 		drawLayoutElements(g2);
 		drawSelectedElement(g2);
 		g2.end();
