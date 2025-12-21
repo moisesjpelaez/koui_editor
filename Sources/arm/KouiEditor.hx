@@ -245,8 +245,7 @@ class KouiEditor extends iron.Trait {
 			}
 		}
 
-		// Handle '1' key reset
-		if (keyboard.started("1") && isInCanvas()) resetCanvasView();
+		if (keyboard.started("f") && isInCanvas()) resetCanvasView();
 	}
 
 	function resetCanvasView() {
