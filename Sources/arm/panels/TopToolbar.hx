@@ -113,15 +113,15 @@ class TopToolbar {
                 snappingToggled.emit(snappingEnabled, snapValue);
 			}
 			ui._x += 4; // Small padding on the left
-			snapValue = ui.slider(snapHandle, "Snap", 4, snapMaxValue, false, 1, true, Align.Right, false);
-			// Round to nearest multiple of 4
+			snapValue = ui.slider(snapHandle, "Snap", 8, snapMaxValue, true, 1/8, true, Align.Right);
+			// Round to nearest multiple of 8
 			if (snapHandle.changed) {
 				snapValue = Math.round(snapValue / 8) * 8;
 				snapHandle.value = snapValue; // Update handle to match rounded value
 			}
 			if (ui.isHovered) ui.tooltip("Grid Snap Value");
 			if (snapHandle.changed) {
-				snapValueChanged.emit(snapValue);
+				snapValueChanged.emit(snapHandle.value);
 			}
 
 			ui._y -= yOffset;

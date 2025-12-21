@@ -6,6 +6,7 @@ import iron.App;
 import koui.elements.Button;
 import koui.elements.Checkbox;
 import koui.elements.Label;
+import koui.elements.Progressbar;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
 import zui.Id;
@@ -81,6 +82,16 @@ class ElementsPanel {
 				}
 
 				uiBase.ui.unindent();
+			}
+
+			if (uiBase.ui.panel(Id.handle({selected: true}), "Misc.")) {
+				uiBase.ui.indent();
+
+				if (uiBase.ui.button("Progressbar")) {
+					var key: String = "Progressbar";
+					var progressbar: Progressbar = new Progressbar(0, 100);
+					ElementEvents.elementAdded.emit({ key: key, element: progressbar });
+				}
 			}
 		}
 

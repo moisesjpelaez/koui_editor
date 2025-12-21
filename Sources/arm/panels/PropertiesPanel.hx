@@ -16,6 +16,7 @@ import koui.elements.Checkbox;
 import koui.elements.Element;
 import koui.elements.Label;
 import koui.elements.Panel;
+import koui.elements.Progressbar;
 import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.Layout.Anchor;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
@@ -61,6 +62,13 @@ class PropertiesPanel {
     var checkboxIsCheckedHandle: Handle;
     var checkboxTextHandle: Handle;
 
+    // Progressbar handles
+    var progressbarMinValueHandle: Handle;
+    var progressbarMaxValueHandle: Handle;
+    var progressbarTextHandle: Handle;
+    var progressbarPrecisionHandle: Handle;
+    var progressbarValueHandle: Handle;
+
     var sceneData: SceneData = SceneData.data;
 
     // Initial values for reset functionality
@@ -98,6 +106,12 @@ class PropertiesPanel {
 
         checkboxTextHandle = new Handle({text: ""});
         checkboxIsCheckedHandle = new Handle({selected: false});
+
+        progressbarValueHandle = new Handle({value: 0});
+        progressbarMinValueHandle = new Handle({text: "0"});
+        progressbarMaxValueHandle = new Handle({text: "1"});
+        progressbarTextHandle = new Handle({text: ""});
+        progressbarPrecisionHandle = new Handle({text: "1"});
 
         ElementEvents.elementAdded.connect(onElementAdded);
         ElementEvents.elementSelected.connect(onElementSelected);
@@ -460,6 +474,65 @@ class PropertiesPanel {
                 // Update the internal Panel's visual state
                 var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
                 checkSquare.setContextElement(newChecked ? "checked" : "");
+            }
+        } else if (selectedElement is Progressbar) {
+            ui.text("Progressbar Properties", Center);
+            ui.separator();
+
+            var progressbar: Progressbar = cast(selectedElement, Progressbar);
+
+            progressbarTextHandle.text = progressbar.text;
+            var newText: String = ui.textInput(progressbarTextHandle, "Text", Right);
+            if (progressbarTextHandle.changed) {
+                ElementEvents.propertyChanged.emit(progressbar, "text", progressbar.text, newText);
+                progressbar.text = newText;
+            }
+
+            progressbarMinValueHandle.text = Std.string(progressbar.minValue);
+            var newMinStr: String = ui.textInput(progressbarMinValueHandle, "Min Value", Right);
+            if (progressbarMinValueHandle.changed) {
+                var newMin: Float = Std.parseFloat(newMinStr);
+                if (!Math.isNaN(newMin)) {
+                    ElementEvents.propertyChanged.emit(progressbar, "minValue", progressbar.minValue, newMin);
+                    progressbar.minValue = newMin;
+                    progressbar.value = Math.max(newMin, progressbar.value);
+                }
+            }
+
+            progressbarMaxValueHandle.text = Std.string(progressbar.maxValue);
+            var newMaxStr: String = ui.textInput(progressbarMaxValueHandle, "Max Value", Right);
+            if (progressbarMaxValueHandle.changed) {
+                var newMax: Float = Std.parseFloat(newMaxStr);
+                if (!Math.isNaN(newMax)) {
+                    ElementEvents.propertyChanged.emit(progressbar, "maxValue", progressbar.maxValue, newMax);
+                    progressbar.maxValue = newMax;
+                    progressbar.value = Math.min(newMax, progressbar.value);
+                }
+            }
+
+            progressbarPrecisionHandle.text = Std.string(progressbar.precision);
+            var newPrecisionStr: String = ui.textInput(progressbarPrecisionHandle, "Precision", Right);
+            var steps: Float = 0;
+            if (progressbarPrecisionHandle.changed) {
+                var newPrecision: Int = Std.parseInt(newPrecisionStr);
+                if (newPrecision != null) {
+                    newPrecision = Std.int(Math.max(0, newPrecision));
+                    ElementEvents.propertyChanged.emit(progressbar, "precision", progressbar.precision, newPrecision);
+                    progressbar.precision = newPrecision;
+                    steps = Math.pow(10, -progressbar.precision);
+                    progressbar.value = Math.round(progressbar.value / steps) * steps;
+                }
+            }
+
+            // Value slider (below min/max so bounds are set first)
+            progressbarValueHandle.value = progressbar.value;
+            steps = Math.pow(10, -progressbar.precision);
+            var newValue: Float = ui.slider(progressbarValueHandle, "Value", progressbar.minValue, progressbar.maxValue, true, 1 / steps, true, Right);
+            if (progressbarValueHandle.changed) {
+                newValue = Math.round(newValue / steps) * steps;
+                progressbarValueHandle.value = newValue;
+                ElementEvents.propertyChanged.emit(progressbar, "value", progressbar.value, newValue);
+                progressbar.value = newValue;
             }
         }
     }

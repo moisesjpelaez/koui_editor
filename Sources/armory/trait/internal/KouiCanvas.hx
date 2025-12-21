@@ -9,6 +9,7 @@ import koui.elements.Button;
 import koui.elements.Checkbox;
 import koui.elements.Label;
 import koui.elements.Panel;
+import koui.elements.Progressbar;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.GridLayout;
@@ -346,6 +347,21 @@ class KouiCanvas extends Trait {
 					checkSquare.setContextElement(checkbox.isChecked ? "checked" : "");
 				}
 				element = checkbox;
+
+			case "Progressbar":
+				var minVal: Float = data.properties.minValue != null ? data.properties.minValue : 0.0;
+				var maxVal: Float = data.properties.maxValue != null ? data.properties.maxValue : 1.0;
+				var progressbar: Progressbar = new Progressbar(minVal, maxVal);
+				if (data.properties.value != null) {
+					progressbar.value = data.properties.value;
+				}
+				if (data.properties.text != null) {
+					progressbar.text = data.properties.text;
+				}
+				if (data.properties.precision != null) {
+					progressbar.precision = data.properties.precision;
+				}
+				element = progressbar;
 
 			case "AnchorPane":
 				element = new AnchorPane(data.posX, data.posY, data.width, data.height);

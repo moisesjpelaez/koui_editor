@@ -5,6 +5,7 @@ import koui.elements.Checkbox;
 import koui.elements.Element;
 import koui.elements.Label;
 import koui.elements.Panel;
+import koui.elements.Progressbar;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
@@ -22,6 +23,7 @@ class ElementUtils {
 	public static function getElementType(element: Element): String {
 		if (Std.isOfType(element, Button)) return "Button";
 		if (Std.isOfType(element, Checkbox)) return "Checkbox";
+		if (Std.isOfType(element, Progressbar)) return "Progressbar";
 		if (Std.isOfType(element, Label)) return "Label";
 		// Check RowLayout/ColLayout before AnchorPane since they're more specific
 		if (Std.isOfType(element, RowLayout)) return "RowLayout";
@@ -98,6 +100,23 @@ class ElementUtils {
 				}
 				element = checkbox;
 
+			case "Progressbar":
+				var minVal: Float = properties != null && properties.minValue != null ? properties.minValue : 0.0;
+				var maxVal: Float = properties != null && properties.maxValue != null ? properties.maxValue : 1.0;
+				var progressbar: Progressbar = new Progressbar(minVal, maxVal);
+				if (properties != null) {
+					if (properties.value != null) {
+						progressbar.value = properties.value;
+					}
+					if (properties.text != null) {
+						progressbar.text = properties.text;
+					}
+					if (properties.precision != null) {
+						progressbar.precision = properties.precision;
+					}
+				}
+				element = progressbar;
+
 			case "AnchorPane":
 				var pane: AnchorPane = new AnchorPane(posX, posY, width, height);
 				element = pane;
@@ -158,6 +177,16 @@ class ElementUtils {
 				return {
 					text: checkbox.text,
 					isChecked: checkbox.isChecked
+				};
+
+			case "Progressbar":
+				var progressbar: Progressbar = cast element;
+				return {
+					value: progressbar.value,
+					minValue: progressbar.minValue,
+					maxValue: progressbar.maxValue,
+					text: progressbar.text,
+					precision: progressbar.precision
 				};
 
 			case "AnchorPane", "RowLayout", "ColLayout":

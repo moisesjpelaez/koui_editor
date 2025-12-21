@@ -8,6 +8,7 @@ import koui.elements.Checkbox;
 import koui.elements.Element;
 import koui.elements.Label;
 import koui.elements.Panel;
+import koui.elements.Progressbar;
 
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
@@ -308,7 +309,7 @@ class HierarchyUtils {
 	}
 
 	public static function shouldSkipInternalChild(parent: Element, child: Element): Bool {
-		return parent is Button || parent is Checkbox;
+		return parent is Button || parent is Checkbox || parent is Progressbar;
 	}
 
 	/**
