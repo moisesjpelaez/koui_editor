@@ -60,7 +60,7 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
             ui_override_project = os.path.join(theme_dir, 'ui_override.ksn')
             if not os.path.exists(ui_override_project):
                 # Copy default from library
-                ui_override_default = os.path.join(this_dir, 'Assets', 'ui_override.ksn')
+                ui_override_default = os.path.join(this_dir, 'Assets', 'koui_canvas', 'ui_override.ksn')
                 if os.path.exists(ui_override_default):
                     import shutil
                     shutil.copy2(ui_override_default, ui_override_project)
