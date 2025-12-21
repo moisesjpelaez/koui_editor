@@ -236,51 +236,63 @@ class PropertiesPanel {
             }
         }
 
-        // Anchor - 3x3 grid selector
-        ui.text("Anchor", Left);
-        drawAnchorGrid(ui, selectedElement);
-
-        // Position - label, reset button, and X/Y inputs in one row
-        ui.row([1/4, 5/16, 5/16, 1/8]);
-        ui.text("Position", Left);
-        posXHandle.text = Std.string(selectedElement.posX);
-        var posXStr: String = ui.textInput(posXHandle, "X", Right);
-        if (posXHandle.changed) {
-            var val: Int = Std.parseInt(posXStr);
-            if (val != null) {
-                ElementEvents.propertyChanged.emit(selectedElement, "posX", selectedElement.posX, val);
-                selectedElement.posX = val;
-            } else {
-                // Reject non-numeric input, reset to current value
-                posXHandle.text = Std.string(selectedElement.posX);
-            }
-        }
-        posYHandle.text = Std.string(selectedElement.posY);
-        var posYStr: String = ui.textInput(posYHandle, "Y", Right);
-        if (posYHandle.changed) {
-            var val: Int = Std.parseInt(posYStr);
-            if (val != null) {
-                ElementEvents.propertyChanged.emit(selectedElement, "posY", selectedElement.posY, val);
-                selectedElement.posY = val;
-            } else {
-                // Reject non-numeric input, reset to current value
-                posYHandle.text = Std.string(selectedElement.posY);
-            }
-        }
-        if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Position", false, false, 0.4)) {
-            ElementEvents.propertyChanged.emit(selectedElement, ["posX", "posY"], [selectedElement.posX, selectedElement.posY], [0, 0]);
-            selectedElement.posX = 0;
-            selectedElement.posY = 0;
-            posXHandle.text = Std.string(0);
-            posYHandle.text = Std.string(0);
-            selectedElement.invalidateElem();
-        }
-        ui._y += 4;
-
         // Check if element is dynamically sized based on theme's minWidth/minHeight
         var isDynamicWidth: Bool = selectedElement.style != null && selectedElement.style.size.minWidth != 0;
         var isDynamicHeight: Bool = selectedElement.style != null && selectedElement.style.size.minHeight != 0;
         var isDynamicallySized: Bool = isDynamicWidth || isDynamicHeight;
+
+        // Anchor - 3x3 grid selector
+        if (isDynamicallySized) {
+            ui.row([1/4, 3/4]);
+            ui.text("Anchor", Left);
+            ui.text("Dynamically Sized", Left);
+        } else {
+            ui.text("Anchor", Left);
+            drawAnchorGrid(ui, selectedElement);
+        }
+
+        // Position - label, reset button, and X/Y inputs in one row
+        if (isDynamicallySized) {
+            ui.row([1/4, 3/4]);
+            ui.text("Position", Left);
+            ui.text("Dynamically Sized", Left);
+        } else {
+            ui.row([1/4, 5/16, 5/16, 1/8]);
+            ui.text("Position", Left);
+            posXHandle.text = Std.string(selectedElement.posX);
+            var posXStr: String = ui.textInput(posXHandle, "X", Right);
+            if (posXHandle.changed) {
+                var val: Int = Std.parseInt(posXStr);
+                if (val != null) {
+                    ElementEvents.propertyChanged.emit(selectedElement, "posX", selectedElement.posX, val);
+                    selectedElement.posX = val;
+                } else {
+                    // Reject non-numeric input, reset to current value
+                    posXHandle.text = Std.string(selectedElement.posX);
+                }
+            }
+            posYHandle.text = Std.string(selectedElement.posY);
+            var posYStr: String = ui.textInput(posYHandle, "Y", Right);
+            if (posYHandle.changed) {
+                var val: Int = Std.parseInt(posYStr);
+                if (val != null) {
+                    ElementEvents.propertyChanged.emit(selectedElement, "posY", selectedElement.posY, val);
+                    selectedElement.posY = val;
+                } else {
+                    // Reject non-numeric input, reset to current value
+                    posYHandle.text = Std.string(selectedElement.posY);
+                }
+            }
+            if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Position", false, false, 0.4)) {
+                ElementEvents.propertyChanged.emit(selectedElement, ["posX", "posY"], [selectedElement.posX, selectedElement.posY], [0, 0]);
+                selectedElement.posX = 0;
+                selectedElement.posY = 0;
+                posXHandle.text = Std.string(0);
+                posYHandle.text = Std.string(0);
+                selectedElement.invalidateElem();
+            }
+        }
+        ui._y += 4;
 
         // Size - label, reset button, and Width/Height inputs in one row
         if (isDynamicallySized) {

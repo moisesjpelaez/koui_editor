@@ -164,6 +164,12 @@ class KouiEditor extends iron.Trait {
 		return mouse.x > tabx && mouse.x < tabx + w && mouse.y > 0 && mouse.y < h0;
 	}
 
+	function isDynamicSized(element: Element): Bool {
+		var isDynamicWidth: Bool = element.style != null && element.style.size.minWidth != 0;
+        var isDynamicHeight: Bool = element.style != null && element.style.size.minHeight != 0;
+        return isDynamicWidth || isDynamicHeight;
+	}
+
 	function setupRootScene(scene: AnchorPane): Void {
 		scene.setSize(canvasWidth, canvasHeight);
 		scene.setTID("fixed_anchorpane");
@@ -277,7 +283,10 @@ class KouiEditor extends iron.Trait {
 				if (element.parent is Button || element.parent is Checkbox || element.parent is Progressbar) selectedElement = element.parent;
 				else selectedElement = element;
 				ElementEvents.elementSelected.emit(selectedElement);
-
+				if (isDynamicSized(selectedElement)) {
+					draggedElement = null;
+					return;
+				}
 				draggedElement = selectedElement;
 
 				// Store original anchor and switch to TopLeft BEFORE calculating offset
@@ -301,7 +310,6 @@ class KouiEditor extends iron.Trait {
 			selectedElement = null;
 			draggedElement = null;
 			ElementEvents.elementSelected.emit(null);
-
 		} else if (mouseDown && draggedElement != null) {
 			// Calculate new position in TopLeft space
 			var elemX = Std.int(mouse.x - dragOffsetX);
