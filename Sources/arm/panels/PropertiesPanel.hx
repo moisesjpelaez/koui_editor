@@ -17,6 +17,7 @@ import koui.elements.Element;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
+import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.Layout.Anchor;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
@@ -314,11 +315,10 @@ class PropertiesPanel {
                 if (val != null) {
                     ElementEvents.propertyChanged.emit(selectedElement, "height", selectedElement.height, val);
                     selectedElement.height = val;
-                    if (selectedElement is GridLayout) {
-                        var grid: GridLayout = cast(selectedElement, GridLayout);
-                        grid.resize(grid.layoutWidth, grid.layoutHeight);
-                        grid.invalidateElem();
-                        grid.onResize();
+                    if (selectedElement is AnchorPane || selectedElement is GridLayout) {
+                        untyped selectedElement.resize(selectedElement.layoutWidth, selectedElement.layoutHeight);
+                        selectedElement.invalidateElem();
+                        selectedElement.onResize();
                     }
                 } else {
                     // Reject non-numeric input, reset to current value
