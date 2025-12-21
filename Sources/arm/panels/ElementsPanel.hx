@@ -29,13 +29,13 @@ class ElementsPanel {
                     ElementEvents.elementAdded.emit({ key: key, element: label });
 				}
 
-				if (uiBase.ui.button("Image Panel")) {
-					trace("Image Panel");
-				}
+				// if (uiBase.ui.button("Image Panel")) {
+				// 	trace("Image Panel");
+				// }
 
-				if (uiBase.ui.button("Panel")) {
-					trace("Panel");
-				}
+				// if (uiBase.ui.button("Panel")) {
+				// 	trace("Panel");
+				// }
 
 				uiBase.ui.unindent();
 			}
@@ -55,9 +55,9 @@ class ElementsPanel {
 					ElementEvents.elementAdded.emit({ key: key, element: checkbox });
 				}
 
-				if (uiBase.ui.button("Radio")) {
-					trace("Radio");
-				}
+				// if (uiBase.ui.button("Radio")) {
+				// 	trace("Radio");
+				// }
 
 				uiBase.ui.unindent();
 			}
@@ -77,9 +77,9 @@ class ElementsPanel {
 					ElementEvents.elementAdded.emit({ key: key, element: rowLayout });
 				}
 
-				if (uiBase.ui.button("Expander")) {
-					trace("Expander");
-				}
+				// if (uiBase.ui.button("Expander")) {
+				// 	trace("Expander");
+				// }
 
 				uiBase.ui.unindent();
 			}
