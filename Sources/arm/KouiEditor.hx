@@ -149,6 +149,21 @@ class KouiEditor extends iron.Trait {
 		notifyOnRender2D(render2D);
 	}
 
+	function isInCanvas(): Bool {
+		var mouse: Mouse = Input.getMouse();
+		var canvasMargin1: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize * 0.5, App.h() - uiBase.getBottomH() - borderSize * 0.5);
+		var canvasMargin2: Vec2 = new Vec2(canvasMargin1.x - borderSize * 0.5, App.h() - uiBase.getSidebarH1() - borderSize * 0.5);
+		return mouse.x < canvasMargin1.x && mouse.y < canvasMargin1.y || mouse.x < canvasMargin2.x && mouse.y < canvasMargin2.y;
+	}
+
+	function isInHierarchyPanel(): Bool {
+		var mouse: Mouse = Input.getMouse();
+		var tabx: Int = uiBase.getTabX() + Std.int(borderSize * 0.5);
+		var w: Int = uiBase.getSidebarW();
+		var h0: Int = uiBase.getSidebarH0() - Std.int(borderSize * 0.5);
+		return mouse.x > tabx && mouse.x < tabx + w && mouse.y > 0 && mouse.y < h0;
+	}
+
 	function setupRootScene(scene: AnchorPane): Void {
 		scene.setSize(canvasWidth, canvasHeight);
 		scene.setTID("fixed_anchorpane");
@@ -185,12 +200,8 @@ class KouiEditor extends iron.Trait {
 		var mouse: Mouse = Input.getMouse();
 		var keyboard: Keyboard = Input.getKeyboard();
 
-		// Calculate canvas area (exclude UI panels)
-		var canvasArea: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize, App.h() - uiBase.getBottomH() - borderSize);
-		var isInCanvas: Bool = mouse.x < canvasArea.x && mouse.y < canvasArea.y;
-
 		// Handle middle mouse button panning
-		if (mouse.started("middle") && isInCanvas) {
+		if (mouse.started("middle") && isInCanvas()) {
 			isPanning = true;
 			panStartX = mouse.x;
 			panStartY = mouse.y;
@@ -222,7 +233,7 @@ class KouiEditor extends iron.Trait {
 		}
 
 		// FIXME: elements flicker when zooming
-		if (isInCanvas && !isPanning) {
+		if (isInCanvas() && !isPanning) {
 			if (mouse.wheelDelta < 0) {
 				currentScale += 0.1;
 				currentScale = Math.min(3.0, currentScale);
@@ -239,16 +250,16 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function resetCanvasView() {
-			canvasPanX = 0;
-			canvasPanY = 0;
+		canvasPanX = 0;
+		canvasPanY = 0;
 
-			rootPane.posX = Std.int(canvasPanX / Koui.uiScale);
-			rootPane.posY = Std.int(canvasPanY / Koui.uiScale);
-			rootPane.drawX = Std.int(rootPane.posX * Koui.uiScale);
-			rootPane.drawY = Std.int(rootPane.posY * Koui.uiScale);
-			Koui.anchorPane.elemUpdated(rootPane);
+		rootPane.posX = Std.int(canvasPanX / Koui.uiScale);
+		rootPane.posY = Std.int(canvasPanY / Koui.uiScale);
+		rootPane.drawX = Std.int(rootPane.posX * Koui.uiScale);
+		rootPane.drawY = Std.int(rootPane.posY * Koui.uiScale);
+		Koui.anchorPane.elemUpdated(rootPane);
 
-			sizeInit = false;
+		sizeInit = false;
 	}
 
 	function updateDragAndDrop() {
@@ -259,10 +270,8 @@ class KouiEditor extends iron.Trait {
 		var mouseDown: Bool = mouse.down();
 		var mouseJustPressed: Bool = mouseDown && !wasMouseDown;
 
-		if (mouseJustPressed) {
+		if (mouseJustPressed && isInCanvas()) {
 			var element: Element = getElementAtPositionUnclipped(Std.int(mouse.x), Std.int(mouse.y));
-			var canvasArea: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize, App.h() - uiBase.getBottomH() - borderSize); // TODO: use a more accurate variable name
-			var hierarchyArea: Vec2 = new Vec2(canvasArea.x + 2 * borderSize, App.h() - uiBase.getSidebarH1() - borderSize); // TODO: use a more accurate variable name
 
 			if (element != null && element != rootPane) {
 				// Select parent element instead of internal children
@@ -283,11 +292,17 @@ class KouiEditor extends iron.Trait {
 
 				dragStartX = draggedElement.posX;
 				dragStartY = draggedElement.posY;
-			} else if (mouse.x < canvasArea.x && mouse.y < canvasArea.y || mouse.x > hierarchyArea.x && mouse.y < hierarchyArea.y) {
+			} else {
 				selectedElement = null;
 				draggedElement = null;
 				ElementEvents.elementSelected.emit(null);
 			}
+		} else if (mouseJustPressed && isInHierarchyPanel()) {
+			// Clicked in hierarchy panel - deselect current element
+			selectedElement = null;
+			draggedElement = null;
+			ElementEvents.elementSelected.emit(null);
+
 		} else if (mouseDown && draggedElement != null) {
 			// Calculate new position in TopLeft space
 			var elemX = Std.int(mouse.x - dragOffsetX);
