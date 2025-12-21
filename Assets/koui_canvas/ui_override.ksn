@@ -36,7 +36,7 @@ _scrollpane > _layout:
 		minHeight: 0
 		minWidth: 0
 
-fixed_anchorpane > _anchorpane:
+_fixed_anchorpane > _anchorpane:
 	size:
 		minHeight: 0
 		minWidth: 0

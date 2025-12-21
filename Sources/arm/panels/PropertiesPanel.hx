@@ -11,6 +11,7 @@ import arm.tools.ZuiUtils;
 
 import iron.math.Vec2;
 import kha.Image;
+import koui.Koui;
 import koui.elements.Button;
 import koui.elements.Checkbox;
 import koui.elements.Element;
@@ -20,12 +21,15 @@ import koui.elements.Progressbar;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.Layout.Anchor;
+import koui.theme.Style;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
 
 import zui.Zui;
 import zui.Zui.Handle;
 
-@:access(koui.elements.Element, zui.Zui)
+import haxe.ds.ObjectMap;
+
+@:access(koui.Koui, koui.elements.Element, zui.Zui)
 class PropertiesPanel {
     var tabHandle: Handle;
 
@@ -73,7 +77,7 @@ class PropertiesPanel {
     var sceneData: SceneData = SceneData.data;
 
     // Initial values for reset functionality
-    var elementSizes: Map<Element, Vec2> = new Map();
+    var elementSizes: ObjectMap<Element, Vec2> = new ObjectMap();
 
     var icons: Image;
 
@@ -201,6 +205,10 @@ class PropertiesPanel {
 
 		var elementType = CanvasUtils.getElementType(selectedElement);
 		ui.text(elementType, Right);
+        // Check if element is dynamically sized based on theme's minWidth/minHeight
+        var isDynamicWidth: Bool = selectedElement.style != null && selectedElement.style.size.minWidth != 0;
+        var isDynamicHeight: Bool = selectedElement.style != null && selectedElement.style.size.minHeight != 0;
+        var isDynamicallySized: Bool = isDynamicWidth || isDynamicHeight;
 
         drawElementProperties(uiBase);
 
@@ -222,24 +230,24 @@ class PropertiesPanel {
         if (tidHandle.changed) {
             if (newTID != null && newTID != "") {
                 // Check if TID exists in theme
-                if (koui.theme.Style.getStyle(newTID) != null) {
+                var style: Style = Style.getStyle(newTID);
+                if (style != null) {
                     ElementEvents.propertyChanged.emit(selectedElement, "TID", originalTID, newTID);
                     selectedElement.setTID(newTID);
+                    if (style.size.minWidth != 0 || style.size.minHeight != 0) {
+                        selectedElement.setPosition(0, 0);
+                    }
                 } else {
                     // TID not found in theme, show error and revert
                     trace('Error: TID "${newTID}" not found in theme. Reverting to "${originalTID}".');
                     tidHandle.text = originalTID;
                 }
 
+                Koui.updateElementSize(selectedElement);
                 uiBase.hwnds[PanelHierarchy].redraws = 2;
 		        uiBase.hwnds[PanelProperties].redraws = 2;
             }
         }
-
-        // Check if element is dynamically sized based on theme's minWidth/minHeight
-        var isDynamicWidth: Bool = selectedElement.style != null && selectedElement.style.size.minWidth != 0;
-        var isDynamicHeight: Bool = selectedElement.style != null && selectedElement.style.size.minHeight != 0;
-        var isDynamicallySized: Bool = isDynamicWidth || isDynamicHeight;
 
         // Anchor - 3x3 grid selector
         if (isDynamicallySized) {
@@ -309,12 +317,7 @@ class PropertiesPanel {
                 if (val != null) {
                     ElementEvents.propertyChanged.emit(selectedElement, "width", selectedElement.width, val);
                     selectedElement.width = val;
-                    if (selectedElement is GridLayout) {
-                        var grid: GridLayout = cast(selectedElement, GridLayout);
-                        grid.resize(grid.layoutWidth, grid.layoutHeight);
-                        grid.invalidateElem();
-                        grid.onResize();
-                    }
+                    Koui.updateElementSize(selectedElement);
                 } else {
                     // Reject non-numeric input, reset to current value
                     widthHandle.text = Std.string(selectedElement.width);
@@ -327,11 +330,7 @@ class PropertiesPanel {
                 if (val != null) {
                     ElementEvents.propertyChanged.emit(selectedElement, "height", selectedElement.height, val);
                     selectedElement.height = val;
-                    if (selectedElement is AnchorPane || selectedElement is GridLayout) {
-                        untyped selectedElement.resize(selectedElement.layoutWidth, selectedElement.layoutHeight);
-                        selectedElement.invalidateElem();
-                        selectedElement.onResize();
-                    }
+                    Koui.updateElementSize(selectedElement);
                 } else {
                     // Reject non-numeric input, reset to current value
                     heightHandle.text = Std.string(selectedElement.height);
@@ -339,12 +338,14 @@ class PropertiesPanel {
             }
             if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.4)) {
                 var originalSize: Vec2 = elementSizes.get(selectedElement);
-                ElementEvents.propertyChanged.emit(selectedElement, ["width", "height"], [selectedElement.width, selectedElement.height], [Std.int(originalSize.x), Std.int(originalSize.y)]);
-                selectedElement.width = Std.int(originalSize.x);
-                selectedElement.height = Std.int(originalSize.y);
-                widthHandle.text = Std.string(selectedElement.width);
-                heightHandle.text = Std.string(selectedElement.height);
-                selectedElement.invalidateElem();
+                if (originalSize != null) {
+                    ElementEvents.propertyChanged.emit(selectedElement, ["width", "height"], [selectedElement.width, selectedElement.height], [Std.int(originalSize.x), Std.int(originalSize.y)]);
+                    selectedElement.width = Std.int(originalSize.x);
+                    selectedElement.height = Std.int(originalSize.y);
+                    widthHandle.text = Std.string(selectedElement.width);
+                    heightHandle.text = Std.string(selectedElement.height);
+                    Koui.updateElementSize(selectedElement);
+                }
             }
         }
         ui._y += 4;
@@ -569,6 +570,11 @@ class PropertiesPanel {
 
         // Update all handles with the new element's values
         if (element != null) {
+            // Register element size if not already tracked (for elements loaded from file)
+            if (!elementSizes.exists(element)) {
+                elementSizes.set(element, new Vec2(element.width, element.height));
+            }
+
             // Find element name
             var elemName: String = "";
             var currentScene = SceneData.data.currentScene;

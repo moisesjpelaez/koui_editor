@@ -172,7 +172,7 @@ class KouiEditor extends iron.Trait {
 
 	function setupRootScene(scene: AnchorPane): Void {
 		scene.setSize(canvasWidth, canvasHeight);
-		scene.setTID("fixed_anchorpane");
+		scene.setTID("_fixed_anchorpane");
 		scene.anchor = Anchor.MiddleCenter;
 		scene.invalidateElem();
 		var s: TSceneEntry = {
@@ -280,8 +280,16 @@ class KouiEditor extends iron.Trait {
 
 			if (element != null && element != rootPane) {
 				// Select parent element instead of internal children
-				if (element.parent is Button || element.parent is Checkbox || element.parent is Progressbar) selectedElement = element.parent;
-				else selectedElement = element;
+				if (element.parent is Button || element.parent is Checkbox || element.parent is Progressbar) {
+					selectedElement = element.parent;
+				}
+				// Select parent AnchorPane instead of child AnchorPane (but not if parent is rootPane)
+				else if (element is AnchorPane && element.layout is AnchorPane && element.layout != rootPane) {
+					selectedElement = cast(element.layout, Element);
+				}
+				else {
+					selectedElement = element;
+				}
 				ElementEvents.elementSelected.emit(selectedElement);
 				if (isDynamicSized(selectedElement)) {
 					draggedElement = null;

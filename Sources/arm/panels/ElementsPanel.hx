@@ -69,7 +69,7 @@ class ElementsPanel {
 				if (uiBase.ui.button("AnchorPane")) {
 					var key: String = "AnchorPane";
 					var anchorPane: AnchorPane = new AnchorPane(0, 0, 200, 200);
-					anchorPane.setTID("fixed_anchorpane");
+					anchorPane.setTID("_fixed_anchorpane");
 					ElementEvents.elementAdded.emit({ key: key, element: anchorPane });
 				}
 
