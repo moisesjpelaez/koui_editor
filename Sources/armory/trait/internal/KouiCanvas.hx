@@ -12,6 +12,7 @@ import koui.elements.Progressbar;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.GridLayout;
+import koui.elements.layouts.Layout.Anchor;
 import koui.elements.layouts.RowLayout;
 import koui.events.MouseEvent.MouseClickEvent;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
@@ -785,6 +786,125 @@ class KouiCanvas extends Trait {
 	 */
 	public function getRoot(): Null<AnchorPane> {
 		return currentScene != null ? currentScene.root : null;
+	}
+
+	/**
+	 * Add a custom element to a specific scene programmatically.
+	 * Use this to add elements that aren't supported by the editor (e.g., ImagePanel).
+	 *
+	 * Example:
+	 * ```haxe
+	 * var imagePanel = new koui.elements.ImagePanel(kha.Assets.images.logo);
+	 * imagePanel.posX = 100;
+	 * imagePanel.posY = 50;
+	 * imagePanel.setSize(200, 150);
+	 * canvas.addElement("Scene_1", "logo_image", imagePanel);
+	 *
+	 * // Or add to a specific container you made in the editor:
+	 * canvas.addElement("Scene_1", "icon", imagePanel, "header_container");
+	 *
+	 * // With anchor:
+	 * canvas.addElement("Scene_1", "icon", imagePanel, null, Anchor.MiddleCenter);
+	 * ```
+	 *
+	 * @param sceneName The scene to add the element to
+	 * @param key Unique key for this element (for later retrieval via getElement)
+	 * @param element The element to add
+	 * @param parentKey Optional parent element key/path. If null, adds to root.
+	 * @param anchor Optional anchor position for the element.
+	 * @return True if added successfully, false otherwise
+	 */
+	public function addElement(sceneName: String, key: String, element: Element, anchor: Anchor = Anchor.TopLeft, parentKey: String = null): Bool {
+		var scene: TKouiScene = scenes.get(sceneName);
+		if (scene == null) {
+			trace('[KouiCanvas] Scene not found: "$sceneName"');
+			return false;
+		}
+
+		if (scene.elements.exists(key)) {
+			trace('[KouiCanvas] Element key "$key" already exists in scene "$sceneName"');
+			return false;
+		}
+
+		// Set anchor if provided
+		if (anchor != null) {
+			element.anchor = anchor;
+		}
+
+		// Find parent
+		var parent: Element = null;
+		if (parentKey != null) {
+			parent = getElementFromScene(sceneName, parentKey);
+			if (parent == null) {
+				trace('[KouiCanvas] Parent not found: "$parentKey" in scene "$sceneName"');
+				return false;
+			}
+		} else {
+			parent = scene.root;
+		}
+
+		// Add to parent layout
+		if (Std.isOfType(parent, AnchorPane)) {
+			cast(parent, AnchorPane).add(element);
+		} else if (Std.isOfType(parent, GridLayout)) {
+			var grid: GridLayout = cast parent;
+			grid.add(element, 0, grid.amountCols);
+		} else {
+			trace('[KouiCanvas] Parent "$parentKey" is not a layout container');
+			return false;
+		}
+
+		// Register in scene maps
+		scene.elements.set(key, element);
+		scene.elementKeys.set(element, key);
+
+		return true;
+	}
+
+	/**
+	 * Remove a programmatically added element from a specific scene.
+	 * Supports both simple keys and paths (e.g., "parent/child/element").
+	 *
+	 * @param sceneName The scene containing the element
+	 * @param keyOrPath The element's key or path
+	 * @return True if removed successfully, false otherwise
+	 */
+	public function removeElement(sceneName: String, keyOrPath: String): Bool {
+		var scene: TKouiScene = scenes.get(sceneName);
+		if (scene == null) return false;
+
+		// Support path-based lookup
+		var element: Element = null;
+		var key: String = keyOrPath;
+
+		if (keyOrPath.indexOf("/") >= 0) {
+			// Path-based: use getElementFromScene
+			element = getElementFromScene(sceneName, keyOrPath);
+			// Extract the final key from path
+			var parts = keyOrPath.split("/");
+			key = parts[parts.length - 1];
+		} else {
+			// Simple key lookup
+			element = scene.elements.get(keyOrPath);
+		}
+
+		if (element == null) return false;
+
+		// Remove from parent layout
+		var parent = element.layout;
+		if (parent != null) {
+			if (Std.isOfType(parent, AnchorPane)) {
+				cast(parent, AnchorPane).remove(element);
+			} else if (Std.isOfType(parent, GridLayout)) {
+				cast(parent, GridLayout).remove(element);
+			}
+		}
+
+		// Remove from scene maps
+		scene.elements.remove(key);
+		scene.elementKeys.remove(element);
+
+		return true;
 	}
 
 	/**
