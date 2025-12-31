@@ -1,6 +1,5 @@
 package armory.trait.internal;
 
-import armory.system.Signal;
 import iron.App;
 import iron.Trait;
 import koui.Koui;
@@ -193,6 +192,7 @@ class KouiCanvas extends Trait {
 			App.resized.connect(onAppResized);
 			baseH = canvasData.canvas.height;
 			baseW = canvasData.canvas.width;
+			onAppResized(App.w(), App.h());
 		}
 
 		// Build each scene
