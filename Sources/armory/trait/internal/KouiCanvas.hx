@@ -15,6 +15,7 @@ import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.Layout.Anchor;
 import koui.elements.layouts.RowLayout;
 import koui.events.MouseEvent.MouseClickEvent;
+import koui.events.MouseEvent.MouseHoverEvent;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
 import koui.utils.SceneManager;
 
@@ -973,6 +974,12 @@ class ButtonExt {
 	public static inline function onPressed(button: Button, callback: Void->Void) {
 		button.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
 			if (e.getState() == ClickStart) callback();
+		});
+	}
+
+	public static inline function onHover(button: Button, callback: Void->Void) {
+		button.addEventListener(MouseHoverEvent, function(e: MouseHoverEvent) {
+			if (e.getState() == HoverStart) callback();
 		});
 	}
 
