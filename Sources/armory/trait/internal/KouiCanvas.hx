@@ -863,6 +863,48 @@ class KouiCanvas extends Trait {
 	}
 
 	/**
+	 * Set the z-index/render order of an element relative to its siblings.
+	 * Index 0 renders first (back), higher indices render later (front).
+	 *
+	 * @param sceneName The scene containing the element
+	 * @param keyOrPath The element's key or path
+	 * @param index The desired index (0 = back, high = front)
+	 * @return True if moved successfully, false otherwise
+	 */
+	public function setElementZIndex(sceneName: String, keyOrPath: String, index: Int): Bool {
+		var scene: TKouiScene = scenes.get(sceneName);
+		if (scene == null) return false;
+
+		var element: Element = getElementFromScene(sceneName, keyOrPath);
+		if (element == null) return false;
+
+		var parent: Element = element.layout;
+		if (parent == null) parent = element.parent;
+		if (parent == null) return false;
+
+		// Get children array
+		var children: Array<Element> = null;
+		if (Std.isOfType(parent, AnchorPane)) {
+			children = untyped parent.elements;
+		} else if (Std.isOfType(parent, GridLayout) || Std.isOfType(parent, RowLayout) || Std.isOfType(parent, ColLayout)) {
+			trace('[KouiCanvas] Z-order control not supported for GridLayout/RowLayout/ColLayout');
+			return false;
+		} else {
+			children = parent.children;
+		}
+
+		// Clamp index
+		if (index < 0) index = 0;
+		if (index >= children.length) index = children.length - 1;
+
+		// Move to desired index
+		children.remove(element);
+		children.insert(index, element);
+
+		return true;
+	}
+
+	/**
 	 * Remove a programmatically added element from a specific scene.
 	 * Supports both simple keys and paths (e.g., "parent/child/element").
 	 *
