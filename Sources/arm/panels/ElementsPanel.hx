@@ -30,9 +30,11 @@ class ElementsPanel {
                     ElementEvents.elementAdded.emit({ key: key, element: label });
 				}
 
-				// if (uiBase.ui.button("Image Panel")) {
-				// 	trace("Image Panel");
-				// }
+				if (uiBase.ui.button("Image Panel")) {
+					var key: String = "ImagePanel";
+					var imagePanel = new koui.elements.ImagePanel(null);
+					ElementEvents.elementAdded.emit({ key: key, element: imagePanel });
+				}
 
 				// if (uiBase.ui.button("Panel")) {
 				// 	trace("Panel");
