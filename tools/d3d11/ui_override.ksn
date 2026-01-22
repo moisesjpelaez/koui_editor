@@ -1,8 +1,14 @@
 // Override
 _label > _root:
+	color:
+		text: #262833
 	textShadow:
+		color: #dddddd
 		offsetX: 1
 		offsetY: 1
+	font:
+		size: 18
+		family: "GamjaFlower_Regular"
 
 _checkbox > _root:
 	color:
@@ -40,3 +46,48 @@ _fixed_anchorpane > _anchorpane:
 	size:
 		minHeight: 0
 		minWidth: 0
+
+_button > _root:
+	color:
+		text: #262833
+	font:
+		size: 20
+		family: "GamjaFlower_Regular"
+	textureBg: "button_variants"
+	atlas:
+		x: 0
+		y: 0
+		w: 535
+		h: 358
+
+_button!hover:
+	atlas:
+		y: 1
+
+_button!click:
+	atlas:
+		y: 2
+
+armory_text > _label:
+	color:
+		text: #dddddd
+	textShadow:
+		color: #262833
+		offsetX: 1
+		offsetY: 1
+	font:
+		size: 32
+		family: "Montserrat_Regular"
+
+title_text > _label:
+	font:
+		size: 42
+		family: "Lacquer_Regular"
+	color:
+		text: #dddddd
+	textShadow:
+		color: #262833
+		offsetX: 1
+		offsetY: 1
+
+// FIXME: Koui Editor doesn't support custom fonts yet. Comment out the font references when opening Koui Editor.

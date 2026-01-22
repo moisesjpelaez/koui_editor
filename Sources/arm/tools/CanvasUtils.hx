@@ -9,6 +9,7 @@ import arm.tools.ElementUtils;
 
 import haxe.Json;
 
+import koui.Koui;
 import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.Label;
@@ -140,6 +141,7 @@ class CanvasUtils {
 
 	/**
 	 * Reloads the theme from the project's Assets/ui_override.ksn file.
+	 * Also loads any custom fonts referenced in the theme from Assets/fonts/.
 	 */
 	public static function refreshTheme(): Void {
 		var assetsPath: String = projectDir + "/Assets/koui_canvas/ui_override.ksn";
@@ -147,23 +149,137 @@ class CanvasUtils {
 
 		if (blob != null) {
 			var themeContent: String = haxe.io.Bytes.ofData(blob).toString();
-			var error: String = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
 
-			if (error != null) {
-				trace('Theme reload ERROR: ${error}');
-			} else {
-				var buildPath: String = projectDir + buildPath + "/ui_override.ksn";
-				try {
-				var bytes: haxe.io.Bytes = haxe.io.Bytes.ofString(themeContent);
-				Krom.fileSaveBytes(buildPath, bytes.getData());
-					trace('Theme reloaded successfully from: ${assetsPath}');
-					trace('Theme copied to build directory: ${buildPath}');
-				} catch (e: Dynamic) {
-					trace('Theme reloaded but failed to copy to build directory: ${e}');
+			// Load all fonts from Assets/fonts/ directory first
+			loadAllFonts(function() {
+				// After fonts are loaded, apply the theme
+				var error: String = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
+
+				if (error != null) {
+					trace('Theme reload ERROR: ${error}');
+				} else {
+					var buildPath: String = projectDir + buildPath + "/ui_override.ksn";
+					try {
+						var bytes: haxe.io.Bytes = haxe.io.Bytes.ofString(themeContent);
+						Krom.fileSaveBytes(buildPath, bytes.getData());
+						trace('Theme reloaded successfully from: ${assetsPath}');
+						trace('Theme copied to build directory: ${buildPath}');
+					} catch (e: Dynamic) {
+						trace('Theme reloaded but failed to copy to build directory: ${e}');
+					}
 				}
-			}
+			});
 		} else {
 			trace('Theme file not found: ${assetsPath}');
+		}
+	}
+
+	/**
+	 * Normalizes a filename to an asset name (like Kha does).
+	 * Replaces hyphens, dots, spaces and other special characters with underscores.
+	 */
+	static function normalizeAssetName(filename: String): String {
+		// Remove extension
+		var name: String = filename;
+		var dotIdx: Int = name.lastIndexOf(".");
+		if (dotIdx >= 0) {
+			name = name.substring(0, dotIdx);
+		}
+		// Replace special characters with underscores (matching Kha's behavior)
+		var result: StringBuf = new StringBuf();
+		for (i in 0...name.length) {
+			var c: String = name.charAt(i);
+			if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+				result.add(c);
+			} else {
+				result.add('_');
+			}
+		}
+		return result.toString();
+	}
+
+	/**
+	 * Loads all fonts from the project's Assets/fonts/ directory.
+	 * Each font is registered in Koui.fontMap with its normalized name.
+	 * @param done Callback when all fonts are loaded
+	 */
+	static function loadAllFonts(done: Void->Void): Void {
+		var fontsDir: String = projectDir + "/Assets/fonts";
+		if (kha.System.systemId == "Windows") {
+			fontsDir = StringTools.replace(fontsDir, "/", "\\");
+		}
+
+		// Use system command to list font files
+		var listFile: String = projectDir + "/Assets/fonts/_fontlist.txt";
+		if (kha.System.systemId == "Windows") {
+			listFile = StringTools.replace(listFile, "/", "\\");
+		}
+
+		var cmd: String;
+		if (kha.System.systemId == "Windows") {
+			// List .ttf files, output just filenames
+			cmd = 'cmd /c dir /b "' + fontsDir + '\\*.ttf" > "' + listFile + '" 2>nul';
+		} else {
+			cmd = 'ls -1 "' + fontsDir + '"/*.ttf > "' + listFile + '" 2>/dev/null || true';
+		}
+
+		trace('Listing fonts with: ${cmd}');
+		Krom.sysCommand(cmd);
+
+		// Read the list file
+		var listBlob: js.lib.ArrayBuffer = Krom.loadBlob(listFile);
+		if (listBlob == null) {
+			trace('No fonts found in Assets/fonts/');
+			done();
+			return;
+		}
+
+		var listContent: String = haxe.io.Bytes.ofData(listBlob).toString();
+		var fontFiles: Array<String> = [];
+
+		for (line in listContent.split("\n")) {
+			var trimmed: String = StringTools.trim(line);
+			if (trimmed.length > 0 && StringTools.endsWith(trimmed.toLowerCase(), ".ttf")) {
+				// On Windows, dir /b gives just filename; on Linux ls -1 gives full path
+				var filename: String = trimmed;
+				var slashIdx: Int = Std.int(Math.max(filename.lastIndexOf("/"), filename.lastIndexOf("\\")));
+				if (slashIdx >= 0) {
+					filename = filename.substring(slashIdx + 1);
+				}
+				fontFiles.push(filename);
+			}
+		}
+
+		trace('Found font files: ${fontFiles}');
+
+		if (fontFiles.length == 0) {
+			done();
+			return;
+		}
+
+		var remaining: Int = fontFiles.length;
+
+		for (filename in fontFiles) {
+			var assetName: String = normalizeAssetName(filename);
+			var fontPath: String = fontsDir + (kha.System.systemId == "Windows" ? "\\" : "/") + filename;
+
+			trace('Loading font: ${fontPath} as ${assetName}');
+
+			// Capture in closure
+			var name: String = assetName;
+			kha.Assets.loadFontFromPath(fontPath, function(font: kha.Font) {
+				if (font != null) {
+					Koui.fontMap.set(name, font);
+					trace('Font loaded and registered: ${name}');
+				} else {
+					trace('Failed to load font: ${name}');
+				}
+
+				remaining--;
+				if (remaining == 0) {
+					done();
+				}
+			});
 		}
 	}
 
