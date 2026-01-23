@@ -108,9 +108,6 @@ class CanvasUtils {
 			#end
 			buildPath = "/tools/" + projectExt;
 		}
-
-		trace('Canvas name: ${canvasName}');
-		trace('Project dir: ${projectDir}');
 	}
 
 	/**
@@ -150,24 +147,25 @@ class CanvasUtils {
 		if (blob != null) {
 			var themeContent: String = haxe.io.Bytes.ofData(blob).toString();
 
-			// Load all fonts from Assets/fonts/ directory first
+			// Load all fonts and images from Assets/ directory first
 			loadAllFonts(function() {
-				// After fonts are loaded, apply the theme
-				var error: String = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
+				loadAllImages(function() {
+					// After assets are loaded, apply the theme
+					var error: String = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
 
-				if (error != null) {
-					trace('Theme reload ERROR: ${error}');
-				} else {
-					var buildPath: String = projectDir + buildPath + "/ui_override.ksn";
-					try {
-						var bytes: haxe.io.Bytes = haxe.io.Bytes.ofString(themeContent);
-						Krom.fileSaveBytes(buildPath, bytes.getData());
-						trace('Theme reloaded successfully from: ${assetsPath}');
-						trace('Theme copied to build directory: ${buildPath}');
-					} catch (e: Dynamic) {
-						trace('Theme reloaded but failed to copy to build directory: ${e}');
+					if (error != null) {
+						trace('Theme reload ERROR: ${error}');
+					} else {
+						var buildPath: String = projectDir + buildPath + "/ui_override.ksn";
+						try {
+							var bytes: haxe.io.Bytes = haxe.io.Bytes.ofString(themeContent);
+							Krom.fileSaveBytes(buildPath, bytes.getData());
+							// Theme reloaded successfully
+						} catch (e: Dynamic) {
+							trace('Theme reloaded but failed to copy to build directory: ${e}');
+						}
 					}
-				}
+				});
 			});
 		} else {
 			trace('Theme file not found: ${assetsPath}');
@@ -223,13 +221,11 @@ class CanvasUtils {
 			cmd = 'ls -1 "' + fontsDir + '"/*.ttf > "' + listFile + '" 2>/dev/null || true';
 		}
 
-		trace('Listing fonts with: ${cmd}');
 		Krom.sysCommand(cmd);
 
 		// Read the list file
 		var listBlob: js.lib.ArrayBuffer = Krom.loadBlob(listFile);
 		if (listBlob == null) {
-			trace('No fonts found in Assets/fonts/');
 			done();
 			return;
 		}
@@ -250,8 +246,6 @@ class CanvasUtils {
 			}
 		}
 
-		trace('Found font files: ${fontFiles}');
-
 		if (fontFiles.length == 0) {
 			done();
 			return;
@@ -263,16 +257,94 @@ class CanvasUtils {
 			var assetName: String = normalizeAssetName(filename);
 			var fontPath: String = fontsDir + (kha.System.systemId == "Windows" ? "\\" : "/") + filename;
 
-			trace('Loading font: ${fontPath} as ${assetName}');
-
 			// Capture in closure
 			var name: String = assetName;
 			kha.Assets.loadFontFromPath(fontPath, function(font: kha.Font) {
 				if (font != null) {
 					Koui.fontMap.set(name, font);
-					trace('Font loaded and registered: ${name}');
 				} else {
 					trace('Failed to load font: ${name}');
+				}
+
+				remaining--;
+				if (remaining == 0) {
+					done();
+				}
+			});
+		}
+	}
+
+	/**
+	 * Loads all images from the project's Assets/images/ directory.
+	 * Each image is registered in Koui.imageMap with its normalized name.
+	 * @param done Callback when all images are loaded
+	 */
+	static function loadAllImages(done: Void->Void): Void {
+		var imagesDir: String = projectDir + "/Assets/images";
+		if (kha.System.systemId == "Windows") {
+			imagesDir = StringTools.replace(imagesDir, "/", "\\");
+		}
+
+		// Use system command to list image files
+		var listFile: String = projectDir + "/Assets/images/_imagelist.txt";
+		if (kha.System.systemId == "Windows") {
+			listFile = StringTools.replace(listFile, "/", "\\");
+		}
+
+		var cmd: String;
+		if (kha.System.systemId == "Windows") {
+			// List image files (png, jpg), output just filenames using wildcard that matches multiple extensions
+			cmd = 'cmd /c dir /b "' + imagesDir + '" > "' + listFile + '" 2>nul';
+		} else {
+			cmd = 'ls -1 "' + imagesDir + '" > "' + listFile + '" 2>/dev/null || true';
+		}
+
+		Krom.sysCommand(cmd);
+
+		// Read the list file
+		var listBlob: js.lib.ArrayBuffer = Krom.loadBlob(listFile);
+		if (listBlob == null) {
+			done();
+			return;
+		}
+
+		var listContent: String = haxe.io.Bytes.ofData(listBlob).toString();
+		var imageFiles: Array<String> = [];
+
+		for (line in listContent.split("\n")) {
+			var trimmed: String = StringTools.trim(line);
+			if (trimmed.length > 0) {
+				var lower: String = trimmed.toLowerCase();
+				if (StringTools.endsWith(lower, ".png") || StringTools.endsWith(lower, ".jpg") || StringTools.endsWith(lower, ".k")) {
+					// On Windows, dir /b gives just filename; on Linux ls -1 gives full path
+					var filename: String = trimmed;
+					var slashIdx: Int = Std.int(Math.max(filename.lastIndexOf("/"), filename.lastIndexOf("\\")));
+					if (slashIdx >= 0) {
+						filename = filename.substring(slashIdx + 1);
+					}
+					imageFiles.push(filename);
+				}
+			}
+		}
+
+		if (imageFiles.length == 0) {
+			done();
+			return;
+		}
+
+		var remaining: Int = imageFiles.length;
+
+		for (filename in imageFiles) {
+			var assetName: String = normalizeAssetName(filename);
+			var imagePath: String = imagesDir + (kha.System.systemId == "Windows" ? "\\" : "/") + filename;
+
+			// Capture in closure
+			var name: String = assetName;
+			kha.Assets.loadImageFromPath(imagePath, false, function(image: kha.Image) {
+				if (image != null) {
+					Koui.imageMap.set(name, image);
+				} else {
+					trace('Failed to load image: ${name}');
 				}
 
 				remaining--;
@@ -296,7 +368,6 @@ class CanvasUtils {
 		try {
 			var bytes: haxe.io.Bytes = haxe.io.Bytes.ofString(jsonString);
 			Krom.fileSaveBytes(path, bytes.getData());
-			trace('Canvas saved: ${canvasName}');
 		} catch (e: Dynamic) {
 			trace('Failed to save canvas: ${e}');
 		}
@@ -317,7 +388,6 @@ class CanvasUtils {
 			var canvasData: TCanvasData = Json.parse(jsonString);
 
 			deserializeCanvas(canvasData);
-			trace('Canvas loaded: ${canvasName}');
 			SceneEvents.canvasLoaded.emit();
 		} catch (e: Dynamic) {
 			trace('Failed to parse canvas: ${e}');
