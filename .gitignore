@@ -2,6 +2,7 @@
 *.blend*
 !*.blend
 khafile.js
+__pycache__*
 build*
 Bundled*
 Sources/Main.hx
