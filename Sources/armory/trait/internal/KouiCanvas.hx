@@ -190,7 +190,7 @@ class KouiCanvas extends Trait {
 			scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
 			scaleVertical = canvasData.canvas.settings.scaleVertical;
 		}
-		if (expandOnResize != null && expandOnResize) {
+		if (expandOnResize) {
 			App.resized.connect(onAppResized);
 			baseH = canvasData.canvas.height;
 			baseW = canvasData.canvas.width;
@@ -826,11 +826,7 @@ class KouiCanvas extends Trait {
 			trace('[KouiCanvas] Element key "$key" already exists in scene "$sceneName"');
 			return false;
 		}
-
-		// Set anchor if provided
-		if (anchor != null) {
-			element.anchor = anchor;
-		}
+		element.anchor = anchor;
 
 		// Find parent
 		var parent: Element = null;
