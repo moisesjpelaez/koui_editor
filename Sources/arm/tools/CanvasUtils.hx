@@ -289,18 +289,18 @@ class CanvasUtils {
 	}
 
 	/**
-	 * Loads all images from the project's Assets/images/ directory and subdirectories.
-	 * Each image is registered in Koui.imageMap with its normalized name (relative path with underscores).
+	 * Loads all images from the project's Assets/ directory and subdirectories.
+	 * Each image is registered in Koui.imageMap with its normalized filename (matching Kha's behavior).
 	 * @param done Callback when all images are loaded
 	 */
 	static function loadAllImages(done: Void->Void): Void {
-		var imagesDir: String = projectDir + "/Assets/images";
+		var assetsDir: String = projectDir + "/Assets";
 		if (kha.System.systemId == "Windows") {
-			imagesDir = StringTools.replace(imagesDir, "/", "\\");
+			assetsDir = StringTools.replace(assetsDir, "/", "\\");
 		}
 
 		// Use system command to list image files recursively
-		var listFile: String = projectDir + "/Assets/images/_imagelist.txt";
+		var listFile: String = projectDir + "/Assets/_imagelist.txt";
 		if (kha.System.systemId == "Windows") {
 			listFile = StringTools.replace(listFile, "/", "\\");
 		}
@@ -308,10 +308,10 @@ class CanvasUtils {
 		var cmd: String;
 		if (kha.System.systemId == "Windows") {
 			// List image files recursively with relative paths using /s and /b flags
-			cmd = 'cmd /c dir /b /s "' + imagesDir + '\\*.png" "' + imagesDir + '\\*.jpg" "' + imagesDir + '\\*.k" > "' + listFile + '" 2>nul';
+			cmd = 'cmd /c dir /b /s "' + assetsDir + '\\*.png" "' + assetsDir + '\\*.jpg" "' + assetsDir + '\\*.k" > "' + listFile + '" 2>nul';
 		} else {
 			// Use find to recursively list image files
-			cmd = 'find "' + imagesDir + '" -type f \\( -iname "*.png" -o -iname "*.jpg" -o -iname "*.k" \\) > "' + listFile + '" 2>/dev/null || true';
+			cmd = 'find "' + assetsDir + '" -type f \\( -iname "*.png" -o -iname "*.jpg" -o -iname "*.k" \\) > "' + listFile + '" 2>/dev/null || true';
 		}
 
 		Krom.sysCommand(cmd);
@@ -324,10 +324,10 @@ class CanvasUtils {
 		}
 
 		var listContent: String = haxe.io.Bytes.ofData(listBlob).toString();
-		var imageFiles: Array<String> = [];  // Stores relative paths from imagesDir
+		var imageFiles: Array<String> = [];  // Stores relative paths from assetsDir
 
 		// Get the base path length to calculate relative paths
-		var basePath: String = imagesDir + (kha.System.systemId == "Windows" ? "\\" : "/");
+		var basePath: String = assetsDir + (kha.System.systemId == "Windows" ? "\\" : "/");
 		var baseLen: Int = basePath.length;
 
 		for (line in listContent.split("\n")) {
@@ -337,7 +337,7 @@ class CanvasUtils {
 				if (StringTools.endsWith(lower, ".png") || StringTools.endsWith(lower, ".jpg") || StringTools.endsWith(lower, ".k")) {
 					// Extract relative path from the full path
 					var relativePath: String = trimmed;
-					if (StringTools.startsWith(trimmed, basePath) || StringTools.startsWith(trimmed, imagesDir)) {
+					if (StringTools.startsWith(trimmed, basePath) || StringTools.startsWith(trimmed, assetsDir)) {
 						relativePath = trimmed.substring(baseLen);
 					}
 					imageFiles.push(relativePath);
@@ -353,8 +353,11 @@ class CanvasUtils {
 		var remaining: Int = imageFiles.length;
 
 		for (filename in imageFiles) {
-			var assetName: String = normalizeAssetName(filename);
-			var imagePath: String = imagesDir + (kha.System.systemId == "Windows" ? "\\" : "/") + filename;
+			// Extract just the filename (without directory) for normalization - matches Kha's behavior
+			var slashIdx: Int = Std.int(Math.max(filename.lastIndexOf("/"), filename.lastIndexOf("\\")));
+			var justFilename: String = slashIdx >= 0 ? filename.substring(slashIdx + 1) : filename;
+			var assetName: String = normalizeAssetName(justFilename);
+			var imagePath: String = assetsDir + (kha.System.systemId == "Windows" ? "\\" : "/") + filename;
 
 			// Capture in closure
 			var name: String = assetName;
