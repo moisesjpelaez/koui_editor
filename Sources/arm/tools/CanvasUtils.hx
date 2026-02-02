@@ -289,8 +289,8 @@ class CanvasUtils {
 	}
 
 	/**
-	 * Loads all images from the project's Assets/images/ directory.
-	 * Each image is registered in Koui.imageMap with its normalized name.
+	 * Loads all images from the project's Assets/images/ directory and subdirectories.
+	 * Each image is registered in Koui.imageMap with its normalized name (relative path with underscores).
 	 * @param done Callback when all images are loaded
 	 */
 	static function loadAllImages(done: Void->Void): Void {
@@ -299,7 +299,7 @@ class CanvasUtils {
 			imagesDir = StringTools.replace(imagesDir, "/", "\\");
 		}
 
-		// Use system command to list image files
+		// Use system command to list image files recursively
 		var listFile: String = projectDir + "/Assets/images/_imagelist.txt";
 		if (kha.System.systemId == "Windows") {
 			listFile = StringTools.replace(listFile, "/", "\\");
@@ -307,10 +307,11 @@ class CanvasUtils {
 
 		var cmd: String;
 		if (kha.System.systemId == "Windows") {
-			// List image files (png, jpg), output just filenames using wildcard that matches multiple extensions
-			cmd = 'cmd /c dir /b "' + imagesDir + '" > "' + listFile + '" 2>nul';
+			// List image files recursively with relative paths using /s and /b flags
+			cmd = 'cmd /c dir /b /s "' + imagesDir + '\\*.png" "' + imagesDir + '\\*.jpg" "' + imagesDir + '\\*.k" > "' + listFile + '" 2>nul';
 		} else {
-			cmd = 'ls -1 "' + imagesDir + '" > "' + listFile + '" 2>/dev/null || true';
+			// Use find to recursively list image files
+			cmd = 'find "' + imagesDir + '" -type f \\( -iname "*.png" -o -iname "*.jpg" -o -iname "*.k" \\) > "' + listFile + '" 2>/dev/null || true';
 		}
 
 		Krom.sysCommand(cmd);
@@ -323,20 +324,23 @@ class CanvasUtils {
 		}
 
 		var listContent: String = haxe.io.Bytes.ofData(listBlob).toString();
-		var imageFiles: Array<String> = [];
+		var imageFiles: Array<String> = [];  // Stores relative paths from imagesDir
+
+		// Get the base path length to calculate relative paths
+		var basePath: String = imagesDir + (kha.System.systemId == "Windows" ? "\\" : "/");
+		var baseLen: Int = basePath.length;
 
 		for (line in listContent.split("\n")) {
 			var trimmed: String = StringTools.trim(line);
 			if (trimmed.length > 0) {
 				var lower: String = trimmed.toLowerCase();
 				if (StringTools.endsWith(lower, ".png") || StringTools.endsWith(lower, ".jpg") || StringTools.endsWith(lower, ".k")) {
-					// On Windows, dir /b gives just filename; on Linux ls -1 gives full path
-					var filename: String = trimmed;
-					var slashIdx: Int = Std.int(Math.max(filename.lastIndexOf("/"), filename.lastIndexOf("\\")));
-					if (slashIdx >= 0) {
-						filename = filename.substring(slashIdx + 1);
+					// Extract relative path from the full path
+					var relativePath: String = trimmed;
+					if (StringTools.startsWith(trimmed, basePath) || StringTools.startsWith(trimmed, imagesDir)) {
+						relativePath = trimmed.substring(baseLen);
 					}
-					imageFiles.push(filename);
+					imageFiles.push(relativePath);
 				}
 			}
 		}
