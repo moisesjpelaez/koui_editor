@@ -15,6 +15,7 @@ import koui.Koui;
 import koui.elements.Button;
 import koui.elements.Checkbox;
 import koui.elements.Element;
+import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
@@ -74,6 +75,10 @@ class PropertiesPanel {
     var progressbarPrecisionHandle: Handle;
     var progressbarValueHandle: Handle;
 
+    // ImagePanel handles
+    var imagePanelImageHandle: Handle;
+    var imagePanelScaleHandle: Handle;
+
     var sceneData: SceneData = SceneData.data;
 
     // Initial values for reset functionality
@@ -117,6 +122,9 @@ class PropertiesPanel {
         progressbarMaxValueHandle = new Handle({text: "1"});
         progressbarTextHandle = new Handle({text: ""});
         progressbarPrecisionHandle = new Handle({text: "1"});
+
+        imagePanelImageHandle = new Handle({position: 0});
+        imagePanelScaleHandle = new Handle({selected: false});
 
         ElementEvents.elementAdded.connect(onElementAdded);
         ElementEvents.elementSelected.connect(onElementSelected);
@@ -557,6 +565,55 @@ class PropertiesPanel {
                 progressbarValueHandle.value = newValue;
                 ElementEvents.propertyChanged.emit(progressbar, "value", progressbar.value, newValue);
                 progressbar.value = newValue;
+            }
+        } else if (selectedElement is ImagePanel) {
+            ui.text("Image Properties", Center);
+            ui.separator();
+
+            var imagePanel: ImagePanel = cast(selectedElement, ImagePanel);
+
+            // Build list of available images from Koui.imageMap
+            var imageNames: Array<String> = ["(none)"];
+            for (key in Koui.imageMap.keys()) {
+                imageNames.push(key);
+            }
+
+            // Find current selection index
+            var currentImageName: String = CanvasUtils.getImageName(imagePanel.image);
+            var currentIndex: Int = 0;
+            for (i in 0...imageNames.length) {
+                if (imageNames[i] == currentImageName) {
+                    currentIndex = i;
+                    break;
+                }
+            }
+            imagePanelImageHandle.position = currentIndex;
+
+            // Image dropdown
+            var newIndex: Int = ui.combo(imagePanelImageHandle, imageNames, "Image", true, Right);
+            if (imagePanelImageHandle.changed) {
+                var selectedName: String = imageNames[newIndex];
+                if (selectedName == "(none)") {
+                    ElementEvents.propertyChanged.emit(imagePanel, "image", currentImageName, "");
+                    imagePanel.image = null;
+                    imagePanel.width = 32;
+                    imagePanel.height = 32;
+                } else {
+                    var img: kha.Image = Koui.getImage(selectedName);
+                    if (img != null) {
+                        ElementEvents.propertyChanged.emit(imagePanel, "image", currentImageName, selectedName);
+                        imagePanel.image = img;
+                    }
+                }
+                Koui.updateElementSize(imagePanel);
+            }
+
+            // Scale checkbox
+            imagePanelScaleHandle.selected = imagePanel.scale;
+            var newScale: Bool = ui.check(imagePanelScaleHandle, "Scale to Size");
+            if (newScale != imagePanel.scale) {
+                ElementEvents.propertyChanged.emit(imagePanel, "scale", imagePanel.scale, newScale);
+                imagePanel.scale = newScale;
             }
         }
     }

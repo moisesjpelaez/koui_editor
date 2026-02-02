@@ -33,6 +33,9 @@ class ElementsPanel {
 				if (uiBase.ui.button("Image Panel")) {
 					var key: String = "ImagePanel";
 					var imagePanel = new koui.elements.ImagePanel(null);
+					// Set default size for empty ImagePanel (no image)
+					imagePanel.width = 32;
+					imagePanel.height = 32;
 					ElementEvents.elementAdded.emit({ key: key, element: imagePanel });
 				}
 

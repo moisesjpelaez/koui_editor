@@ -119,6 +119,20 @@ class CanvasUtils {
 	}
 
 	/**
+	 * Looks up the asset name for a kha.Image by searching Koui.imageMap.
+	 * Returns empty string if not found.
+	 */
+	public static function getImageName(image: kha.Image): String {
+		if (image == null) return "";
+		for (key in Koui.imageMap.keys()) {
+			if (Koui.imageMap.get(key) == image) {
+				return key;
+			}
+		}
+		return "";
+	}
+
+	/**
 	 * Gets the directory path for canvas files.
 	 */
 	public static function getCanvasDir(): String {

@@ -6,6 +6,7 @@ import koui.Koui;
 import koui.elements.Element;
 import koui.elements.Button;
 import koui.elements.Checkbox;
+import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
@@ -373,6 +374,21 @@ class KouiCanvas extends Trait {
 
 			case "ColLayout":
 				element = new ColLayout(data.posX, data.posY, data.width, data.height, 0);
+
+			case "ImagePanel":
+				var imagePanel: ImagePanel = new ImagePanel(null);
+				if (data.properties != null) {
+					if (data.properties.imageName != null && data.properties.imageName != "") {
+						var img: kha.Image = Koui.getImage(data.properties.imageName);
+						if (img != null) {
+							imagePanel.image = img;
+						}
+					}
+					if (data.properties.scale != null) {
+						imagePanel.scale = data.properties.scale;
+					}
+				}
+				element = imagePanel;
 
 			// TODO: Add more element types as needed:
 			// case "Slider": ...

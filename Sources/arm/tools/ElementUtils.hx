@@ -1,8 +1,12 @@
 package arm.tools;
 
+import arm.tools.CanvasUtils;
+
+import koui.Koui;
 import koui.elements.Button;
 import koui.elements.Checkbox;
 import koui.elements.Element;
+import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
@@ -25,6 +29,7 @@ class ElementUtils {
 		if (Std.isOfType(element, Checkbox)) return "Checkbox";
 		if (Std.isOfType(element, Progressbar)) return "Progressbar";
 		if (Std.isOfType(element, Label)) return "Label";
+		if (Std.isOfType(element, ImagePanel)) return "ImagePanel";
 		// Check RowLayout/ColLayout before AnchorPane since they're more specific
 		if (Std.isOfType(element, RowLayout)) return "RowLayout";
 		if (Std.isOfType(element, ColLayout)) return "ColLayout";
@@ -129,6 +134,21 @@ class ElementUtils {
 				var col: ColLayout = new ColLayout(posX, posY, width, height, 0);
 				element = col;
 
+			case "ImagePanel":
+				var imagePanel: ImagePanel = new ImagePanel(null);
+				if (properties != null) {
+					if (properties.imageName != null && properties.imageName != "") {
+						var img: kha.Image = Koui.getImage(properties.imageName);
+						if (img != null) {
+							imagePanel.image = img;
+						}
+					}
+					if (properties.scale != null) {
+						imagePanel.scale = properties.scale;
+					}
+				}
+				element = imagePanel;
+
 			default:
 				trace('Unknown element type: $type');
 				return null;
@@ -191,6 +211,13 @@ class ElementUtils {
 
 			case "AnchorPane", "RowLayout", "ColLayout":
 				return {};
+
+			case "ImagePanel":
+				var imagePanel: ImagePanel = cast element;
+				return {
+					imageName: CanvasUtils.getImageName(imagePanel.image),
+					scale: imagePanel.scale
+				};
 
 			default:
 				return {};
