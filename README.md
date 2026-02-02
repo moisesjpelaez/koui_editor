@@ -7,7 +7,7 @@ A [Koui](https://gitlab.com/koui/Koui) editor for [Armory 3D](https://armory3d.o
 - `git clone https://github.com/moisesjpelaez/koui_editor.git` into `Libraries` folder
 
 For development:
-- `git clone https://gitlab.com/koui/Koui.git -b runtime_theme_parser` into `Subprojects` folder
+- `git clone https://gitlab.com/moises.jpelaez/Koui.git -b runtime_theme_parser` into `Subprojects` folder
 
 ## License
 This project is licensed under the terms of the zlib License. See the [LICENSE](LICENSE.md) file for details.
