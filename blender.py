@@ -7,6 +7,12 @@ import arm.utils
 import arm.props_traits as pt
 import arm.log as log
 
+# Capture this library's directory at module load time.
+# Armory reuses the same 'blender' module name for all libraries, so __file__
+# will point to whichever library was loaded last. Freezing it here ensures
+# KOUI_OT_launch_editor always resolves to the koui_editor directory.
+_KOUI_EDITOR_DIR = os.path.dirname(os.path.realpath(__file__))
+
 # Stored originals for Armory patching
 _original_arm_edit_canvas_execute = None
 _original_arm_edit_canvas_label = None
@@ -34,11 +40,9 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
     canvas_name: StringProperty(name="Canvas", default="")
 
     def execute(self, context):
-        this_dir = os.path.dirname(os.path.realpath(__file__))
-
         sdk_path = arm.utils.get_sdk_path()
         ext = 'd3d11' if get_os() == 'win' else 'opengl'
-        sdk_koui_path = os.path.join(this_dir, 'tools', ext) if sdk_path else ""
+        sdk_koui_path = os.path.join(_KOUI_EDITOR_DIR, 'tools', ext) if sdk_path else ""
 
         if sdk_koui_path and os.path.exists(sdk_koui_path):
             koui_editor_path = sdk_koui_path
