@@ -96,9 +96,6 @@ class KouiEditor extends iron.Trait {
 			// Initialize canvas utilities
 			CanvasUtils.init();
 
-			// Initialize undo/redo system
-			EditorUtils.init();
-
 			// Create UIBase with the loaded font
 			uiBase = new UIBase(Assets.fonts.font_default);
 

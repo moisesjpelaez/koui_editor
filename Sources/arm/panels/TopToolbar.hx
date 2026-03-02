@@ -2,7 +2,6 @@ package arm.panels;
 
 import arm.base.UIBase;
 import arm.tools.CanvasUtils;
-import arm.tools.EditorUtils;
 import arm.tools.ImageUtils;
 import arm.tools.ZuiUtils;
 import armory.system.Signal;
@@ -36,8 +35,6 @@ class TopToolbar {
 		snapHandle.value = 64.0;
 		windowHandle = Id.handle();
 
-		// Subscribe to stack changes to refresh button states
-		EditorUtils.stackChanged.connect(onStackChanged);
 	}
 
 	// Wrapper for ZuiUtils.iconButton with local icons
@@ -95,12 +92,8 @@ class TopToolbar {
 			}
 			hSeparator(ui);
 
-			if (iconButton(ui, 6, 2, "Undo", false, !EditorUtils.canUndo())) {
-				EditorUtils.undo();
-			}
-			if (iconButton(ui, 7, 2, "Redo", false, !EditorUtils.canRedo())) {
-				EditorUtils.redo();
-			}
+			iconButton(ui, 6, 2, "Undo", false, true);
+			iconButton(ui, 7, 2, "Redo", false, true);
 			hSeparator(ui);
 
 			if (iconButton(ui, 5, 0, "Reload Theme")) {
@@ -134,7 +127,4 @@ class TopToolbar {
         icons = iconsImage;
     }
 
-	function onStackChanged(): Void {
-		windowHandle.redraws = 2;
-	}
 }
