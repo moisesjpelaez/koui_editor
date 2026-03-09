@@ -5,7 +5,9 @@ import arm.base.UIBase;
 import iron.App;
 import koui.elements.Button;
 import koui.elements.Checkbox;
+import koui.elements.ImagePanel;
 import koui.elements.Label;
+import koui.elements.Panel;
 import koui.elements.Progressbar;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
@@ -32,16 +34,18 @@ class ElementsPanel {
 
 				if (uiBase.ui.button("Image Panel")) {
 					var key: String = "ImagePanel";
-					var imagePanel = new koui.elements.ImagePanel(null);
+					var imagePanel: ImagePanel = new ImagePanel(null);
 					// Set default size for empty ImagePanel (no image)
 					imagePanel.width = 32;
 					imagePanel.height = 32;
 					ElementEvents.elementAdded.emit({ key: key, element: imagePanel });
 				}
 
-				// if (uiBase.ui.button("Panel")) {
-				// 	trace("Panel");
-				// }
+				if (uiBase.ui.button("Panel")) {
+					var key: String = "Panel";
+					var panel: Panel = new Panel();
+					ElementEvents.elementAdded.emit({ key: key, element: panel });
+				}
 
 				uiBase.ui.unindent();
 			}
