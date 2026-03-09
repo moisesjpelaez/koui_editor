@@ -705,7 +705,7 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function onElementRemoved(element: Element): Void {
-		var children: Array<Element> = HierarchyUtils.getChildren(element).copy();
+		var children: Array<Element> = HierarchyUtils.getChildren(element);
 		for (child in children) {
 			ElementEvents.elementRemoved.emit(child);
 		}
