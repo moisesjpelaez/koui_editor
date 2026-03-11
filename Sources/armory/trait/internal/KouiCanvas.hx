@@ -15,6 +15,7 @@ import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.Layout.Anchor;
 import koui.elements.layouts.RowLayout;
+import koui.events.FocusEvent;
 import koui.events.MouseEvent.MouseClickEvent;
 import koui.events.MouseEvent.MouseHoverEvent;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
@@ -1050,6 +1051,12 @@ class ButtonExt {
 	public static inline function onHover(button: Button, callback: Void->Void) {
 		button.addEventListener(MouseHoverEvent, function(e: MouseHoverEvent) {
 			if (e.getState() == HoverStart) callback();
+		});
+	}
+
+	public static inline function onFocus(button: Button, callback: Void->Void) {
+		button.addEventListener(FocusEvent, function(e: FocusEvent) {
+			if (e.getState() == FocusGet) callback();
 		});
 	}
 
