@@ -51,6 +51,10 @@ class PropertiesPanel {
     var visibleHandle: Handle;
     var disabledHandle: Handle;
     var anchorHandle: Handle;
+    var focusUpHandle: Handle;
+    var focusDownHandle: Handle;
+    var focusLeftHandle: Handle;
+    var focusRightHandle: Handle;
 
     // Label handles
     var labelTextHandle: Handle;
@@ -101,6 +105,10 @@ class PropertiesPanel {
         visibleHandle = new Handle({selected: true});
         disabledHandle = new Handle({selected: false});
         anchorHandle = new Handle({position: 0});
+        focusUpHandle = new Handle({position: 0});
+        focusDownHandle = new Handle({position: 0});
+        focusLeftHandle = new Handle({position: 0});
+        focusRightHandle = new Handle({position: 0});
 
         labelTextHandle = new Handle({text: "New Label"});
 
@@ -352,6 +360,38 @@ class PropertiesPanel {
         if (newDisabled != selectedElement.disabled) {
             ElementEvents.propertyChanged.emit(selectedElement, "disabled", selectedElement.disabled, newDisabled);
             selectedElement.disabled = newDisabled;
+        }
+
+        if (selectedElement.canFocus) {
+            ui._y += 4;
+            ui.text("Navigation", Left);
+            ui.separator();
+
+            var focusableNames: Array<String> = ["(none)"];
+            var elementMap: Map<String, Element> = new Map();
+            if (currentScene != null) {
+                for (entry in currentScene.elements) {
+                    if (entry.element != selectedElement && entry.element.canFocus) {
+                        focusableNames.push(entry.key);
+                        elementMap.set(entry.key, entry.element);
+                    }
+                }
+            }
+
+            var drawFocusCombo = function(label: String, handle: Handle, currentTarget: Element, setTarget: Element->Void, propertyName: String) {
+                var newIdx = ui.combo(handle, focusableNames, label, true, Right);
+                if (handle.changed) {
+                    var selectedName = focusableNames[newIdx];
+                    var newTarget = selectedName == "(none)" ? null : elementMap.get(selectedName);
+                    ElementEvents.propertyChanged.emit(selectedElement, propertyName, currentTarget, newTarget);
+                    setTarget(newTarget);
+                }
+            };
+
+            drawFocusCombo("Focus Up", focusUpHandle, selectedElement.focusUp, function(e) selectedElement.focusUp = e, "focusUp");
+            drawFocusCombo("Focus Down", focusDownHandle, selectedElement.focusDown, function(e) selectedElement.focusDown = e, "focusDown");
+            drawFocusCombo("Focus Left", focusLeftHandle, selectedElement.focusLeft, function(e) selectedElement.focusLeft = e, "focusLeft");
+            drawFocusCombo("Focus Right", focusRightHandle, selectedElement.focusRight, function(e) selectedElement.focusRight = e, "focusRight");
         }
     }
 
@@ -633,6 +673,27 @@ class PropertiesPanel {
             visibleHandle.selected = element.visible;
             disabledHandle.selected = element.disabled;
             anchorHandle.position = element.anchor;
+
+            if (element.canFocus) {
+                var getIndex = function(targetElem: Element): Int {
+                    if (targetElem == null) return 0;
+                    var idx = 1;
+                    if (currentScene != null) {
+                        for (entry in currentScene.elements) {
+                            if (entry.element != element && entry.element.canFocus) {
+                                if (entry.element == targetElem) return idx;
+                                idx++;
+                            }
+                        }
+                    }
+                    return 0;
+                };
+
+                focusUpHandle.position = getIndex(element.focusUp);
+                focusDownHandle.position = getIndex(element.focusDown);
+                focusLeftHandle.position = getIndex(element.focusLeft);
+                focusRightHandle.position = getIndex(element.focusRight);
+            }
         }
     }
 

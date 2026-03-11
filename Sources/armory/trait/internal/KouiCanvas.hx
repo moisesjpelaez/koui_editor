@@ -60,6 +60,10 @@ private typedef TElementData = {
 	var visible: Bool;
 	var disabled: Bool;
 	var parentKey: Null<String>;
+	var focusUp: Null<String>;
+	var focusDown: Null<String>;
+	var focusLeft: Null<String>;
+	var focusRight: Null<String>;
 	var properties: Dynamic;
 }
 
@@ -298,6 +302,18 @@ class KouiCanvas extends Trait {
 					element.parent = parent;
 					parent.children.push(element);
 				}
+			}
+
+			// Third pass: resolve focus connections
+			for (i in 0...sceneData.elements.length) {
+				var elemData = sceneData.elements[i];
+				var element = createdElements[i];
+				if (element == null) continue;
+
+				if (elemData.focusUp != null) element.focusUp = elementMap.get(elemData.focusUp);
+				if (elemData.focusDown != null) element.focusDown = elementMap.get(elemData.focusDown);
+				if (elemData.focusLeft != null) element.focusLeft = elementMap.get(elemData.focusLeft);
+				if (elemData.focusRight != null) element.focusRight = elementMap.get(elemData.focusRight);
 			}
 
 			// Final pass: resize all RowLayout/ColLayout elements

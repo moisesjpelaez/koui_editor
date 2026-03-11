@@ -55,6 +55,10 @@ typedef TElementData = {
 	var visible: Bool;
 	var disabled: Bool;
 	var parentKey: Null<String>;
+	var focusUp: Null<String>;
+	var focusDown: Null<String>;
+	var focusLeft: Null<String>;
+	var focusRight: Null<String>;
 	var properties: Dynamic;
 }
 
@@ -521,6 +525,14 @@ class CanvasUtils {
 			parentKey = elementKeyMap.get(parent);
 		}
 
+		var getElemKey = function(elem: Null<Element>): Null<String> {
+			if (elem == null) return null;
+			for (e in SceneData.data.currentScene.elements) {
+				if (e.element == elem) return e.key;
+			}
+			return null;
+		};
+
 		return {
 			key: entry.key,
 			type: type,
@@ -533,6 +545,10 @@ class CanvasUtils {
 			visible: element.visible,
 			disabled: element.disabled,
 			parentKey: parentKey,
+			focusUp: getElemKey(element.focusUp),
+			focusDown: getElemKey(element.focusDown),
+			focusLeft: getElemKey(element.focusLeft),
+			focusRight: getElemKey(element.focusRight),
 			properties: serializeTypeProperties(element, type)
 		};
 	}
@@ -638,6 +654,18 @@ class CanvasUtils {
 				// Root-level element - add to scene root
 				scene.root.add(element, cast elemData.anchor);
 			}
+		}
+
+		// Third pass: resolve focus connections
+		for (i in 0...sceneDataEntry.elements.length) {
+			var elemData = sceneDataEntry.elements[i];
+			var element = createdElements[i];
+			if (element == null) continue;
+
+			if (elemData.focusUp != null) element.focusUp = elementMap.get(elemData.focusUp);
+			if (elemData.focusDown != null) element.focusDown = elementMap.get(elemData.focusDown);
+			if (elemData.focusLeft != null) element.focusLeft = elementMap.get(elemData.focusLeft);
+			if (elemData.focusRight != null) element.focusRight = elementMap.get(elemData.focusRight);
 		}
 	}
 

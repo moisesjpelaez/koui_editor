@@ -7,5 +7,6 @@ build*
 Bundled*
 Sources/Main.hx
 Sources/arm/node*
+Subprojects/Koui*
 tools/d3d11/data/*.json
 tools/opengl/data/*.json
