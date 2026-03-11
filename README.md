@@ -4,10 +4,7 @@ A [Koui](https://gitlab.com/koui/Koui) editor for [Armory 3D](https://armory3d.o
 ## Instalation and Setup
 - Locate the `.blend` file you are working with
 - Create `Libraries` folder alongside your `.blend` file
-- `git clone https://github.com/moisesjpelaez/koui_editor.git` into `Libraries` folder
-
-For development:
-- `git clone https://gitlab.com/moises.jpelaez/Koui.git -b runtime_theme_parser` into `Subprojects` folder
+- `git clone --recursive https://github.com/moisesjpelaez/koui_editor.git` into `Libraries` folder
 
 ## License
 This project is licensed under the terms of the zlib License. See the [LICENSE](LICENSE.md) file for details.
