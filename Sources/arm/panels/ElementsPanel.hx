@@ -5,13 +5,17 @@ import arm.base.UIBase;
 import iron.App;
 import koui.elements.Button;
 import koui.elements.Checkbox;
+// import koui.elements.Dropdown;
 import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
+// import koui.elements.RadioButton;
+import koui.elements.Slider;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
+// import koui.utils.RadioGroup;
 import zui.Id;
 
 class ElementsPanel {
@@ -65,8 +69,10 @@ class ElementsPanel {
 					ElementEvents.elementAdded.emit({ key: key, element: checkbox });
 				}
 
+				// TODO: design a solution for RadioGroup in the editor, maybe in the PropertiesPanel (in Settings) for managing groups and assigning buttons to them?
 				// if (uiBase.ui.button("Radio")) {
-				// 	trace("Radio");
+				// 	var key: String = "Radio";
+				// 	var radio: RadioButton = new RadioButton(new RadioGroup(), "New Radio");
 				// }
 
 				uiBase.ui.unindent();
@@ -104,6 +110,12 @@ class ElementsPanel {
 					var key: String = "Progressbar";
 					var progressbar: Progressbar = new Progressbar(0, 100);
 					ElementEvents.elementAdded.emit({ key: key, element: progressbar });
+				}
+
+				if (uiBase.ui.button("Slider")) {
+					var key: String = "Slider";
+					var slider: Slider = new Slider(0, 100);
+					ElementEvents.elementAdded.emit({ key: key, element: slider });
 				}
 			}
 		}

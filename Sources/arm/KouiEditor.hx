@@ -30,6 +30,7 @@ import koui.elements.Checkbox;
 import koui.elements.Element;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
+import koui.elements.Slider;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.GridLayout;
@@ -278,7 +279,7 @@ class KouiEditor extends iron.Trait {
 
 			if (element != null && element != rootPane) {
 				// Select parent element instead of internal children
-				if (element.parent is Button || element.parent is Checkbox || element.parent is Progressbar || element is Panel && element.parent != rootPane) {
+				if (element.parent is Button || element.parent is Checkbox || element.parent is Progressbar || element.parent is Slider || element is Panel && element.parent != rootPane) {
 					selectedElement = element.parent;
 				}
 				// Select parent AnchorPane instead of child AnchorPane (but not if parent is rootPane)

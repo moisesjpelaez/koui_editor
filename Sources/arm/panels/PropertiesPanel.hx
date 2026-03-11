@@ -19,8 +19,7 @@ import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
-import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.GridLayout;
+import koui.elements.Slider;
 import koui.elements.layouts.Layout.Anchor;
 import koui.theme.Style;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
@@ -81,6 +80,13 @@ class PropertiesPanel {
     var imagePanelImageHandle: Handle;
     var imagePanelScaleHandle: Handle;
 
+    // Slider handles
+    var sliderMaxValueHandle: Handle;
+    var sliderMinValueHandle: Handle;
+    var sliderValueHandle: Handle;
+    var sliderOrientationHandle: Handle;
+    var sliderPrecisionHandle: Handle;
+
     var sceneData: SceneData = SceneData.data;
 
     // Initial values for reset functionality
@@ -129,6 +135,12 @@ class PropertiesPanel {
 
         imagePanelImageHandle = new Handle({position: 0});
         imagePanelScaleHandle = new Handle({selected: false});
+
+        sliderMaxValueHandle = new Handle({text: "1"});
+        sliderMinValueHandle = new Handle({text: "0"});
+        sliderValueHandle = new Handle({value: 0});
+        sliderOrientationHandle = new Handle({position: 3});
+        sliderPrecisionHandle = new Handle({text: "1"});
 
         ElementEvents.elementAdded.connect(onElementAdded);
         ElementEvents.elementSelected.connect(onElementSelected);
@@ -503,7 +515,7 @@ class PropertiesPanel {
                 ElementEvents.propertyChanged.emit(button, "isToggle", button.isToggle, newToggle);
                 button.isToggle = newToggle;
             }
-        } else if (selectedElement is koui.elements.Checkbox) {
+        } else if (selectedElement is Checkbox) {
             ui.text("Checkbox Properties", Center);
             ui.separator();
 
@@ -634,6 +646,81 @@ class PropertiesPanel {
             if (newScale != imagePanel.scale) {
                 ElementEvents.propertyChanged.emit(imagePanel, "scale", imagePanel.scale, newScale);
                 imagePanel.scale = newScale;
+            }
+        } else if (selectedElement is Slider) {
+            ui.text("Slider Properties", Center);
+            ui.separator();
+
+            var slider: Slider = cast(selectedElement, Slider);
+
+            var orientation: Array<String> = ["Up", "Down", "Left", "Right"];
+            var currentIndex: Int = 0;
+            switch (slider.orientation) {
+                case Up: currentIndex = 0;
+                case Down: currentIndex = 1;
+                case Left: currentIndex = 2;
+                case Right: currentIndex = 3;
+            }
+            sliderOrientationHandle.position = currentIndex;
+
+            var newIndex: Int = ui.combo(sliderOrientationHandle, orientation, "Orientation", true, Right);
+            if (sliderOrientationHandle.changed) {
+                var newOrientation = slider.orientation;
+                switch (newIndex) {
+                    case 0: newOrientation = Up;
+                    case 1: newOrientation = Down;
+                    case 2: newOrientation = Left;
+                    case 3: newOrientation = Right;
+                }
+                ElementEvents.propertyChanged.emit(slider, "orientation", slider.orientation, newOrientation);
+                slider.orientation = newOrientation;
+                Koui.updateElementSize(slider);
+            }
+
+            sliderMinValueHandle.text = Std.string(slider.minValue);
+            var newMinStr: String = ui.textInput(sliderMinValueHandle, "Min Value", Right);
+            if (sliderMinValueHandle.changed) {
+                var newMin: Float = Std.parseFloat(newMinStr);
+                if (!Math.isNaN(newMin)) {
+                    ElementEvents.propertyChanged.emit(slider, "minValue", slider.minValue, newMin);
+                    slider.minValue = newMin;
+                    slider.value = Math.max(newMin, slider.value);
+                }
+            }
+
+            sliderMaxValueHandle.text = Std.string(slider.maxValue);
+            var newMaxStr: String = ui.textInput(sliderMaxValueHandle, "Max Value", Right);
+            if (sliderMaxValueHandle.changed) {
+                var newMax: Float = Std.parseFloat(newMaxStr);
+                if (!Math.isNaN(newMax)) {
+                    ElementEvents.propertyChanged.emit(slider, "maxValue", slider.maxValue, newMax);
+                    slider.maxValue = newMax;
+                    slider.value = Math.min(newMax, slider.value);
+                }
+            }
+
+            sliderPrecisionHandle.text = Std.string(slider.precision);
+            var newPrecisionStr: String = ui.textInput(sliderPrecisionHandle, "Precision", Right);
+            var steps: Float = 0;
+            if (sliderPrecisionHandle.changed) {
+                var newPrecision: Int = Std.parseInt(newPrecisionStr);
+                if (newPrecision != null) {
+                    newPrecision = Std.int(Math.max(0, newPrecision));
+                    ElementEvents.propertyChanged.emit(slider, "precision", slider.precision, newPrecision);
+                    slider.precision = newPrecision;
+                    steps = Math.pow(10, -slider.precision);
+                    slider.value = Math.round(slider.value / steps) * steps;
+                }
+            }
+
+            sliderValueHandle.value = slider.value;
+            steps = Math.pow(10, -slider.precision);
+            var newValue: Float = ui.slider(sliderValueHandle, "Value", slider.minValue, slider.maxValue, true, 1 / steps, true, Right);
+            if (sliderValueHandle.changed) {
+                newValue = Math.round(newValue / steps) * steps;
+                sliderValueHandle.value = newValue;
+                ElementEvents.propertyChanged.emit(slider, "value", slider.value, newValue);
+                slider.value = newValue;
             }
         }
     }

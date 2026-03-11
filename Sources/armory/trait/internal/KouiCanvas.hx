@@ -10,6 +10,7 @@ import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
+import koui.elements.Slider;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.GridLayout;
@@ -407,8 +408,22 @@ class KouiCanvas extends Trait {
 				}
 				element = imagePanel;
 
+			case "Slider":
+				var minVal: Float = data.properties.minValue != null ? data.properties.minValue : 0.0;
+				var maxVal: Float = data.properties.maxValue != null ? data.properties.maxValue : 1.0;
+				var slider: Slider = new Slider(minVal, maxVal);
+				if (data.properties.value != null) {
+					slider.value = data.properties.value;
+				}
+				if (data.properties.precision != null) {
+					slider.precision = data.properties.precision;
+				}
+				if (data.properties.orientation != null) {
+					slider.orientation = cast data.properties.orientation;
+				}
+				element = slider;
+
 			// TODO: Add more element types as needed:
-			// case "Slider": ...
 			// case "TextInput": ...
 			// case "Dropdown": ...
 

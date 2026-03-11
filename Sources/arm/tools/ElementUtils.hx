@@ -10,6 +10,7 @@ import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
+import koui.elements.Slider;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
@@ -28,6 +29,7 @@ class ElementUtils {
 		if (Std.isOfType(element, Button)) return "Button";
 		if (Std.isOfType(element, Checkbox)) return "Checkbox";
 		if (Std.isOfType(element, Progressbar)) return "Progressbar";
+		if (Std.isOfType(element, Slider)) return "Slider";
 		if (Std.isOfType(element, Label)) return "Label";
 		if (Std.isOfType(element, ImagePanel)) return "ImagePanel";
 		// Check RowLayout/ColLayout before AnchorPane since they're more specific
@@ -122,6 +124,23 @@ class ElementUtils {
 				}
 				element = progressbar;
 
+			case "Slider":
+				var minVal: Float = properties != null && properties.minValue != null ? properties.minValue : 0.0;
+				var maxVal: Float = properties != null && properties.maxValue != null ? properties.maxValue : 1.0;
+				var slider: Slider = new Slider(minVal, maxVal);
+				if (properties != null) {
+					if (properties.value != null) {
+						slider.value = properties.value;
+					}
+					if (properties.precision != null) {
+						slider.precision = properties.precision;
+					}
+					if (properties.orientation != null) {
+						slider.orientation = cast properties.orientation;
+					}
+				}
+				element = slider;
+
 			case "AnchorPane":
 				var pane: AnchorPane = new AnchorPane(posX, posY, width, height);
 				element = pane;
@@ -207,6 +226,16 @@ class ElementUtils {
 					maxValue: progressbar.maxValue,
 					text: progressbar.text,
 					precision: progressbar.precision
+				};
+
+			case "Slider":
+				var slider: Slider = cast element;
+				return {
+					value: slider.value,
+					minValue: slider.minValue,
+					maxValue: slider.maxValue,
+					precision: slider.precision,
+					orientation: cast slider.orientation
 				};
 
 			case "AnchorPane", "RowLayout", "ColLayout":
