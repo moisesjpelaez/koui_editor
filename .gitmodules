@@ -1,0 +1,4 @@
+[submodule "Subprojects/Koui"]
+	path = Subprojects/Koui
+	url = https://gitlab.com/moises.jpelaez/Koui.git
+	branch = runtime_theme_parser
