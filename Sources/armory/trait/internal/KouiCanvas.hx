@@ -393,6 +393,9 @@ class KouiCanvas extends Trait {
 			case "ColLayout":
 				element = new ColLayout(data.posX, data.posY, data.width, data.height, 0);
 
+			case "Panel":
+				element = new Panel();
+
 			case "ImagePanel":
 				var imagePanel: ImagePanel = new ImagePanel(null);
 				if (data.properties != null) {

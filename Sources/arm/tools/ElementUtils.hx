@@ -32,6 +32,7 @@ class ElementUtils {
 		if (Std.isOfType(element, Slider)) return "Slider";
 		if (Std.isOfType(element, Label)) return "Label";
 		if (Std.isOfType(element, ImagePanel)) return "ImagePanel";
+		if (Std.isOfType(element, Panel)) return "Panel";
 		// Check RowLayout/ColLayout before AnchorPane since they're more specific
 		if (Std.isOfType(element, RowLayout)) return "RowLayout";
 		if (Std.isOfType(element, ColLayout)) return "ColLayout";
@@ -153,6 +154,9 @@ class ElementUtils {
 				var col: ColLayout = new ColLayout(posX, posY, width, height, 0);
 				element = col;
 
+			case "Panel":
+				element = new Panel();
+
 			case "ImagePanel":
 				var imagePanel: ImagePanel = new ImagePanel(null);
 				if (properties != null) {
@@ -238,7 +242,7 @@ class ElementUtils {
 					orientation: cast slider.orientation
 				};
 
-			case "AnchorPane", "RowLayout", "ColLayout":
+			case "Panel", "AnchorPane", "RowLayout", "ColLayout":
 				return {};
 
 			case "ImagePanel":
