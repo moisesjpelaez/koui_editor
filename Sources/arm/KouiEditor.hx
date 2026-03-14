@@ -10,8 +10,8 @@ import arm.panels.HierarchyPanel;
 import arm.panels.PropertiesPanel;
 import arm.panels.ElementsPanel;
 import arm.panels.TopToolbar;
+import arm.data.Clipboard;
 import arm.tools.CanvasUtils;
-import arm.tools.EditorUtils;
 import arm.tools.HierarchyUtils;
 import arm.tools.NameUtils;
 import arm.types.Enums;
@@ -198,6 +198,30 @@ class KouiEditor extends iron.Trait {
 		var keyboard: Keyboard = Input.getKeyboard();
 		if (keyboard.started("delete") && selectedElement != null && selectedElement != rootPane) {
 			ElementEvents.elementRemoved.emit(selectedElement);
+		}
+
+		// Copy (Ctrl+C)
+		if (keyboard.down("control") && keyboard.started("c") && selectedElement != null && selectedElement != rootPane) {
+			Clipboard.clipboardData = CanvasUtils.serializeElementTree(selectedElement);
+			Clipboard.isCut = false;
+		}
+
+		// Cut (Ctrl+X)
+		if (keyboard.down("control") && keyboard.started("x") && selectedElement != null && selectedElement != rootPane) {
+			Clipboard.clipboardData = CanvasUtils.serializeElementTree(selectedElement);
+			Clipboard.isCut = true;
+			ElementEvents.elementRemoved.emit(selectedElement);
+		}
+
+		// Paste (Ctrl+V)
+		if (keyboard.down("control") && keyboard.started("v") && Clipboard.clipboardData.length > 0) {
+			CanvasUtils.pasteElements(Clipboard.clipboardData, selectedElement);
+			if (Clipboard.isCut) {
+				Clipboard.clipboardData = [];
+				Clipboard.isCut = false;
+			}
+			uiBase.hwnds[PanelHierarchy].redraws = 2;
+			uiBase.hwnds[PanelProperties].redraws = 2;
 		}
 	}
 

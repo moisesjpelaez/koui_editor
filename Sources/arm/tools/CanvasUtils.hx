@@ -509,7 +509,7 @@ class CanvasUtils {
 	/**
 	 * Serializes a single element to TElementData.
 	 */
-	static function serializeElement(entry: {key: String, element: Element}, elementKeyMap: Map<Element, String>): TElementData {
+	public static function serializeElement(entry: {key: String, element: Element}, elementKeyMap: Map<Element, String>): TElementData {
 		var element: Element = entry.element;
 		var type: String = getElementType(element);
 
@@ -672,7 +672,7 @@ class CanvasUtils {
 	/**
 	 * Creates an element from TElementData.
 	 */
-	static function createElementFromData(data: TElementData): Element {
+	public static function createElementFromData(data: TElementData): Element {
 		return ElementUtils.createElement(
 			data.type,
 			data.posX,
@@ -685,6 +685,142 @@ class CanvasUtils {
 			data.tID,
 			data.properties
 		);
+	}
+
+	/**
+	 * Recursively serializes an element and all its user-facing children into a flat array.
+	 * The root element's parentKey is set to null; children reference their parent's key.
+	 */
+	public static function serializeElementTree(element: Element): Array<TElementData> {
+		var result: Array<TElementData> = [];
+		var scene = sceneData.currentScene;
+		if (scene == null) return result;
+
+		// Build element->key map from current scene
+		var elementKeyMap: Map<Element, String> = new Map();
+		for (entry in scene.elements) {
+			elementKeyMap.set(entry.element, entry.key);
+		}
+
+		// Find the entry for the root element
+		var rootEntry: {key: String, element: Element} = null;
+		for (entry in scene.elements) {
+			if (entry.element == element) {
+				rootEntry = entry;
+				break;
+			}
+		}
+		if (rootEntry == null) return result;
+
+		// Serialize the root element with parentKey = null
+		var rootData: TElementData = serializeElement(rootEntry, elementKeyMap);
+		if (rootData == null) return result;
+		rootData.parentKey = null; // Force root to have no parent in clipboard
+		rootData.focusUp = null;
+		rootData.focusDown = null;
+		rootData.focusLeft = null;
+		rootData.focusRight = null;
+		result.push(rootData);
+
+		// Recursively serialize children
+		serializeChildrenRecursive(element, scene.elements, elementKeyMap, result);
+
+		return result;
+	}
+
+	/**
+	 * Helper: recursively serializes children of a parent element.
+	 */
+	static function serializeChildrenRecursive(parent: Element, sceneElements: Array<{key: String, element: Element}>, elementKeyMap: Map<Element, String>, output: Array<TElementData>): Void {
+		var children: Array<Element> = HierarchyUtils.getChildren(parent);
+		for (child in children) {
+			if (HierarchyUtils.shouldSkipInternalChild(parent, child)) continue;
+
+			var entry: {key: String, element: Element} = null;
+			for (e in sceneElements) {
+				if (e.element == child) {
+					entry = e;
+					break;
+				}
+			}
+			if (entry == null) continue;
+
+			var elemData: TElementData = serializeElement(entry, elementKeyMap);
+			if (elemData == null) continue;
+			// Clear focus nav links — they reference elements by key that won't exist after paste
+			elemData.focusUp = null;
+			elemData.focusDown = null;
+			elemData.focusLeft = null;
+			elemData.focusRight = null;
+			output.push(elemData);
+
+			serializeChildrenRecursive(child, sceneElements, elementKeyMap, output);
+		}
+	}
+
+	/**
+	 * Pastes elements from clipboard data into the current scene.
+	 * Creates new elements with unique names and restores parent-child relationships.
+	 * If targetParent is a layout container, the root element is pasted as its child.
+	 */
+	public static function pasteElements(clipboardData: Array<TElementData>, ?targetParent: Element): Void {
+		var scene = sceneData.currentScene;
+		if (scene == null || clipboardData.length == 0) return;
+
+		// Determine where to paste the root element
+		var pasteParent: Element = scene.root;
+		if (targetParent != null && (Std.isOfType(targetParent, AnchorPane) || Std.isOfType(targetParent, RowLayout) || Std.isOfType(targetParent, ColLayout))) {
+			pasteParent = targetParent;
+		}
+
+		// Collect ALL existing keys in the scene for global uniqueness
+		var allSceneKeys: Array<String> = [for (entry in scene.elements) entry.key];
+
+		// Map from original clipboard key -> new element (for restoring parent-child)
+		var keyToElement: Map<String, Element> = new Map();
+		// Map from original clipboard key -> final unique key (for parentKey remapping)
+		var keyToNewKey: Map<String, String> = new Map();
+
+		for (elemData in clipboardData) {
+			var element: Element = createElementFromData(elemData);
+			if (element == null) continue;
+
+			element.anchor = cast elemData.anchor;
+
+			// Resolve the parent element for this entry
+			var parent: Element = pasteParent;
+			if (elemData.parentKey != null && keyToElement.exists(elemData.parentKey)) {
+				parent = keyToElement.get(elemData.parentKey);
+			}
+
+			// Ensure key is globally unique within the scene
+			var proposedKey: String = elemData.key;
+			if (allSceneKeys.indexOf(proposedKey) != -1) {
+				var parts: Array<String> = proposedKey.split("_");
+				var baseName: String = parts[0];
+				proposedKey = NameUtils.generateUniqueName(baseName, allSceneKeys, "_");
+			}
+			allSceneKeys.push(proposedKey);
+
+			keyToElement.set(elemData.key, element);
+			keyToNewKey.set(elemData.key, proposedKey);
+
+			if (elemData.parentKey == null) {
+				// Root element
+				if (pasteParent == scene.root) {
+					element.setPosition(elemData.posX + 10, elemData.posY + 10);
+					scene.root.add(element, cast elemData.anchor);
+				} else {
+					HierarchyUtils.moveAsChild(element, pasteParent);
+				}
+				scene.elements.push({key: proposedKey, element: element});
+				ElementEvents.elementSelected.emit(element);
+			} else {
+				// Child element — add to its parent
+				HierarchyUtils.moveAsChild(element, parent);
+				scene.elements.push({key: proposedKey, element: element});
+			}
+		}
 	}
 
 	/**
