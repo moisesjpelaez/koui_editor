@@ -527,10 +527,7 @@ class CanvasUtils {
 
 		var getElemKey = function(elem: Null<Element>): Null<String> {
 			if (elem == null) return null;
-			for (e in SceneData.data.currentScene.elements) {
-				if (e.element == elem) return e.key;
-			}
-			return null;
+			return elementKeyMap.get(elem);
 		};
 
 		return {
