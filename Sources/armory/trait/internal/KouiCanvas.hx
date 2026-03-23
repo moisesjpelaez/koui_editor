@@ -1059,98 +1059,33 @@ class KouiCanvas extends Trait {
 	}
 }
 
-// TODO: refactor these classes
-class ButtonExt {
-	public static inline function onPressed(button: Button, callback: Void->Void) {
-		button.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
+class ElementExt {
+	public static inline function onPressed(element: Element, callback: Void->Void) {
+		element.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
 			if (e.getState() == ClickStart) callback();
 		});
 	}
 
-	public static inline function onHover(button: Button, callback: Void->Void) {
-		button.addEventListener(MouseHoverEvent, function(e: MouseHoverEvent) {
+	public static inline function onHover(element: Element, callback: Void->Void) {
+		element.addEventListener(MouseHoverEvent, function(e: MouseHoverEvent) {
 			if (e.getState() == HoverStart) callback();
 		});
 	}
 
-	public static inline function onFocus(button: Button, callback: Void->Void) {
-		button.addEventListener(FocusEvent, function(e: FocusEvent) {
+	public static inline function onFocus(element: Element, callback: Void->Void) {
+		element.addEventListener(FocusEvent, function(e: FocusEvent) {
 			if (e.getState() == FocusGet) callback();
 		});
 	}
 
-	public static inline function onHold(button: Button, callback: Void->Void) {
-		button.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
+	public static inline function onHold(element: Element, callback: Void->Void) {
+		element.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
 			if (e.getState() == ClickHold) callback();
 		});
 	}
 
-	public static inline function onReleased(button: Button, callback: Void->Void) {
-		button.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
-			if (e.getState() == ClickEnd) callback();
-		});
-	}
-}
-
-class CheckboxExt {
-	public static inline function onPressed(checkbox: Checkbox, callback: Void->Void) {
-		checkbox.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
-			if (e.getState() == ClickStart) callback();
-		});
-	}
-
-	public static inline function onHover(checkbox: Checkbox, callback: Void->Void) {
-		checkbox.addEventListener(MouseHoverEvent, function(e: MouseHoverEvent) {
-			if (e.getState() == HoverStart) callback();
-		});
-	}
-
-	public static inline function onFocus(checkbox: Checkbox, callback: Void->Void) {
-		checkbox.addEventListener(FocusEvent, function(e: FocusEvent) {
-			if (e.getState() == FocusGet) callback();
-		});
-	}
-
-	public static inline function onHold(checkbox: Checkbox, callback: Void->Void) {
-		checkbox.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
-			if (e.getState() == ClickHold) callback();
-		});
-	}
-
-	public static inline function onReleased(checkbox: Checkbox, callback: Void->Void) {
-		checkbox.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
-			if (e.getState() == ClickEnd) callback();
-		});
-	}
-}
-
-class SliderExt {
-	public static inline function onPressed(slider: Slider, callback: Void->Void) {
-		slider.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
-			if (e.getState() == ClickStart) callback();
-		});
-	}
-
-	public static inline function onHover(slider: Slider, callback: Void->Void) {
-		slider.addEventListener(MouseHoverEvent, function(e: MouseHoverEvent) {
-			if (e.getState() == HoverStart) callback();
-		});
-	}
-
-	public static inline function onFocus(slider: Slider, callback: Void->Void) {
-		slider.addEventListener(FocusEvent, function(e: FocusEvent) {
-			if (e.getState() == FocusGet) callback();
-		});
-	}
-
-	public static inline function onHold(slider: Slider, callback: Void->Void) {
-		slider.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
-			if (e.getState() == ClickHold) callback();
-		});
-	}
-
-	public static inline function onReleased(slider: Slider, callback: Void->Void) {
-		slider.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
+	public static inline function onReleased(element: Element, callback: Void->Void) {
+		element.addEventListener(MouseClickEvent, function(e: MouseClickEvent) {
 			if (e.getState() == ClickEnd) callback();
 		});
 	}
