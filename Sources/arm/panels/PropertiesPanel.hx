@@ -19,15 +19,19 @@ import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
+import koui.elements.RadioButton;
 import koui.elements.Slider;
 import koui.elements.layouts.Layout.Anchor;
 import koui.theme.Style;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
+import koui.utils.RadioGroup;
 
 import zui.Zui;
 import zui.Zui.Handle;
 
 import haxe.ds.ObjectMap;
+import haxe.ds.StringMap;
+import StringTools;
 
 @:access(koui.Koui, koui.elements.Element, zui.Zui)
 class PropertiesPanel {
@@ -87,6 +91,12 @@ class PropertiesPanel {
     var sliderOrientationHandle: Handle;
     var sliderPrecisionHandle: Handle;
 
+    // RadioGroups tab handles/state
+    var radioGroupNameHandle: Handle;
+    var radioGroupAddHandles: StringMap<Handle>;
+    var radioGroupMembers: StringMap<Array<RadioButton>>;
+    var radioGroups: Array<RadioGroup>;
+
     var sceneData: SceneData = SceneData.data;
 
     // Initial values for reset functionality
@@ -142,6 +152,11 @@ class PropertiesPanel {
         sliderOrientationHandle = new Handle({position: 3});
         sliderPrecisionHandle = new Handle({text: "1"});
 
+        radioGroupNameHandle = new Handle({text: "RadioGroup"});
+        radioGroupAddHandles = new StringMap();
+        radioGroupMembers = new StringMap();
+        radioGroups = [];
+
         ElementEvents.elementAdded.connect(onElementAdded);
         ElementEvents.elementSelected.connect(onElementSelected);
         ElementEvents.elementRemoved.connect(onElementRemoved);
@@ -156,6 +171,10 @@ class PropertiesPanel {
                 } else {
                     uiBase.ui.text("No element selected");
                 }
+            }
+
+            if (uiBase.ui.tab(tabHandle, "Radio Groups")) {
+                drawRadioGroups(uiBase);
             }
 
             if (uiBase.ui.tab(tabHandle, "Settings")) {
@@ -194,6 +213,219 @@ class PropertiesPanel {
                 }
             }
 		}
+    }
+
+    function drawRadioGroups(uiBase: UIBase): Void {
+        var ui: Zui = uiBase.ui;
+
+        if (sceneData.currentScene == null) {
+            ui.text("No active scene", Center);
+            return;
+        }
+
+        var radioEntries = getSceneRadioButtons();
+
+        ui.text("Radio Group Management", Center);
+        ui.separator();
+
+        ui.row([3/4, 1/4]);
+        var requestedId = ui.textInput(radioGroupNameHandle, "Group ID", Right);
+        if (ZuiUtils.iconButton(ui, icons, 1, 2, "Create Radio Group", false, false, 0.4)) {
+            createRadioGroup(requestedId);
+            uiBase.hwnds[PanelProperties].redraws = 2;
+        }
+
+        ui._y += 4;
+        ui.separator();
+
+        if (radioGroups.length == 0) {
+            ui.text("No radio groups yet.");
+            return;
+        }
+
+        if (radioEntries.length == 0) {
+            ui.text("No radio buttons found in current scene.");
+        }
+
+        var groupToDelete: String = null;
+        for (group in radioGroups) {
+            ui.row([5/6, 1/6]);
+            ui.button(group.id, Left);
+            if (ZuiUtils.iconButton(ui, icons, 1, 3, "Delete group", false, false, 0.4)) {
+                groupToDelete = group.id;
+            }
+
+            ui.indent();
+
+            var addHandle = getRadioGroupAddHandle(group.id);
+            var addOptions: Array<String> = ["(add radio button)"];
+            for (entry in radioEntries) addOptions.push(entry.key);
+            var selectedAdd = ui.combo(addHandle, addOptions, "Add", true, Right);
+            if (addHandle.changed && selectedAdd > 0 && selectedAdd < addOptions.length) {
+                var button = radioEntries[selectedAdd - 1].button;
+                addButtonToGroup(group, button);
+                addHandle.position = 0;
+                uiBase.hwnds[PanelProperties].redraws = 2;
+            }
+
+            var members = getGroupMembers(group);
+            var memberCopy = members.copy();
+            for (button in memberCopy) {
+                if (sceneData.getElementKey(button) == null) {
+                    members.remove(button);
+                }
+            }
+
+            if (members.length == 0) {
+                ui.text("No buttons in this group.");
+            } else {
+                for (button in members.copy()) {
+                    var key = sceneData.getElementKey(button);
+                    var label = key != null ? key : "(removed)";
+                    if (group.activeButton == button) label += " [active]";
+
+                    ui.row([1/2, 1/3, 1/6]);
+                    ui.text(label, Left);
+
+                    if (ui.button("Set Active")) {
+                        group.setActiveButton(button);
+                        uiBase.hwnds[PanelProperties].redraws = 2;
+                    }
+
+                    if (ZuiUtils.iconButton(ui, icons, 1, 3, "Remove from group", false, false, 0.4)) {
+                        removeButtonFromGroup(group, button);
+                        uiBase.hwnds[PanelProperties].redraws = 2;
+                    }
+                }
+            }
+
+            ui.unindent();
+            ui._y += 2;
+            ui.separator();
+        }
+
+        if (groupToDelete != null) {
+            deleteRadioGroup(groupToDelete);
+            uiBase.hwnds[PanelProperties].redraws = 2;
+        }
+    }
+
+    function getSceneRadioButtons(): Array<{ key: String, button: RadioButton }> {
+        var entries: Array<{ key: String, button: RadioButton }> = [];
+        var currentScene = sceneData.currentScene;
+        if (currentScene == null) return entries;
+
+        for (entry in currentScene.elements) {
+            if (Std.isOfType(entry.element, RadioButton)) {
+                entries.push({ key: entry.key, button: cast entry.element });
+            }
+        }
+
+        return entries;
+    }
+
+    function getRadioGroupAddHandle(groupId: String): Handle {
+        if (!radioGroupAddHandles.exists(groupId)) {
+            radioGroupAddHandles.set(groupId, new Handle({position: 0}));
+        }
+        return radioGroupAddHandles.get(groupId);
+    }
+
+    function getGroupMembers(group: RadioGroup): Array<RadioButton> {
+        if (!radioGroupMembers.exists(group.id)) {
+            radioGroupMembers.set(group.id, []);
+        }
+        return radioGroupMembers.get(group.id);
+    }
+
+    function createRadioGroup(requestedId: String): Void {
+        var baseId = StringTools.trim(requestedId != null ? requestedId : "");
+        if (baseId == "") baseId = "RadioGroup";
+
+        var uniqueId = getUniqueRadioGroupId(baseId);
+
+        var group = new RadioGroup(uniqueId);
+        radioGroups.push(group);
+        radioGroupMembers.set(group.id, []);
+        radioGroupAddHandles.set(group.id, new Handle({position: 0}));
+        radioGroupNameHandle.text = uniqueId;
+    }
+
+    function getUniqueRadioGroupId(requestedId: String): String {
+        if (!radioGroupMembers.exists(requestedId)) return requestedId;
+
+        var prefix = requestedId;
+        var nextIndex = 1;
+        var suffixPattern = ~/^(.*)_(\d+)$/;
+        if (suffixPattern.match(requestedId)) {
+            prefix = suffixPattern.matched(1);
+            var parsed = Std.parseInt(suffixPattern.matched(2));
+            if (parsed != null) nextIndex = parsed + 1;
+        }
+
+        var candidate = prefix + "_" + nextIndex;
+        while (radioGroupMembers.exists(candidate)) {
+            nextIndex++;
+            candidate = prefix + "_" + nextIndex;
+        }
+
+        return candidate;
+    }
+
+    function deleteRadioGroup(groupId: String): Void {
+        var index = -1;
+        for (i in 0...radioGroups.length) {
+            if (radioGroups[i].id == groupId) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0) return;
+
+        var group = radioGroups[index];
+        var members = getGroupMembers(group).copy();
+        for (button in members) {
+            removeButtonFromGroup(group, button);
+        }
+
+        radioGroups.splice(index, 1);
+        radioGroupMembers.remove(groupId);
+        radioGroupAddHandles.remove(groupId);
+    }
+
+    function addButtonToGroup(group: RadioGroup, button: RadioButton): Void {
+        if (button == null || group == null || button.group == group) return;
+
+        if (button.group != null) {
+            var previousMembers = radioGroupMembers.get(button.group.id);
+            if (previousMembers != null && previousMembers.indexOf(button) >= 0) {
+                previousMembers.remove(button);
+                button.group.remove(button);
+            }
+        }
+
+        button.group = group;
+        group.add(button);
+
+        var members = getGroupMembers(group);
+        if (members.indexOf(button) < 0) members.push(button);
+    }
+
+    function removeButtonFromGroup(group: RadioGroup, button: RadioButton): Void {
+        if (button == null || group == null) return;
+
+        var members = getGroupMembers(group);
+        var idx = members.indexOf(button);
+        if (idx >= 0) {
+            members.splice(idx, 1);
+            group.remove(button);
+        }
+
+        var fallbackId = sceneData.getElementKey(button);
+        if (fallbackId == null || fallbackId == "") fallbackId = "Radio";
+        var fallbackGroup = new RadioGroup(fallbackId + "_solo");
+        button.group = fallbackGroup;
+        fallbackGroup.add(button);
     }
 
     function drawProperties(uiBase: UIBase): Void {
@@ -786,10 +1018,27 @@ class PropertiesPanel {
 
     public function onElementRemoved(element: Element): Void {
         elementSizes.remove(element);
+
+        if (Std.isOfType(element, RadioButton)) {
+            var radioButton: RadioButton = cast element;
+            for (group in radioGroups) {
+                var members = getGroupMembers(group);
+                var idx = members.indexOf(radioButton);
+                if (idx >= 0) {
+                    members.splice(idx, 1);
+                    group.remove(radioButton);
+                }
+            }
+        }
     }
 
     public function onCanvasLoaded(): Void {
         scaleOnResizeHandle.selected = CanvasSettings.scaleOnResize;
+
+        radioGroups = [];
+        radioGroupMembers = new StringMap();
+        radioGroupAddHandles = new StringMap();
+        radioGroupNameHandle.text = "RadioGroup";
 
         if (CanvasSettings.autoScale) scaleOnResizeGroup.position = 0;
         else if (CanvasSettings.scaleHorizontal) scaleOnResizeGroup.position = 1;
