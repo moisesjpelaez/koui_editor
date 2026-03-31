@@ -21,10 +21,12 @@ class CheckboxEditor implements IElementEditor {
 	public var typeName(get, never): String;
 	public var displayName(get, never): String;
 	public var category(get, never): String;
+	public var isComposite(get, never): Bool;
 
 	function get_typeName(): String return "Checkbox";
 	function get_displayName(): String return "Checkbox";
 	function get_category(): String return "Buttons";
+	function get_isComposite(): Bool return true;
 
 	public function matches(element: Element): Bool return Std.isOfType(element, Checkbox);
 
@@ -39,7 +41,8 @@ class CheckboxEditor implements IElementEditor {
 			if (properties.isChecked != null) {
 				checkbox.isChecked = properties.isChecked;
 				var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
-				checkSquare.setContextElement(checkbox.isChecked ? "checked" : "");
+				if (checkSquare != null)
+					checkSquare.setContextElement(checkbox.isChecked ? "checked" : "");
 			}
 		}
 		return checkbox;
@@ -81,7 +84,8 @@ class CheckboxEditor implements IElementEditor {
 			ElementEvents.propertyChanged.emit(checkbox, "isChecked", checkbox.isChecked, newChecked);
 			checkbox.isChecked = newChecked;
 			var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
-			checkSquare.setContextElement(newChecked ? "checked" : "");
+			if (checkSquare != null)
+				checkSquare.setContextElement(newChecked ? "checked" : "");
 		}
 	}
 }

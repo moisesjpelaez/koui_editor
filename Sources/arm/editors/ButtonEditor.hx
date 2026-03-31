@@ -19,10 +19,12 @@ class ButtonEditor implements IElementEditor {
 	public var typeName(get, never): String;
 	public var displayName(get, never): String;
 	public var category(get, never): String;
+	public var isComposite(get, never): Bool;
 
 	function get_typeName(): String return "Button";
 	function get_displayName(): String return "Button";
 	function get_category(): String return "Buttons";
+	function get_isComposite(): Bool return true;
 
 	public function matches(element: Element): Bool return Std.isOfType(element, Button);
 

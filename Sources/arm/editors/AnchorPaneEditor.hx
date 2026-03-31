@@ -12,10 +12,12 @@ class AnchorPaneEditor implements IElementEditor {
 	public var typeName(get, never): String;
 	public var displayName(get, never): String;
 	public var category(get, never): String;
+	public var isComposite(get, never): Bool;
 
 	function get_typeName(): String return "AnchorPane";
 	function get_displayName(): String return "AnchorPane";
 	function get_category(): String return "Layout";
+	function get_isComposite(): Bool return false;
 
 	public function matches(element: Element): Bool return Std.isOfType(element, AnchorPane);
 

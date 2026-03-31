@@ -1,6 +1,7 @@
 package arm;
 
 import arm.base.UIBase;
+import arm.editors.ElementRegistry;
 import arm.events.ElementEvents;
 import arm.panels.TopToolbar;
 import arm.types.Enums.PanelHandle;
@@ -8,14 +9,9 @@ import arm.types.Enums.PanelHandle;
 import iron.math.Vec2;
 import iron.system.Input;
 import iron.system.Input.Mouse;
-import iron.system.Input.Keyboard;
 
 import koui.Koui;
-import koui.elements.Button;
-import koui.elements.Checkbox;
 import koui.elements.Element;
-import koui.elements.Progressbar;
-import koui.elements.Slider;
 import koui.elements.Panel;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
@@ -88,8 +84,9 @@ class DragDropHandler {
 			var element: Element = getElementAtPositionUnclipped(Std.int(mouse.x), Std.int(mouse.y));
 
 			if (element != null && element != rootPane) {
-				// Select parent element instead of internal children
-				if (element.parent is Button || element.parent is Checkbox || element.parent is Progressbar || element.parent is Slider || element is Panel && element.parent != rootPane) {
+				// Select parent element instead of internal children of composite types
+				var parentEditor = ElementRegistry.getForElement(element.parent);
+				if ((parentEditor != null && parentEditor.isComposite) || (element is Panel && element.parent != rootPane)) {
 					selectedElement = element.parent;
 				}
 				// Select parent AnchorPane instead of child AnchorPane (but not if parent is rootPane)
