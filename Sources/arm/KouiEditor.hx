@@ -188,6 +188,7 @@ class KouiEditor extends iron.Trait {
 		if (uiBase == null) return;
 		if (!canvasLoaded) { // HACK: ensure canvas is loaded after Koui init
 			CanvasUtils.loadCanvas();
+			commandManager.clear();
 			canvasLoaded = true;
 		}
 		uiBase.update();
