@@ -8,6 +8,7 @@ import arm.tools.HierarchyUtils;
 import arm.tools.NameUtils;
 import arm.tools.ZuiUtils;
 import arm.types.Enums;
+import arm.types.Types;
 import haxe.ds.ObjectMap;
 import iron.system.Input;
 import kha.Image;
@@ -71,7 +72,7 @@ class HierarchyPanel {
 	}
 
 	/** Update tab handle position to match current scene */
-	function updateTabPosition(): Void {
+	public function updateTabPosition(): Void {
 		if (sceneData.currentScene != null) {
 			var tabs = getSceneTabs();
 			var idx = tabs.indexOf(sceneData.currentScene.key);
@@ -93,8 +94,12 @@ class HierarchyPanel {
             }
 
 			// Click on empty space (no item captured the mouse-down) → deselect on release
+			// Only track clicks that originated inside the hierarchy panel
 			if (!mouseDownOnItem && uiBase.ui.inputStarted) {
-				clickedEmptySpace = true;
+				var mouse = Input.getMouse();
+				if (mouse.x >= params.tabx && mouse.x < params.tabx + params.w && mouse.y >= 0 && mouse.y < params.h0) {
+					clickedEmptySpace = true;
+				}
 			}
 			if (clickedEmptySpace && uiBase.ui.inputReleased && !isDragging) {
 				clickedEmptySpace = false;

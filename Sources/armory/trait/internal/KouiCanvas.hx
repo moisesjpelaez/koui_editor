@@ -1,5 +1,6 @@
 package armory.trait.internal;
 
+import arm.types.Types;
 import iron.App;
 import iron.Trait;
 import koui.Koui;
@@ -23,59 +24,6 @@ import koui.events.MouseEvent.MouseHoverEvent;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
 import koui.utils.RadioGroup;
 import koui.utils.SceneManager;
-
-private typedef TRadioGroupData = {
-	var id: String;
-	var activeButtonKey: Null<String>;
-}
-
-// JSON structure typedefs (matching CanvasUtils format)
-private typedef TCanvasData = {
-	var name: String;
-	var version: String;
-	var canvas: TCanvasSettings;
-	var radioGroups: Array<TRadioGroupData>;
-	var scenes: Array<TSceneData>;
-}
-
-private typedef TCanvasSettings = {
-	var width: Int;
-	var height: Int;
-	var settings: TSettings;
-}
-
-private typedef TSettings = {
-	var expandOnResize: Bool;
-	var scaleOnResize: Bool;
-	var autoScale: Bool;
-	var scaleHorizontal: Bool;
-	var scaleVertical: Bool;
-}
-
-private typedef TSceneData = {
-	var key: String;
-	var active: Bool;
-	var elements: Array<TElementData>;
-}
-
-private typedef TElementData = {
-	var key: String;
-	var type: String;
-	var tID: String;
-	var posX: Int;
-	var posY: Int;
-	var width: Int;
-	var height: Int;
-	var anchor: Int;
-	var visible: Bool;
-	var disabled: Bool;
-	var parentKey: Null<String>;
-	var focusUp: Null<String>;
-	var focusDown: Null<String>;
-	var focusLeft: Null<String>;
-	var focusRight: Null<String>;
-	var properties: Dynamic;
-}
 
 // Runtime scene storage
 private typedef TKouiScene = {

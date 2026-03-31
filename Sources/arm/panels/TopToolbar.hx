@@ -1,9 +1,11 @@
 package arm.panels;
 
 import arm.base.UIBase;
+import arm.commands.CommandManager;
 import arm.tools.CanvasUtils;
 import arm.tools.ImageUtils;
 import arm.tools.ZuiUtils;
+import arm.types.Enums.PanelHandle;
 import armory.system.Signal;
 import iron.App;
 import kha.Image;
@@ -92,8 +94,19 @@ class TopToolbar {
 			}
 			hSeparator(ui);
 
-			iconButton(ui, 6, 2, "Undo", false, true);
-			iconButton(ui, 7, 2, "Redo", false, true);
+			var cm = CommandManager.instance;
+			if (iconButton(ui, 6, 2, "Undo", false, cm == null || !cm.canUndo())) {
+				if (cm.undo()) {
+					uiBase.hwnds[PanelHierarchy].redraws = 2;
+					uiBase.hwnds[PanelProperties].redraws = 2;
+				}
+			}
+			if (iconButton(ui, 7, 2, "Redo", false, cm == null || !cm.canRedo())) {
+				if (cm.redo()) {
+					uiBase.hwnds[PanelHierarchy].redraws = 2;
+					uiBase.hwnds[PanelProperties].redraws = 2;
+				}
+			}
 			hSeparator(ui);
 
 			if (iconButton(ui, 5, 0, "Reload Theme")) {

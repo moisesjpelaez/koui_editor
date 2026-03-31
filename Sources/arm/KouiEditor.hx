@@ -15,9 +15,29 @@ import arm.tools.CanvasUtils;
 import arm.tools.HierarchyUtils;
 import arm.tools.NameUtils;
 import arm.types.Enums;
+import arm.types.Types;
+import arm.commands.CommandManager;
+import arm.commands.PropertyChangeCommand;
+import arm.commands.SceneAddCommand;
+import arm.commands.SceneRemoveCommand;
+import arm.commands.SceneRenameCommand;
+import arm.commands.ElementAddCommand;
+import arm.commands.ElementRemoveCommand;
+import arm.commands.KeyRenameCommand;
+import arm.editors.ElementRegistry;
+import arm.editors.LabelEditor;
+import arm.editors.ImagePanelEditor;
+import arm.editors.PanelEditor;
+import arm.editors.ButtonEditor;
+import arm.editors.CheckboxEditor;
+import arm.editors.RadioButtonEditor;
+import arm.editors.AnchorPaneEditor;
+import arm.editors.ColLayoutEditor;
+import arm.editors.RowLayoutEditor;
+import arm.editors.ProgressbarEditor;
+import arm.editors.SliderEditor;
 
 import iron.App;
-import iron.Scene;
 import iron.math.Vec2;
 import iron.system.Input;
 
@@ -38,6 +58,8 @@ import koui.elements.layouts.Layout;
 import koui.elements.layouts.Layout.Anchor;
 import koui.elements.layouts.RowLayout;
 import koui.utils.SceneManager;
+
+import arm.CanvasViewport;
 
 @:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane)
 class KouiEditor extends iron.Trait {
@@ -62,17 +84,11 @@ class KouiEditor extends iron.Trait {
 	var dragStartX: Float = 0;
 	var dragStartY: Float = 0;
 
-	// Canvas controls
-	var isPanning: Bool = false;
-	var panStartX: Float = 0;
-	var panStartY: Float = 0;
-	var canvasPanX: Float = 0;
-	var canvasPanY: Float = 0;
-	var initialScale: Float = 0.8;
-	var currentScale: Float = 0.8;
-
 	// Constants
 	var borderSize: Int = 8;
+
+	// Viewport controller
+	var viewport: CanvasViewport = new CanvasViewport();
 
 	// Panels
 	var topToolbar: TopToolbar = new TopToolbar();
@@ -86,8 +102,25 @@ class KouiEditor extends iron.Trait {
 	var canvasWidth: Int = 1024;
 	var canvasHeight: Int = 576;
 
+	var commandManager: CommandManager;
+
 	public function new() {
 		super();
+
+		commandManager = new CommandManager();
+
+		// Register element editors (order matters: specific types before their parent classes)
+		ElementRegistry.register(new LabelEditor());
+		ElementRegistry.register(new PanelEditor());
+		ElementRegistry.register(new ImagePanelEditor());
+		ElementRegistry.register(new ButtonEditor());
+		ElementRegistry.register(new RadioButtonEditor());
+		ElementRegistry.register(new CheckboxEditor());
+		ElementRegistry.register(new AnchorPaneEditor());
+		ElementRegistry.register(new ColLayoutEditor());
+		ElementRegistry.register(new RowLayoutEditor());
+		ElementRegistry.register(new ProgressbarEditor());
+		ElementRegistry.register(new SliderEditor());
 
 		Assets.loadEverything(function() {
 			// Initialize framework
@@ -100,6 +133,9 @@ class KouiEditor extends iron.Trait {
 
 			// Create UIBase with the loaded font
 			uiBase = new UIBase(Assets.fonts.font_default);
+			viewport.uiBase = uiBase;
+			viewport.sceneData = sceneData;
+			viewport.topToolbar = topToolbar;
 
 			Koui.init(function() {
 				Koui.setPadding(100, 100, 75, 75);
@@ -120,7 +156,7 @@ class KouiEditor extends iron.Trait {
 				}
 				baseH = canvasHeight;
 
-				SceneManager.addScene("Scene_1", setupRootScene);
+				SceneManager.addScene("Scene_1", (scene) -> setupRootScene(scene, "Scene_1"));
 				CanvasUtils.refreshTheme();
 
 				// Set snap max value based on canvas size
@@ -133,6 +169,7 @@ class KouiEditor extends iron.Trait {
 			ElementEvents.elementSelected.connect(onElementSelected);
 			ElementEvents.elementDropped.connect(onElementDropped);
 			ElementEvents.elementRemoved.connect(onElementRemoved);
+			ElementEvents.propertyChanged.connect(onPropertyChangedForUndo);
 
 			SceneEvents.sceneAdded.connect(onSceneAdded);
 			SceneEvents.sceneChanged.connect(onSceneChanged);
@@ -169,13 +206,13 @@ class KouiEditor extends iron.Trait {
         return isDynamicWidth || isDynamicHeight;
 	}
 
-	function setupRootScene(scene: AnchorPane): Void {
+	function setupRootScene(scene: AnchorPane, sceneName: String): Void {
 		scene.setSize(canvasWidth, canvasHeight);
 		scene.setTID("_fixed_anchorpane");
 		scene.anchor = Anchor.MiddleCenter;
 		scene.invalidateElem();
 		var s: TSceneEntry = {
-		    key: "Scene_1",
+		    key: sceneName,
 		    root: scene,
 		    elements: [],
 		    active: true
@@ -183,7 +220,8 @@ class KouiEditor extends iron.Trait {
 		sceneData.scenes.push(s);
 		sceneData.currentScene = s;
 		rootPane = scene;
-		hierarchyPanel.onElementAdded({ key: sceneData.currentScene.key, element: sceneData.currentScene.root }); // Manually register the root element in the
+		viewport.rootPane = rootPane;
+		hierarchyPanel.onElementAdded({ key: sceneName, element: scene });
 	}
 
 	function update() {
@@ -193,28 +231,30 @@ class KouiEditor extends iron.Trait {
 			canvasLoaded = true;
 		}
 		uiBase.update();
-		canvasControl();
+		viewport.canvasControl(isInCanvas());
 
 		var keyboard: Keyboard = Input.getKeyboard();
-		if (keyboard.started("delete") && selectedElement != null && selectedElement != rootPane) {
+		var isTyping: Bool = uiBase.ui.isTyping;
+
+		if (!isTyping && keyboard.started("delete") && selectedElement != null && selectedElement != rootPane) {
 			ElementEvents.elementRemoved.emit(selectedElement);
 		}
 
 		// Copy (Ctrl+C)
-		if (keyboard.down("control") && keyboard.started("c") && selectedElement != null && selectedElement != rootPane) {
+		if (!isTyping && keyboard.down("control") && keyboard.started("c") && selectedElement != null && selectedElement != rootPane) {
 			Clipboard.clipboardData = CanvasUtils.serializeElementTree(selectedElement);
 			Clipboard.isCut = false;
 		}
 
 		// Cut (Ctrl+X)
-		if (keyboard.down("control") && keyboard.started("x") && selectedElement != null && selectedElement != rootPane) {
+		if (!isTyping && keyboard.down("control") && keyboard.started("x") && selectedElement != null && selectedElement != rootPane) {
 			Clipboard.clipboardData = CanvasUtils.serializeElementTree(selectedElement);
 			Clipboard.isCut = true;
 			ElementEvents.elementRemoved.emit(selectedElement);
 		}
 
 		// Paste (Ctrl+V)
-		if (keyboard.down("control") && keyboard.started("v") && Clipboard.clipboardData.length > 0) {
+		if (!isTyping && keyboard.down("control") && keyboard.started("v") && Clipboard.clipboardData.length > 0) {
 			CanvasUtils.pasteElements(Clipboard.clipboardData, selectedElement);
 			if (Clipboard.isCut) {
 				Clipboard.clipboardData = [];
@@ -223,75 +263,34 @@ class KouiEditor extends iron.Trait {
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 			uiBase.hwnds[PanelProperties].redraws = 2;
 		}
-	}
 
-	function canvasControl() {
-		var mouse: Mouse = Input.getMouse();
-		var keyboard: Keyboard = Input.getKeyboard();
-
-		// Handle middle mouse button panning
-		if (mouse.started("middle") && isInCanvas()) {
-			isPanning = true;
-			panStartX = mouse.x;
-			panStartY = mouse.y;
-		}
-		else if (mouse.down("middle") && isPanning) {
-			// Calculate delta movement
-			var deltaX: Float = mouse.x - panStartX;
-			var deltaY: Float = mouse.y - panStartY;
-
-			// Update canvas pan via padding
-			canvasPanX += deltaX;
-			canvasPanY += deltaY;
-
-			rootPane.posX = Std.int(canvasPanX / Koui.uiScale);
-			rootPane.posY = Std.int(canvasPanY / Koui.uiScale);
-			rootPane.drawX = Std.int(rootPane.posX * Koui.uiScale);
-			rootPane.drawY = Std.int(rootPane.posY * Koui.uiScale);
-			Koui.anchorPane.elemUpdated(rootPane);
-
-			// Update start position for next frame
-			panStartX = mouse.x;
-			panStartY = mouse.y;
-
-			Krom.setMouseCursor(9);
-		}
-		else if (!mouse.down("middle") && isPanning) {
-			isPanning = false;
-			Krom.setMouseCursor(0); // Default cursor
-		}
-
-		// FIXME: elements flicker when zooming
-		if (isInCanvas() && !isPanning) {
-			if (mouse.wheelDelta < 0) {
-				currentScale += 0.1;
-				currentScale = Math.min(3.0, currentScale);
-				Koui.uiScale = currentScale;
-			} else if (mouse.wheelDelta > 0) {
-				currentScale -= 0.1;
-				currentScale = Math.max(0.25, currentScale);
-				Koui.uiScale = currentScale;
+		// Undo (Ctrl+Z)
+		if (!isTyping && keyboard.down("control") && !keyboard.down("shift") && keyboard.started("z")) {
+			if (commandManager.undo()) {
+				rootPane = SceneManager.activeScene;
+				viewport.rootPane = rootPane;
+				hierarchyPanel.updateTabPosition();
+				ElementEvents.elementSelected.emit(selectedElement);
+				uiBase.hwnds[PanelHierarchy].redraws = 2;
+				uiBase.hwnds[PanelProperties].redraws = 2;
 			}
 		}
 
-		if (keyboard.started("f") && isInCanvas()) resetCanvasView();
-	}
-
-	function resetCanvasView() {
-		canvasPanX = 0;
-		canvasPanY = 0;
-
-		rootPane.posX = Std.int(canvasPanX / Koui.uiScale);
-		rootPane.posY = Std.int(canvasPanY / Koui.uiScale);
-		rootPane.drawX = Std.int(rootPane.posX * Koui.uiScale);
-		rootPane.drawY = Std.int(rootPane.posY * Koui.uiScale);
-		Koui.anchorPane.elemUpdated(rootPane);
-
-		sizeInit = false;
+		// Redo (Ctrl+Shift+Z or Ctrl+Y)
+		if (!isTyping && keyboard.down("control") && (keyboard.down("shift") && keyboard.started("z") || keyboard.started("y"))) {
+			if (commandManager.redo()) {
+				rootPane = SceneManager.activeScene;
+				viewport.rootPane = rootPane;
+				hierarchyPanel.updateTabPosition();
+				ElementEvents.elementSelected.emit(selectedElement);
+				uiBase.hwnds[PanelHierarchy].redraws = 2;
+				uiBase.hwnds[PanelProperties].redraws = 2;
+			}
+		}
 	}
 
 	function updateDragAndDrop() {
-		if (isPanning) return;
+		if (viewport.isPanning) return;
 
 		// FIXME: elements flicker on mouse start and release
 		var mouse: Mouse = Input.getMouse();
@@ -456,7 +455,6 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function drawRightPanels() {
-		// Adjust heights if window was resized
 		var tabx: Int = uiBase.getTabX();
 		var w: Int = uiBase.getSidebarW();
 		var h0: Int = uiBase.getSidebarH0();
@@ -466,145 +464,6 @@ class KouiEditor extends iron.Trait {
 		propertiesPanel.draw(uiBase, {tabx: tabx, h0: h0, w: w, h1: h1});
 	}
 
-	function drawGrid(g2: Graphics) {
-		if (!topToolbar.snappingEnabled || rootPane == null) return;
-
-		var cellSize: Float = topToolbar.snapValue * currentScale;
-		if (cellSize < 4) return; // Don't draw if cells are too small
-
-		// Visible area (canvas area only, excluding sidebar)
-		var viewWidth: Float = App.w() - uiBase.getSidebarW();
-		var viewHeight: Float = App.h() - uiBase.getBottomH();
-
-		// Calculate grid offset based on rootPane's actual screen position
-		// This ensures grid aligns with the rootPane regardless of its anchor
-		var offsetX: Float = rootPane.drawX % cellSize;
-		var offsetY: Float = rootPane.drawY % cellSize;
-
-		// Minor grid lines (every cell)
-		var minorAlpha: Int = 0x30; // ~19% opacity
-		g2.color = (minorAlpha << 24) | 0xffffff;
-
-		// Vertical lines
-		var x: Float = offsetX;
-		while (x < viewWidth) {
-			g2.drawLine(x, 0, x, viewHeight, 1);
-			x += cellSize;
-		}
-
-		// Horizontal lines
-		var y: Float = offsetY;
-		while (y < viewHeight) {
-			g2.drawLine(0, y, viewWidth, y, 1);
-			y += cellSize;
-		}
-
-		// Major grid lines (every 4 cells)
-		var majorCellSize: Float = cellSize * 4;
-		var majorOffsetX: Float = rootPane.drawX % majorCellSize;
-		var majorOffsetY: Float = rootPane.drawY % majorCellSize;
-
-		var majorAlpha: Int = 0x50; // ~31% opacity
-		g2.color = (majorAlpha << 24) | 0xffffff;
-
-		// Vertical major lines
-		x = majorOffsetX;
-		while (x < viewWidth) {
-			g2.drawLine(x, 0, x, viewHeight, 1);
-			x += majorCellSize;
-		}
-
-		// Horizontal major lines
-		y = majorOffsetY;
-		while (y < viewHeight) {
-			g2.drawLine(0, y, viewWidth, y, 1);
-			y += majorCellSize;
-		}
-	}
-
-	function drawRootPane(g2: Graphics) {
-		// Draw border with g2 in screen coordinates using drawX/drawY
-		if (rootPane != null) {
-			var thickness: Int = 1;
-			g2.color = 0xffe7e7e7;
-
-			var x: Int = rootPane.drawX;
-			var y: Int = rootPane.drawY;
-			var w: Int = rootPane.drawWidth;
-			var h: Int = rootPane.drawHeight;
-
-			g2.fillRect(x, y, w, thickness);
-			g2.fillRect(x, y + h - thickness, w, thickness);
-			g2.fillRect(x, y + thickness, thickness, h - thickness * 2);
-			g2.fillRect(x + w - thickness, y + thickness, thickness, h - thickness * 2);
-		}
-	}
-
-	function drawSelectedElement(g2: Graphics) {
-		if (selectedElement != null && selectedElement != rootPane) {
-			var thickness: Int = 2;
-			g2.color = 0xff469cff;
-
-			var x: Int = draggedElement != selectedElement || selectedElement is Layout ? selectedElement.drawX + rootPane.drawX : Std.int(selectedElement.drawX / Koui.uiScale) + rootPane.drawX;
-			var y: Int = draggedElement != selectedElement || selectedElement is Layout ? selectedElement.drawY + rootPane.drawY : Std.int(selectedElement.drawY / Koui.uiScale) + rootPane.drawY;
-			var w: Int = selectedElement.drawWidth;
-			var h: Int = selectedElement.drawHeight;
-
-			var finalPos: Vec2 = sumLayout(selectedElement, 0, 0);
-			if (selectedElement.layout != rootPane) {
-				x += Std.int(finalPos.x);
-				y += Std.int(finalPos.y);
-			}
-
-			g2.fillRect(x, y, w, thickness);
-			g2.fillRect(x, y + h - thickness, w, thickness);
-			g2.fillRect(x, y + thickness, thickness, h - thickness * 2);
-			g2.fillRect(x + w - thickness, y + thickness, thickness, h - thickness * 2);
-		}
-	}
-
-	function sumLayout(elem: Element, x: Int, y: Int): Vec2 {
-		if (elem.layout != null && elem.layout != rootPane) {
-			return sumLayout(elem.layout, x + elem.layout.drawX, y + elem.layout.drawY);
-		} else {
-			return new Vec2(x, y);
-		}
-	}
-
-	function drawLayoutElements(g2: Graphics) {
-		// Draw thin borders around layout elements (RowLayout, ColLayout, child AnchorPanes) since they're invisible
-		if (sceneData.currentScene == null) return;
-
-		var thickness: Int = 1;
-		g2.color = 0xff808080; // Gray color to distinguish from canvas border
-
-		for (entry in sceneData.currentScene.elements) {
-			var elem: Element = entry.element;
-			// Skip rootPane - it has its own drawing in drawRootPane
-			if (elem == rootPane) continue;
-
-			// Draw borders for child AnchorPanes, RowLayout, and ColLayout
-			if (elem is AnchorPane || elem is RowLayout || elem is ColLayout) {
-				var x: Int = elem.drawX + rootPane.drawX;
-				var y: Int = elem.drawY + rootPane.drawY;
-				var w: Int = elem.drawWidth;
-				var h: Int = elem.drawHeight;
-
-				// Use sumLayout for proper nested layout position calculation
-				var finalPos: Vec2 = sumLayout(elem, 0, 0);
-				if (elem.layout != rootPane) {
-					x += Std.int(finalPos.x);
-					y += Std.int(finalPos.y);
-				}
-
-				g2.fillRect(x, y, w, thickness);
-				g2.fillRect(x, y + h - thickness, w, thickness);
-				g2.fillRect(x, y + thickness, thickness, h - thickness * 2);
-				g2.fillRect(x + w - thickness, y + thickness, thickness, h - thickness * 2);
-			}
-		}
-	}
-
 	function render2D(g2: Graphics) {
 		if (uiBase == null) return;
 		g2.end();
@@ -612,10 +471,10 @@ class KouiEditor extends iron.Trait {
 		updateDragAndDrop();
 		Koui.render(g2);
 		g2.begin(false);
-		drawGrid(g2);
-		drawRootPane(g2);
-		drawLayoutElements(g2);
-		drawSelectedElement(g2);
+		viewport.drawGrid(g2);
+		viewport.drawRootPane(g2);
+		viewport.drawLayoutElements(g2);
+		viewport.drawSelectedElement(g2, selectedElement, draggedElement);
 		g2.end();
 
 		uiBase.ui.begin(g2);
@@ -628,21 +487,42 @@ class KouiEditor extends iron.Trait {
 
 		g2.begin(false);
 
-		if (!sizeInit) {
+		if (!sizeInit || viewport.viewReset) {
+			viewport.viewReset = false;
 			onResized();
 			sizeInit = true;
 		}
 	}
 
 	function onResized() {
-		if (!sizeInit) {
-			Koui.uiScale = ((App.h() - uiBase.getBottomH()) / baseH) * initialScale;
-			currentScale = Koui.uiScale;
+		viewport.onResized(sizeInit, baseH);
+	}
+
+	function onPropertyChangedForUndo(element: Element, properties: Dynamic, oldValues: Dynamic, newValues: Dynamic): Void {
+		if (commandManager.isUndoRedoing) return;
+
+		var props: Array<String>;
+		var olds: Array<Dynamic>;
+		var news: Array<Dynamic>;
+
+		if (Std.isOfType(properties, String)) {
+			props = [cast properties];
+			olds = [oldValues];
+			news = [newValues];
+		} else {
+			props = cast properties;
+			olds = cast oldValues;
+			news = cast newValues;
 		}
-		Koui.onResize(App.w() - uiBase.getSidebarW(), App.h() - uiBase.getBottomH());
-		if (Scene.active != null && Scene.active.camera != null) {
-			Scene.active.camera.buildProjection();
+
+		// Skip if nothing actually changed (e.g. click without drag)
+		var hasChange = false;
+		for (i in 0...props.length) {
+			if (olds[i] != news[i]) { hasChange = true; break; }
 		}
+		if (!hasChange) return;
+
+		commandManager.record(new PropertyChangeCommand(element, props, olds, news));
 	}
 
 	function onElementSelected(element: Element): Void {
@@ -726,38 +606,133 @@ class KouiEditor extends iron.Trait {
 		sceneData.updateElementKey(entry.element, uniqueName);
 
 		ElementEvents.elementSelected.emit(entry.element);
+
+		// Record for undo (SceneData.onElementAdded already pushed the entry via event)
+		if (!commandManager.isUndoRedoing) {
+			commandManager.record(new ElementAddCommand(entry.element, uniqueName, rootPane));
+		}
 	}
 
 	function onElementRemoved(element: Element): Void {
-		var children: Array<Element> = HierarchyUtils.getChildren(element);
-		for (child in children) {
-			ElementEvents.elementRemoved.emit(child);
+		if (commandManager.isUndoRedoing) return; // Commands handle removal directly
+
+		// Collect ALL entries for this element and its descendants BEFORE removing
+		var allEntries = collectDescendantEntries(element);
+		var parentElement = HierarchyUtils.getParentElement(element);
+
+		// Remove all entries from SceneData (since SceneData is no longer auto-connected)
+		for (entry in allEntries) {
+			sceneData.onElementRemoved(entry.element);
 		}
 
+		// Detach from parent (children stay attached to element)
 		HierarchyUtils.detachFromCurrentParent(element);
+
 		if (selectedElement == element) {
 			selectedElement = null;
 			ElementEvents.elementSelected.emit(null);
 		}
+
+		// Record for undo
+		var key = allEntries.length > 0 ? allEntries[0].key : "";
+		commandManager.record(new ElementRemoveCommand(element, key, parentElement, 0, allEntries));
+	}
+
+	/** Recursively collect TElementEntry records for an element and all its descendants. */
+	function collectDescendantEntries(element: Element): Array<TElementEntry> {
+		var result: Array<TElementEntry> = [];
+		var currentScene = sceneData.currentScene;
+		if (currentScene == null) return result;
+
+		// Find this element's entry
+		for (entry in currentScene.elements) {
+			if (entry.element == element) {
+				result.push({key: entry.key, element: entry.element});
+				break;
+			}
+		}
+
+		// Recursively collect children's entries
+		var children = HierarchyUtils.getChildren(element);
+		for (child in children) {
+			var childEntries = collectDescendantEntries(child);
+			for (ce in childEntries) {
+				result.push(ce);
+			}
+		}
+
+		return result;
 	}
 
 	function onSceneAdded(sceneName: String): Void {
-		SceneManager.addScene(sceneName, setupRootScene);
+		if (commandManager.isUndoRedoing) return; // Commands handle scene creation directly
+
+		SceneManager.addScene(sceneName, (scene) -> setupRootScene(scene, sceneName));
 		SceneManager.setScene(sceneName);
-		sceneData.currentScene.key = sceneName;
+		selectedElement = null;
+		ElementEvents.elementSelected.emit(null);
+		hierarchyPanel.updateTabPosition();
+
+		// Find the just-created scene entry and record for undo
+		for (scene in sceneData.scenes) {
+			if (scene.key == sceneName) {
+				commandManager.record(new SceneAddCommand(sceneName, scene));
+				break;
+			}
+		}
 	}
 
 	function onSceneChanged(sceneName: String): Void {
 		SceneManager.setScene(sceneName);
 		rootPane = SceneManager.activeScene;
+		viewport.rootPane = rootPane;
 	}
 
 	function onSceneNameChanged(oldKey: String, newKey: String): Void {
+		if (commandManager.isUndoRedoing) return; // Commands handle renaming directly
+
 		SceneManager.renameScene(oldKey, newKey);
 		sceneData.currentScene.key = newKey;
+
+		commandManager.record(new SceneRenameCommand(oldKey, newKey));
 	}
 
 	function onSceneRemoved(sceneName: String): Void {
+		if (commandManager.isUndoRedoing) return; // Commands handle removal directly
+
+		// Capture backup BEFORE removal
+		var sceneEntry: TSceneEntry = null;
+		var sceneIndex: Int = 0;
+		for (i in 0...sceneData.scenes.length) {
+			if (sceneData.scenes[i].key == sceneName) {
+				sceneEntry = sceneData.scenes[i];
+				sceneIndex = i;
+				break;
+			}
+		}
+
+		if (sceneEntry == null) return;
+
+		// Remove from SceneManager
 		SceneManager.removeScene(sceneName);
+
+		// Remove from SceneData
+		sceneEntry.active = false;
+		sceneData.scenes.splice(sceneIndex, 1);
+
+		// Switch to another scene
+		if (sceneData.scenes.length > 0) {
+			var idx = sceneIndex > 0 ? sceneIndex - 1 : 0;
+			if (idx >= sceneData.scenes.length) idx = sceneData.scenes.length - 1;
+			SceneManager.setScene(sceneData.scenes[idx].key);
+			SceneEvents.sceneChanged.emit(sceneData.scenes[idx].key);
+		}
+
+		selectedElement = null;
+		ElementEvents.elementSelected.emit(null);
+		hierarchyPanel.updateTabPosition();
+
+		// Record for undo
+		commandManager.record(new SceneRemoveCommand(sceneName, sceneEntry, sceneIndex));
 	}
 }

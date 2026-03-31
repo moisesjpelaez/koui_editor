@@ -4,7 +4,11 @@ import arm.data.CanvasSettings;
 import arm.data.SceneData;
 import arm.events.SceneEvents;
 import arm.events.ElementEvents;
+import arm.editors.ElementRegistry;
+import arm.commands.CommandManager;
+import arm.commands.KeyRenameCommand;
 import arm.types.Enums;
+import arm.types.Types;
 import arm.base.UIBase;
 import arm.tools.CanvasUtils;
 import arm.tools.ZuiUtils;
@@ -12,18 +16,10 @@ import arm.tools.ZuiUtils;
 import iron.math.Vec2;
 import kha.Image;
 import koui.Koui;
-import koui.elements.Button;
-import koui.elements.Checkbox;
 import koui.elements.Element;
-import koui.elements.ImagePanel;
-import koui.elements.Label;
-import koui.elements.Panel;
-import koui.elements.Progressbar;
 import koui.elements.RadioButton;
-import koui.elements.Slider;
 import koui.elements.layouts.Layout.Anchor;
 import koui.theme.Style;
-import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
 import koui.utils.RadioGroup;
 
 import zui.Zui;
@@ -62,43 +58,6 @@ class PropertiesPanel {
     var focusLeftHandle: Handle;
     var focusRightHandle: Handle;
 
-    // Label handles
-    var labelTextHandle: Handle;
-
-    // Button handles
-    var buttonTextHandle: Handle;
-    var buttonIconHandle: Handle;
-    var buttonIconSizeHandle: Handle;
-    var buttonIsPressedHandle: Handle;
-    var buttonIsToggleHandle: Handle;
-
-    // Checkbox handles
-    var checkboxIsCheckedHandle: Handle;
-    var checkboxTextHandle: Handle;
-
-    // RadioButton handles
-    var radioButtonIsCheckedHandle: Handle;
-    var radioButtonTextHandle: Handle;
-    var radioButtonGroupHandle: Handle;
-
-    // Progressbar handles
-    var progressbarMinValueHandle: Handle;
-    var progressbarMaxValueHandle: Handle;
-    var progressbarTextHandle: Handle;
-    var progressbarPrecisionHandle: Handle;
-    var progressbarValueHandle: Handle;
-
-    // ImagePanel handles
-    var imagePanelImageHandle: Handle;
-    var imagePanelScaleHandle: Handle;
-
-    // Slider handles
-    var sliderMaxValueHandle: Handle;
-    var sliderMinValueHandle: Handle;
-    var sliderValueHandle: Handle;
-    var sliderOrientationHandle: Handle;
-    var sliderPrecisionHandle: Handle;
-
     // RadioGroups tab handles/state
     var radioGroupNameHandle: Handle;
     var radioGroupRenameHandles: StringMap<Handle>;
@@ -132,36 +91,6 @@ class PropertiesPanel {
         focusDownHandle = new Handle({position: 0});
         focusLeftHandle = new Handle({position: 0});
         focusRightHandle = new Handle({position: 0});
-
-        labelTextHandle = new Handle({text: "New Label"});
-
-        buttonTextHandle = new Handle({text: "New Button"});
-        // buttonIconHandle = new Handle({text: ""});
-        // buttonIconSizeHandle = new Handle({text: "16"});
-        buttonIsPressedHandle = new Handle({selected: false});
-        buttonIsToggleHandle = new Handle({selected: false});
-
-        checkboxTextHandle = new Handle({text: ""});
-        checkboxIsCheckedHandle = new Handle({selected: false});
-
-        radioButtonTextHandle = new Handle({text: ""});
-        radioButtonIsCheckedHandle = new Handle({selected: false});
-        radioButtonGroupHandle = new Handle({position: 0});
-
-        progressbarValueHandle = new Handle({value: 0});
-        progressbarMinValueHandle = new Handle({text: "0"});
-        progressbarMaxValueHandle = new Handle({text: "1"});
-        progressbarTextHandle = new Handle({text: ""});
-        progressbarPrecisionHandle = new Handle({text: "1"});
-
-        imagePanelImageHandle = new Handle({position: 0});
-        imagePanelScaleHandle = new Handle({selected: false});
-
-        sliderMaxValueHandle = new Handle({text: "1"});
-        sliderMinValueHandle = new Handle({text: "0"});
-        sliderValueHandle = new Handle({value: 0});
-        sliderOrientationHandle = new Handle({position: 3});
-        sliderPrecisionHandle = new Handle({text: "1"});
 
         radioGroupNameHandle = new Handle({text: "RadioGroup"});
         radioGroupRenameHandles = new StringMap();
@@ -299,16 +228,11 @@ class PropertiesPanel {
                     var label = key != null ? key : "(removed)";
                     if (group.activeButton == button) label += " [active]";
 
-                    ui.row([2/3, 1/6, 1/6]);
+                    ui.row([5/6, 1/6]);
                     ui.text(label, Left);
 
                     if (ZuiUtils.iconButton(ui, icons, 7, 0, "Set Active", group.activeButton == button, false, 0.4)) {
                         group.setActiveButton(button);
-                        uiBase.hwnds[PanelProperties].redraws = 2;
-                    }
-
-                    if (ZuiUtils.iconButton(ui, icons, 1, 3, "Remove from group", false, false, 0.4)) {
-                        removeButtonFromGroup(group, button);
                         uiBase.hwnds[PanelProperties].redraws = 2;
                     }
                 }
@@ -342,11 +266,6 @@ class PropertiesPanel {
         }
 
         return entries;
-    }
-
-    function getAvailableRadioGroups(currentRadioButton: RadioButton = null): Array<RadioGroup> {
-        ensureRadioGroups();
-        return sceneData.radioGroups;
     }
 
     function findRadioGroup(groupId: String): RadioGroup {
@@ -513,7 +432,12 @@ class PropertiesPanel {
         nameHandle.text = elemName;
         var newName: String = ui.textInput(nameHandle, "Key", Right);
         if (nameHandle.changed) {
-            if (newName != null && newName != "") sceneData.updateElementKey(selectedElement, newName);
+            if (newName != null && newName != "" && newName != elemName) {
+                sceneData.updateElementKey(selectedElement, newName);
+                if (!CommandManager.instance.isUndoRedoing) {
+                    CommandManager.instance.record(new KeyRenameCommand(selectedElement, elemName, newName));
+                }
+            }
             uiBase.hwnds[PanelHierarchy].redraws = 2;
             uiBase.hwnds[PanelProperties].redraws = 2;
         }
@@ -757,312 +681,9 @@ class PropertiesPanel {
     }
 
     function drawElementProperties(uiBase: UIBase) {
-        var ui: Zui = uiBase.ui;
-
-        if (selectedElement is Label) {
-            ui.text("Label Properties", Center);
-            ui.separator();
-
-            var label: Label = cast(selectedElement, Label);
-            labelTextHandle.text = label.text;
-            var newText: String = ui.textInput(labelTextHandle, "Text", Right);
-            if (labelTextHandle.changed) {
-                if (newText != null && newText != "") {
-                    ElementEvents.propertyChanged.emit(label, "text", label.text, newText);
-                    label.text = newText;
-                }
-            }
-        } else if (selectedElement is Button) {
-            ui.text("Button Properties", Center);
-            ui.separator();
-
-            var button: Button = cast(selectedElement, Button);
-            buttonTextHandle.text = button.text;
-            var newText: String = ui.textInput(buttonTextHandle, "Text", Right);
-            if (buttonTextHandle.changed) {
-                if (newText != null && newText != "") {
-                    ElementEvents.propertyChanged.emit(button, "text", button.text, newText);
-                    button.text = newText;
-                }
-            }
-
-            // TODO: Icon
-            // TODO: Icon Size
-
-            buttonIsPressedHandle.selected = button.isToggle && button.isPressed;
-            var newPressed = ui.check(buttonIsPressedHandle, "Is Pressed");
-            if (newPressed != button.isPressed) {
-                ElementEvents.propertyChanged.emit(button, "isPressed", button.isPressed, newPressed);
-                button.isPressed = newPressed;
-            }
-
-            buttonIsToggleHandle.selected = button.isToggle;
-            var newToggle = ui.check(buttonIsToggleHandle, "Is Toggle");
-            if (newToggle != button.isToggle) {
-                ElementEvents.propertyChanged.emit(button, "isToggle", button.isToggle, newToggle);
-                button.isToggle = newToggle;
-            }
-        } else if (selectedElement is RadioButton) {
-            ui.text("Radio Button Properties", Center);
-            ui.separator();
-
-            var radioButton: RadioButton = cast(selectedElement, RadioButton);
-
-            radioButtonTextHandle.text = radioButton.text;
-            var newText: String = ui.textInput(radioButtonTextHandle, "Text", Right);
-            if (radioButtonTextHandle.changed) {
-                if (newText != null && newText != "") {
-                    ElementEvents.propertyChanged.emit(radioButton, "text", radioButton.text, newText);
-                    radioButton.text = newText;
-                }
-            }
-
-            radioButtonIsCheckedHandle.selected = radioButton.isChecked;
-            var newChecked = ui.check(radioButtonIsCheckedHandle, "Is Checked");
-            if (newChecked != radioButton.isChecked) {
-                ElementEvents.propertyChanged.emit(radioButton, "isChecked", radioButton.isChecked, newChecked);
-                if (newChecked) {
-                    radioButton.group.setActiveButton(radioButton);
-                } else {
-                    radioButton.isChecked = false;
-                    var checkSquare: Panel = radioButton.getChild(new TypeMatchBehaviour(Panel));
-                    checkSquare.setContextElement("");
-                }
-            }
-
-            var availableGroups = getAvailableRadioGroups(radioButton);
-            var groupNames: Array<String> = [];
-            var currentIndex = 0;
-            for (i in 0...availableGroups.length) {
-                groupNames.push(availableGroups[i].id);
-                if (radioButton.group != null && (availableGroups[i] == radioButton.group || availableGroups[i].id == radioButton.group.id)) {
-                    currentIndex = i;
-                }
-            }
-
-            if (groupNames.length == 0) {
-                groupNames.push("(none)");
-                radioButtonGroupHandle.position = 0;
-                ui.combo(radioButtonGroupHandle, groupNames, "Radio Group", true, Right);
-            } else {
-                radioButtonGroupHandle.position = currentIndex;
-                var newGroupIndex = ui.combo(radioButtonGroupHandle, groupNames, "Radio Group", true, Right);
-                if (radioButtonGroupHandle.changed && newGroupIndex >= 0 && newGroupIndex < availableGroups.length) {
-                    var newGroup = availableGroups[newGroupIndex];
-                    if (radioButton.group == null || (radioButton.group != newGroup && radioButton.group.id != newGroup.id)) {
-                        var oldGroupId = radioButton.group != null ? radioButton.group.id : "";
-                        addButtonToGroup(newGroup, radioButton);
-                        ElementEvents.propertyChanged.emit(radioButton, "radioGroup", oldGroupId, newGroup.id);
-                    }
-                }
-            }
-        } else if (selectedElement is Checkbox) {
-            ui.text("Checkbox Properties", Center);
-            ui.separator();
-
-            var checkbox: Checkbox = cast(selectedElement, Checkbox);
-
-            checkboxTextHandle.text = checkbox.text;
-            var newText: String = ui.textInput(checkboxTextHandle, "Text", Right);
-            if (checkboxTextHandle.changed) {
-                if (newText != null && newText != "") {
-                    ElementEvents.propertyChanged.emit(checkbox, "text", checkbox.text, newText);
-                    checkbox.text = newText;
-                }
-            }
-
-            checkboxIsCheckedHandle.selected = checkbox.isChecked;
-            var newChecked = ui.check(checkboxIsCheckedHandle, "Is Checked");
-            if (newChecked != checkbox.isChecked) {
-                ElementEvents.propertyChanged.emit(checkbox, "isChecked", checkbox.isChecked, newChecked);
-                checkbox.isChecked = newChecked;
-                // Update the internal Panel's visual state
-                var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
-                checkSquare.setContextElement(newChecked ? "checked" : "");
-            }
-        } else if (selectedElement is Progressbar) {
-            ui.text("Progressbar Properties", Center);
-            ui.separator();
-
-            var progressbar: Progressbar = cast(selectedElement, Progressbar);
-
-            progressbarTextHandle.text = progressbar.text;
-            var newText: String = ui.textInput(progressbarTextHandle, "Text", Right);
-            if (progressbarTextHandle.changed) {
-                ElementEvents.propertyChanged.emit(progressbar, "text", progressbar.text, newText);
-                progressbar.text = newText;
-            }
-
-            progressbarMinValueHandle.text = Std.string(progressbar.minValue);
-            var newMinStr: String = ui.textInput(progressbarMinValueHandle, "Min Value", Right);
-            if (progressbarMinValueHandle.changed) {
-                var newMin: Float = Std.parseFloat(newMinStr);
-                if (!Math.isNaN(newMin)) {
-                    ElementEvents.propertyChanged.emit(progressbar, "minValue", progressbar.minValue, newMin);
-                    progressbar.minValue = newMin;
-                    progressbar.value = Math.max(newMin, progressbar.value);
-                }
-            }
-
-            progressbarMaxValueHandle.text = Std.string(progressbar.maxValue);
-            var newMaxStr: String = ui.textInput(progressbarMaxValueHandle, "Max Value", Right);
-            if (progressbarMaxValueHandle.changed) {
-                var newMax: Float = Std.parseFloat(newMaxStr);
-                if (!Math.isNaN(newMax)) {
-                    ElementEvents.propertyChanged.emit(progressbar, "maxValue", progressbar.maxValue, newMax);
-                    progressbar.maxValue = newMax;
-                    progressbar.value = Math.min(newMax, progressbar.value);
-                }
-            }
-
-            progressbarPrecisionHandle.text = Std.string(progressbar.precision);
-            var newPrecisionStr: String = ui.textInput(progressbarPrecisionHandle, "Precision", Right);
-            var steps: Float = 0;
-            if (progressbarPrecisionHandle.changed) {
-                var newPrecision: Int = Std.parseInt(newPrecisionStr);
-                if (newPrecision != null) {
-                    newPrecision = Std.int(Math.max(0, newPrecision));
-                    ElementEvents.propertyChanged.emit(progressbar, "precision", progressbar.precision, newPrecision);
-                    progressbar.precision = newPrecision;
-                    steps = Math.pow(10, -progressbar.precision);
-                    progressbar.value = Math.round(progressbar.value / steps) * steps;
-                }
-            }
-
-            // Value slider (below min/max so bounds are set first)
-            progressbarValueHandle.value = progressbar.value;
-            steps = Math.pow(10, -progressbar.precision);
-            var newValue: Float = ui.slider(progressbarValueHandle, "Value", progressbar.minValue, progressbar.maxValue, true, 1 / steps, true, Right);
-            if (progressbarValueHandle.changed) {
-                newValue = Math.round(newValue / steps) * steps;
-                progressbarValueHandle.value = newValue;
-                ElementEvents.propertyChanged.emit(progressbar, "value", progressbar.value, newValue);
-                progressbar.value = newValue;
-            }
-        } else if (selectedElement is ImagePanel) {
-            ui.text("Image Properties", Center);
-            ui.separator();
-
-            var imagePanel: ImagePanel = cast(selectedElement, ImagePanel);
-
-            // Build list of available images from Koui.imageMap
-            var imageNames: Array<String> = ["(none)"];
-            for (key in Koui.imageMap.keys()) {
-                imageNames.push(key);
-            }
-
-            // Find current selection index
-            var currentImageName: String = CanvasUtils.getImageName(imagePanel.image);
-            var currentIndex: Int = 0;
-            for (i in 0...imageNames.length) {
-                if (imageNames[i] == currentImageName) {
-                    currentIndex = i;
-                    break;
-                }
-            }
-            imagePanelImageHandle.position = currentIndex;
-
-            // Image dropdown
-            var newIndex: Int = ui.combo(imagePanelImageHandle, imageNames, "Image", true, Right);
-            if (imagePanelImageHandle.changed) {
-                var selectedName: String = imageNames[newIndex];
-                if (selectedName == "(none)") {
-                    ElementEvents.propertyChanged.emit(imagePanel, "image", currentImageName, "");
-                    imagePanel.image = null;
-                    imagePanel.width = 32;
-                    imagePanel.height = 32;
-                } else {
-                    var img: kha.Image = Koui.getImage(selectedName);
-                    if (img != null) {
-                        ElementEvents.propertyChanged.emit(imagePanel, "image", currentImageName, selectedName);
-                        imagePanel.image = img;
-                    }
-                }
-                Koui.updateElementSize(imagePanel);
-            }
-
-            // Scale checkbox
-            imagePanelScaleHandle.selected = imagePanel.scale;
-            var newScale: Bool = ui.check(imagePanelScaleHandle, "Scale to Size");
-            if (newScale != imagePanel.scale) {
-                ElementEvents.propertyChanged.emit(imagePanel, "scale", imagePanel.scale, newScale);
-                imagePanel.scale = newScale;
-            }
-        } else if (selectedElement is Slider) {
-            ui.text("Slider Properties", Center);
-            ui.separator();
-
-            var slider: Slider = cast(selectedElement, Slider);
-
-            var orientation: Array<String> = ["Up", "Down", "Left", "Right"];
-            var currentIndex: Int = 0;
-            switch (slider.orientation) {
-                case Up: currentIndex = 0;
-                case Down: currentIndex = 1;
-                case Left: currentIndex = 2;
-                case Right: currentIndex = 3;
-            }
-            sliderOrientationHandle.position = currentIndex;
-
-            var newIndex: Int = ui.combo(sliderOrientationHandle, orientation, "Orientation", true, Right);
-            if (sliderOrientationHandle.changed) {
-                var newOrientation = slider.orientation;
-                switch (newIndex) {
-                    case 0: newOrientation = Up;
-                    case 1: newOrientation = Down;
-                    case 2: newOrientation = Left;
-                    case 3: newOrientation = Right;
-                }
-                ElementEvents.propertyChanged.emit(slider, "orientation", slider.orientation, newOrientation);
-                slider.orientation = newOrientation;
-                Koui.updateElementSize(slider);
-            }
-
-            sliderMinValueHandle.text = Std.string(slider.minValue);
-            var newMinStr: String = ui.textInput(sliderMinValueHandle, "Min Value", Right);
-            if (sliderMinValueHandle.changed) {
-                var newMin: Float = Std.parseFloat(newMinStr);
-                if (!Math.isNaN(newMin)) {
-                    ElementEvents.propertyChanged.emit(slider, "minValue", slider.minValue, newMin);
-                    slider.minValue = newMin;
-                    slider.value = Math.max(newMin, slider.value);
-                }
-            }
-
-            sliderMaxValueHandle.text = Std.string(slider.maxValue);
-            var newMaxStr: String = ui.textInput(sliderMaxValueHandle, "Max Value", Right);
-            if (sliderMaxValueHandle.changed) {
-                var newMax: Float = Std.parseFloat(newMaxStr);
-                if (!Math.isNaN(newMax)) {
-                    ElementEvents.propertyChanged.emit(slider, "maxValue", slider.maxValue, newMax);
-                    slider.maxValue = newMax;
-                    slider.value = Math.min(newMax, slider.value);
-                }
-            }
-
-            sliderPrecisionHandle.text = Std.string(slider.precision);
-            var newPrecisionStr: String = ui.textInput(sliderPrecisionHandle, "Precision", Right);
-            var steps: Float = 0;
-            if (sliderPrecisionHandle.changed) {
-                var newPrecision: Int = Std.parseInt(newPrecisionStr);
-                if (newPrecision != null) {
-                    newPrecision = Std.int(Math.max(0, newPrecision));
-                    ElementEvents.propertyChanged.emit(slider, "precision", slider.precision, newPrecision);
-                    slider.precision = newPrecision;
-                    steps = Math.pow(10, -slider.precision);
-                    slider.value = Math.round(slider.value / steps) * steps;
-                }
-            }
-
-            sliderValueHandle.value = slider.value;
-            steps = Math.pow(10, -slider.precision);
-            var newValue: Float = ui.slider(sliderValueHandle, "Value", slider.minValue, slider.maxValue, true, 1 / steps, true, Right);
-            if (sliderValueHandle.changed) {
-                newValue = Math.round(newValue / steps) * steps;
-                sliderValueHandle.value = newValue;
-                ElementEvents.propertyChanged.emit(slider, "value", slider.value, newValue);
-                slider.value = newValue;
-            }
+        var editor = ElementRegistry.getForElement(selectedElement);
+        if (editor != null) {
+            editor.drawProperties(uiBase.ui, selectedElement);
         }
     }
 
@@ -1135,6 +756,10 @@ class PropertiesPanel {
                 focusLeftHandle.position = getIndex(element.focusLeft);
                 focusRightHandle.position = getIndex(element.focusRight);
             }
+
+            // Sync type-specific editor handles
+            var editor = ElementRegistry.getForElement(element);
+            if (editor != null) editor.syncHandles(element);
         }
     }
 

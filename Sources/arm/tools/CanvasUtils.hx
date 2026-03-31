@@ -2,10 +2,10 @@ package arm.tools;
 
 import arm.data.CanvasSettings;
 import arm.data.SceneData;
-import arm.data.SceneData.TSceneEntry;
 import arm.events.SceneEvents;
 import arm.events.ElementEvents;
 import arm.tools.ElementUtils;
+import arm.types.Types;
 
 import haxe.Json;
 
@@ -18,57 +18,6 @@ import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
 import koui.utils.RadioGroup;
-
-typedef TRadioGroupData = {
-	var id: String;
-	var activeButtonKey: Null<String>;
-}
-
-// JSON structure typedefs
-typedef TCanvasData = {
-	var name: String;
-	var version: String;
-	var canvas: TCanvasSettings;
-	var radioGroups: Array<TRadioGroupData>;
-	var scenes: Array<TSceneData>;
-}
-
-typedef TCanvasSettings = {
-	var width: Int;
-	var height: Int;
-	var settings: {
-		var expandOnResize: Bool;
-		var scaleOnResize: Bool;
-		var autoScale: Bool;
-		var scaleHorizontal: Bool;
-		var scaleVertical: Bool;
-	};
-}
-
-typedef TSceneData = {
-	var key: String;
-	var active: Bool;
-	var elements: Array<TElementData>;
-}
-
-typedef TElementData = {
-	var key: String;
-	var type: String;
-	var tID: String;
-	var posX: Int;
-	var posY: Int;
-	var width: Int;
-	var height: Int;
-	var anchor: Int;
-	var visible: Bool;
-	var disabled: Bool;
-	var parentKey: Null<String>;
-	var focusUp: Null<String>;
-	var focusDown: Null<String>;
-	var focusLeft: Null<String>;
-	var focusRight: Null<String>;
-	var properties: Dynamic;
-}
 
 class CanvasUtils {
 	static inline var FORMAT_VERSION: String = "1.3";

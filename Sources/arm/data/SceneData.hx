@@ -2,21 +2,10 @@ package arm.data;
 
 import arm.events.ElementEvents;
 import arm.events.SceneEvents;
+import arm.types.Types;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.Element;
 import koui.utils.RadioGroup;
-
-typedef TSceneEntry = {
-    var key: String;
-    var root: AnchorPane;
-    var elements: Array<TElementEntry>;
-    var active: Bool;
-}
-
-typedef TElementEntry = {
-    var key: String;
-    var element: Element;
-}
 
 class SceneData {
     public static var data: SceneData = new SceneData();
@@ -26,9 +15,9 @@ class SceneData {
 
     public function new() {
         ElementEvents.elementAdded.connect(onElementAdded);
-        ElementEvents.elementRemoved.connect(onElementRemoved);
         SceneEvents.sceneChanged.connect(onSceneChanged);
-        SceneEvents.sceneRemoved.connect(onSceneRemoved);
+        // Note: sceneRemoved and elementRemoved are handled by KouiEditor directly
+        // to support undo/redo (commands need to capture state before mutation).
     }
 
     public function updateElementKey(element: Element, newKey: String): Void {
@@ -67,7 +56,7 @@ class SceneData {
     }
 
     function onSceneChanged(sceneKey: String): Void {
-        currentScene.active = false;
+        if (currentScene != null) currentScene.active = false;
         for (i in 0...scenes.length) {
             if (scenes[i].key == sceneKey) {
                 currentScene = scenes[i];
