@@ -10,12 +10,12 @@ import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
-// import koui.elements.RadioButton;
+import koui.elements.RadioButton;
 import koui.elements.Slider;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
-// import koui.utils.RadioGroup;
+import koui.utils.RadioGroup;
 import zui.Id;
 
 class ElementsPanel {
@@ -69,11 +69,15 @@ class ElementsPanel {
 					ElementEvents.elementAdded.emit({ key: key, element: checkbox });
 				}
 
-				// TODO: design a solution for RadioGroup in the editor, maybe in the PropertiesPanel (in Settings) for managing groups and assigning buttons to them?
-				// if (uiBase.ui.button("Radio")) {
-				// 	var key: String = "Radio";
-				// 	var radio: RadioButton = new RadioButton(new RadioGroup(), "New Radio");
-				// }
+				if (uiBase.ui.button("Radio Button")) {
+					var key: String = "RadioButton";
+					var defaultGroup = PropertiesPanel.getDefaultRadioGroup();
+					if (defaultGroup == null) {
+						defaultGroup = new RadioGroup("RadioGroup");
+					}
+					var radio: RadioButton = new RadioButton(defaultGroup, "New Radio");
+					ElementEvents.elementAdded.emit({ key: key, element: radio });
+				}
 
 				uiBase.ui.unindent();
 			}

@@ -13,15 +13,23 @@ import koui.Koui;
 import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.Label;
+import koui.elements.RadioButton;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
+import koui.utils.RadioGroup;
+
+typedef TRadioGroupData = {
+	var id: String;
+	var activeButtonKey: Null<String>;
+}
 
 // JSON structure typedefs
 typedef TCanvasData = {
 	var name: String;
 	var version: String;
 	var canvas: TCanvasSettings;
+	var radioGroups: Array<TRadioGroupData>;
 	var scenes: Array<TSceneData>;
 }
 
@@ -63,7 +71,7 @@ typedef TElementData = {
 }
 
 class CanvasUtils {
-	static inline var FORMAT_VERSION: String = "1.1";
+	static inline var FORMAT_VERSION: String = "1.3";
 
 	// Canvas name from command line args (e.g., "MyCanvas")
 	public static var canvasName: String = "UntitledCanvas";
@@ -446,6 +454,7 @@ class CanvasUtils {
 					scaleVertical: CanvasSettings.scaleVertical
 				}
 			},
+			radioGroups: serializeRadioGroups(),
 			scenes: scenesData
 		};
 	}
@@ -470,6 +479,26 @@ class CanvasUtils {
 			active: scene.active,
 			elements: elementsData
 		};
+	}
+
+	static function serializeRadioGroups(): Array<TRadioGroupData> {
+		var groups = sceneData.radioGroups;
+
+		// Find active button key by searching all scenes
+		var findElementKey = function(element: Element): Null<String> {
+			if (element == null) return null;
+			for (scene in sceneData.scenes) {
+				for (entry in scene.elements) {
+					if (entry.element == element) return entry.key;
+				}
+			}
+			return null;
+		};
+
+		return [for (group in groups) {
+			id: group.id,
+			activeButtonKey: findElementKey(group.activeButton)
+		}];
 	}
 
 	/**
@@ -580,12 +609,53 @@ class CanvasUtils {
 			CanvasSettings.scaleVertical = canvasData.canvas.settings.scaleVertical;
 		}
 
-		// Deserialize each scene by emitting sceneAdded (like the Add Scene button does)
+		// Build global radio group map from canvas-level data
+		var radioGroupMap: Map<String, RadioGroup> = new Map();
+		sceneData.radioGroups = [];
+
+		if (canvasData.radioGroups != null) {
+			for (radioGroupData in canvasData.radioGroups) {
+				if (radioGroupData == null || radioGroupData.id == null || radioGroupData.id == "") continue;
+				if (!radioGroupMap.exists(radioGroupData.id)) {
+					var group = new RadioGroup(radioGroupData.id);
+					radioGroupMap.set(radioGroupData.id, group);
+					sceneData.radioGroups.push(group);
+				}
+			}
+		}
+
+		if (sceneData.radioGroups.length == 0) {
+			var defaultGroup = new RadioGroup("RadioGroup");
+			radioGroupMap.set(defaultGroup.id, defaultGroup);
+			sceneData.radioGroups.push(defaultGroup);
+		}
+
+		// Deserialize each scene, sharing the global radio group map
 		var activeSceneKey: String = null;
+		var allElementMaps: Array<Map<String, Element>> = [];
 		for (sceneDataEntry in canvasData.scenes) {
-			deserializeScene(sceneDataEntry, canvasData.canvas.width, canvasData.canvas.height);
+			var elementMap = deserializeScene(sceneDataEntry, canvasData.canvas.width, canvasData.canvas.height, radioGroupMap);
+			allElementMaps.push(elementMap);
 			if (sceneDataEntry.active) {
 				activeSceneKey = sceneDataEntry.key;
+			}
+		}
+
+		// Restore active buttons (search across all scenes' element maps)
+		if (canvasData.radioGroups != null) {
+			for (radioGroupData in canvasData.radioGroups) {
+				if (radioGroupData == null || radioGroupData.activeButtonKey == null) continue;
+				var group = radioGroupMap.get(radioGroupData.id);
+				if (group == null) continue;
+
+				for (elementMap in allElementMaps) {
+					var targetElement = elementMap.get(radioGroupData.activeButtonKey);
+					var targetButton: RadioButton = Std.downcast(targetElement, RadioButton);
+					if (targetButton != null) {
+						group.setActiveButton(targetButton);
+						break;
+					}
+				}
 			}
 		}
 
@@ -602,8 +672,9 @@ class CanvasUtils {
 
 	/**
 	 * Deserializes a single scene from TSceneData.
+	 * Returns the element map for active button restoration.
 	 */
-	static function deserializeScene(sceneDataEntry: TSceneData, canvasWidth: Int, canvasHeight: Int): Void {
+	static function deserializeScene(sceneDataEntry: TSceneData, canvasWidth: Int, canvasHeight: Int, radioGroupMap: Map<String, RadioGroup>): Map<String, Element> {
 		// Emit sceneAdded - this triggers KouiEditor.onSceneAdded which properly sets up the scene
 		SceneEvents.sceneAdded.emit(sceneDataEntry.key);
 
@@ -613,7 +684,7 @@ class CanvasUtils {
 		// First pass: create all elements in order (use array to handle duplicate keys)
 		var createdElements: Array<Element> = [];
 		for (elemData in sceneDataEntry.elements) {
-			var element: Element = createElementFromData(elemData);
+			var element: Element = createElementFromData(elemData, radioGroupMap);
 			createdElements.push(element);
 		}
 
@@ -626,7 +697,6 @@ class CanvasUtils {
 		}
 
 		// Second pass: add elements to correct parents with correct anchors
-		// Use index to pair each elemData with its created element (handles duplicate keys)
 		for (i in 0...sceneDataEntry.elements.length) {
 			var elemData = sceneDataEntry.elements[i];
 			var element = createdElements[i];
@@ -664,12 +734,14 @@ class CanvasUtils {
 			if (elemData.focusLeft != null) element.focusLeft = elementMap.get(elemData.focusLeft);
 			if (elemData.focusRight != null) element.focusRight = elementMap.get(elemData.focusRight);
 		}
+
+		return elementMap;
 	}
 
 	/**
 	 * Creates an element from TElementData.
 	 */
-	public static function createElementFromData(data: TElementData): Element {
+	public static function createElementFromData(data: TElementData, ?radioGroupMap: Map<String, RadioGroup>): Element {
 		return ElementUtils.createElement(
 			data.type,
 			data.posX,
@@ -680,7 +752,8 @@ class CanvasUtils {
 			data.visible,
 			data.disabled,
 			data.tID,
-			data.properties
+			data.properties,
+			radioGroupMap
 		);
 	}
 

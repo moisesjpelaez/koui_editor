@@ -10,11 +10,13 @@ import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
+import koui.elements.RadioButton;
 import koui.elements.Slider;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
+import koui.utils.RadioGroup;
 
 /**
  * Shared utilities for element creation and type detection.
@@ -27,6 +29,7 @@ class ElementUtils {
 	 */
 	public static function getElementType(element: Element): String {
 		if (Std.isOfType(element, Button)) return "Button";
+		if (Std.isOfType(element, RadioButton)) return "RadioButton";
 		if (Std.isOfType(element, Checkbox)) return "Checkbox";
 		if (Std.isOfType(element, Progressbar)) return "Progressbar";
 		if (Std.isOfType(element, Slider)) return "Slider";
@@ -64,7 +67,8 @@ class ElementUtils {
 		visible: Bool,
 		disabled: Bool,
 		tID: String,
-		properties: Dynamic
+		properties: Dynamic,
+		?radioGroupMap: Map<String, RadioGroup>
 	): Element {
 		var element: Element = null;
 
@@ -107,6 +111,26 @@ class ElementUtils {
 					}
 				}
 				element = checkbox;
+
+			case "RadioButton":
+				var text: String = properties != null && properties.text != null ? properties.text : "";
+				var groupId: String = properties != null && properties.radioGroup != null ? properties.radioGroup : "RadioGroup";
+				var group: RadioGroup = null;
+				if (radioGroupMap != null) {
+					group = radioGroupMap.get(groupId);
+					if (group == null) {
+						group = new RadioGroup(groupId);
+						radioGroupMap.set(groupId, group);
+					}
+				} else {
+					group = new RadioGroup(groupId);
+				}
+
+				var radioButton: RadioButton = new RadioButton(group, text);
+				if (properties != null && properties.isChecked != null && properties.isChecked) {
+					radioButton.group.setActiveButton(radioButton);
+				}
+				element = radioButton;
 
 			case "Progressbar":
 				var minVal: Float = properties != null && properties.minValue != null ? properties.minValue : 0.0;
@@ -220,6 +244,14 @@ class ElementUtils {
 				return {
 					text: checkbox.text,
 					isChecked: checkbox.isChecked
+				};
+
+			case "RadioButton":
+				var radioButton: RadioButton = cast element;
+				return {
+					text: radioButton.text,
+					isChecked: radioButton.isChecked,
+					radioGroup: radioButton.group != null ? radioButton.group.id : ""
 				};
 
 			case "Progressbar":

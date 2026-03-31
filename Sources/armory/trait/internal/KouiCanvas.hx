@@ -10,6 +10,7 @@ import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.Panel;
 import koui.elements.Progressbar;
+import koui.elements.RadioButton;
 import koui.elements.Slider;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
@@ -20,13 +21,20 @@ import koui.events.FocusEvent;
 import koui.events.MouseEvent.MouseClickEvent;
 import koui.events.MouseEvent.MouseHoverEvent;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
+import koui.utils.RadioGroup;
 import koui.utils.SceneManager;
+
+private typedef TRadioGroupData = {
+	var id: String;
+	var activeButtonKey: Null<String>;
+}
 
 // JSON structure typedefs (matching CanvasUtils format)
 private typedef TCanvasData = {
 	var name: String;
 	var version: String;
 	var canvas: TCanvasSettings;
+	var radioGroups: Array<TRadioGroupData>;
 	var scenes: Array<TSceneData>;
 }
 
@@ -74,7 +82,7 @@ private typedef TKouiScene = {
 	var key: String;
 	var root: AnchorPane;
 	var elements: Map<String, Element>;
-	var elementKeys: Map<Element, String>; // Reverse lookup for path traversal
+	var elementKeys: Map<Element, String>;
 }
 
 /**
@@ -99,6 +107,9 @@ class KouiCanvas extends Trait {
 
 	/** All scenes in this canvas */
 	private var scenes: Map<String, TKouiScene>;
+
+	/** Global radio groups shared across all scenes */
+	private var radioGroups: Map<String, RadioGroup>;
 
 	/** The currently active scene */
 	private var currentScene: TKouiScene;
@@ -134,6 +145,7 @@ class KouiCanvas extends Trait {
 
 		cnvName = canvasName;
 		scenes = new Map();
+		radioGroups = new Map();
 
 		notifyOnInit(function() {
 			// Load canvas JSON
@@ -204,9 +216,38 @@ class KouiCanvas extends Trait {
 			onAppResized(App.w(), App.h());
 		}
 
+		// Build global radio groups from canvas-level data
+		if (canvasData.radioGroups != null) {
+			for (radioGroupData in canvasData.radioGroups) {
+				if (radioGroupData == null || radioGroupData.id == null || radioGroupData.id == "") continue;
+				if (!radioGroups.exists(radioGroupData.id)) {
+					radioGroups.set(radioGroupData.id, new RadioGroup(radioGroupData.id));
+				}
+			}
+		}
+
 		// Build each scene
 		for (sceneData in canvasData.scenes) {
 			buildScene(sceneData, canvasData.canvas.width, canvasData.canvas.height);
+		}
+
+		// Restore active buttons from canvas-level radio group data
+		if (canvasData.radioGroups != null) {
+			for (radioGroupData in canvasData.radioGroups) {
+				if (radioGroupData == null || radioGroupData.activeButtonKey == null) continue;
+				var group = radioGroups.get(radioGroupData.id);
+				if (group == null) continue;
+
+				// Search all scenes for the target element
+				for (kouiScene in scenes) {
+					var targetElement = kouiScene.elements.get(radioGroupData.activeButtonKey);
+					var targetButton: RadioButton = Std.downcast(targetElement, RadioButton);
+					if (targetButton != null) {
+						group.setActiveButton(targetButton);
+						break;
+					}
+				}
+			}
 		}
 
 		// Activate the scene marked as active (if any)
@@ -238,10 +279,10 @@ class KouiCanvas extends Trait {
 			kouiScene.root = scenePane;
 			kouiScene.elements.set(sceneKey, scenePane);
 
-			// First pass: create all elements in order (use array to handle duplicate keys)
+			// First pass: create all elements in order
 			var createdElements: Array<Element> = [];
 			for (elemData in sceneData.elements) {
-				var element: Element = createElementFromData(elemData, kouiScene);
+				var element: Element = createElementFromData(elemData);
 				createdElements.push(element);
 			}
 
@@ -251,9 +292,7 @@ class KouiCanvas extends Trait {
 				if (createdElements[i] != null) {
 					var key = sceneData.elements[i].key;
 					elementMap.set(key, createdElements[i]);
-					// Also store in kouiScene.elements for runtime access
 					kouiScene.elements.set(key, createdElements[i]);
-					// Store reverse lookup for path traversal
 					kouiScene.elementKeys.set(createdElements[i], key);
 				}
 			}
@@ -262,13 +301,11 @@ class KouiCanvas extends Trait {
 			var layoutIndices: Map<Element, Int> = new Map();
 
 			// Second pass: parent elements correctly
-			// Use index to pair each elemData with its created element (handles duplicate keys)
 			for (i in 0...sceneData.elements.length) {
 				var elemData = sceneData.elements[i];
 				var element = createdElements[i];
 				if (element == null) continue;
 
-				// Set the anchor before adding to parent
 				element.anchor = cast elemData.anchor;
 
 				var parent: Element = scenePane;
@@ -276,12 +313,10 @@ class KouiCanvas extends Trait {
 					parent = elementMap.get(elemData.parentKey);
 				}
 
-				// Add to parent with correct anchor
 				if (Std.isOfType(parent, RowLayout)) {
 					var row: RowLayout = cast parent;
 					var grid: GridLayout = cast row;
 					var idx: Int = layoutIndices.exists(parent) ? layoutIndices.get(parent) : 0;
-					// Add a new row if needed
 					while (grid.amountRows <= idx) {
 						addRowToGrid(grid);
 					}
@@ -291,7 +326,6 @@ class KouiCanvas extends Trait {
 					var col: ColLayout = cast parent;
 					var grid: GridLayout = cast col;
 					var idx: Int = layoutIndices.exists(parent) ? layoutIndices.get(parent) : 0;
-					// Add a new column if needed
 					while (grid.amountCols <= idx) {
 						addColumnToGrid(grid);
 					}
@@ -335,7 +369,7 @@ class KouiCanvas extends Trait {
 	/**
 	 * Create an element from JSON data.
 	 */
-	private function createElementFromData(data: TElementData, kouiScene: TKouiScene): Element {
+	private function createElementFromData(data: TElementData): Element {
 		var element: Element = null;
 
 		switch (data.type) {
@@ -368,6 +402,20 @@ class KouiCanvas extends Trait {
 					checkSquare.setContextElement(checkbox.isChecked ? "checked" : "");
 				}
 				element = checkbox;
+
+			case "RadioButton":
+				var groupId: String = data.properties != null && data.properties.radioGroup != null ? data.properties.radioGroup : "RadioGroup";
+				var group = radioGroups.get(groupId);
+				if (group == null) {
+					group = new RadioGroup(groupId);
+					radioGroups.set(groupId, group);
+				}
+
+				var radioButton: RadioButton = new RadioButton(group, data.properties.text != null ? data.properties.text : "");
+				if (data.properties.isChecked != null && data.properties.isChecked) {
+					group.setActiveButton(radioButton);
+				}
+				element = radioButton;
 
 			case "Progressbar":
 				var minVal: Float = data.properties.minValue != null ? data.properties.minValue : 0.0;

@@ -33,8 +33,11 @@ import haxe.ds.ObjectMap;
 import haxe.ds.StringMap;
 import StringTools;
 
-@:access(koui.Koui, koui.elements.Element, zui.Zui)
+@:access(koui.Koui, koui.elements.Element, koui.utils.RadioGroup, zui.Zui)
 class PropertiesPanel {
+    static var instance: PropertiesPanel;
+    static var defaultRadioGroup: RadioGroup;
+
     var tabHandle: Handle;
 
     // Settings
@@ -73,6 +76,11 @@ class PropertiesPanel {
     var checkboxIsCheckedHandle: Handle;
     var checkboxTextHandle: Handle;
 
+    // RadioButton handles
+    var radioButtonIsCheckedHandle: Handle;
+    var radioButtonTextHandle: Handle;
+    var radioButtonGroupHandle: Handle;
+
     // Progressbar handles
     var progressbarMinValueHandle: Handle;
     var progressbarMaxValueHandle: Handle;
@@ -93,9 +101,8 @@ class PropertiesPanel {
 
     // RadioGroups tab handles/state
     var radioGroupNameHandle: Handle;
+    var radioGroupRenameHandles: StringMap<Handle>;
     var radioGroupAddHandles: StringMap<Handle>;
-    var radioGroupMembers: StringMap<Array<RadioButton>>;
-    var radioGroups: Array<RadioGroup>;
 
     var sceneData: SceneData = SceneData.data;
 
@@ -137,6 +144,10 @@ class PropertiesPanel {
         checkboxTextHandle = new Handle({text: ""});
         checkboxIsCheckedHandle = new Handle({selected: false});
 
+        radioButtonTextHandle = new Handle({text: ""});
+        radioButtonIsCheckedHandle = new Handle({selected: false});
+        radioButtonGroupHandle = new Handle({position: 0});
+
         progressbarValueHandle = new Handle({value: 0});
         progressbarMinValueHandle = new Handle({text: "0"});
         progressbarMaxValueHandle = new Handle({text: "1"});
@@ -153,9 +164,13 @@ class PropertiesPanel {
         sliderPrecisionHandle = new Handle({text: "1"});
 
         radioGroupNameHandle = new Handle({text: "RadioGroup"});
+        radioGroupRenameHandles = new StringMap();
         radioGroupAddHandles = new StringMap();
-        radioGroupMembers = new StringMap();
-        radioGroups = [];
+
+        // Create default RadioGroup on startup
+        ensureRadioGroups();
+
+        instance = this;
 
         ElementEvents.elementAdded.connect(onElementAdded);
         ElementEvents.elementSelected.connect(onElementSelected);
@@ -187,12 +202,10 @@ class PropertiesPanel {
                 if (CanvasSettings.expandOnResize && CanvasSettings.scaleOnResize) {
                     uiBase.ui.text("Scale Mode");
 
-                    // Set radio selection based on current settings
                     if (CanvasSettings.autoScale) scaleOnResizeGroup.position = 0;
                     else if (CanvasSettings.scaleHorizontal) scaleOnResizeGroup.position = 1;
                     else if (CanvasSettings.scaleVertical) scaleOnResizeGroup.position = 2;
 
-                    // Radio buttons for scale mode (all use the same handle)
                     if (uiBase.ui.radio(scaleOnResizeGroup, 0, "Auto")) {
                         CanvasSettings.autoScale = true;
                         CanvasSettings.scaleHorizontal = false;
@@ -212,17 +225,15 @@ class PropertiesPanel {
                     }
                 }
             }
-		}
+        }
     }
 
     function drawRadioGroups(uiBase: UIBase): Void {
         var ui: Zui = uiBase.ui;
 
-        if (sceneData.currentScene == null) {
-            ui.text("No active scene", Center);
-            return;
-        }
+        ensureRadioGroups();
 
+        var radioGroups = sceneData.radioGroups;
         var radioEntries = getSceneRadioButtons();
 
         ui.text("Radio Group Management", Center);
@@ -243,17 +254,29 @@ class PropertiesPanel {
             return;
         }
 
-        if (radioEntries.length == 0) {
-            ui.text("No radio buttons found in current scene.");
-        }
-
         var groupToDelete: String = null;
+        var groupToRename: { oldId: String, newId: String } = null;
+
+        var groupIndex = 0;
         for (group in radioGroups) {
             ui.row([5/6, 1/6]);
-            ui.button(group.id, Left);
-            if (ZuiUtils.iconButton(ui, icons, 1, 3, "Delete group", false, false, 0.4)) {
+
+            // Show rename input for group name
+            var renameHandle = getRadioGroupRenameHandle(group.id);
+            renameHandle.text = group.id;
+            var newGroupName = ui.textInput(renameHandle, "", Left);
+
+            if (renameHandle.changed && newGroupName != "" && newGroupName != group.id) {
+                groupToRename = { oldId: group.id, newId: newGroupName };
+            }
+
+            // Only allow deleting groups after the first one
+            var canDelete = groupIndex > 0;
+            if (ZuiUtils.iconButton(ui, icons, 1, 3, "Delete group", false, !canDelete, 0.4)) {
                 groupToDelete = group.id;
             }
+
+            groupIndex++;
 
             ui.indent();
 
@@ -268,26 +291,18 @@ class PropertiesPanel {
                 uiBase.hwnds[PanelProperties].redraws = 2;
             }
 
-            var members = getGroupMembers(group);
-            var memberCopy = members.copy();
-            for (button in memberCopy) {
-                if (sceneData.getElementKey(button) == null) {
-                    members.remove(button);
-                }
-            }
-
-            if (members.length == 0) {
+            if (group.buttons.length == 0) {
                 ui.text("No buttons in this group.");
             } else {
-                for (button in members.copy()) {
+                for (button in group.buttons.copy()) {
                     var key = sceneData.getElementKey(button);
                     var label = key != null ? key : "(removed)";
                     if (group.activeButton == button) label += " [active]";
 
-                    ui.row([1/2, 1/3, 1/6]);
+                    ui.row([2/3, 1/6, 1/6]);
                     ui.text(label, Left);
 
-                    if (ui.button("Set Active")) {
+                    if (ZuiUtils.iconButton(ui, icons, 7, 0, "Set Active", group.activeButton == button, false, 0.4)) {
                         group.setActiveButton(button);
                         uiBase.hwnds[PanelProperties].redraws = 2;
                     }
@@ -308,6 +323,11 @@ class PropertiesPanel {
             deleteRadioGroup(groupToDelete);
             uiBase.hwnds[PanelProperties].redraws = 2;
         }
+
+        if (groupToRename != null) {
+            renameRadioGroup(groupToRename.oldId, groupToRename.newId);
+            uiBase.hwnds[PanelProperties].redraws = 2;
+        }
     }
 
     function getSceneRadioButtons(): Array<{ key: String, button: RadioButton }> {
@@ -324,6 +344,25 @@ class PropertiesPanel {
         return entries;
     }
 
+    function getAvailableRadioGroups(currentRadioButton: RadioButton = null): Array<RadioGroup> {
+        ensureRadioGroups();
+        return sceneData.radioGroups;
+    }
+
+    function findRadioGroup(groupId: String): RadioGroup {
+        for (group in sceneData.radioGroups) {
+            if (group.id == groupId) return group;
+        }
+        return null;
+    }
+
+    function ensureRadioGroups(): Void {
+        if (sceneData.radioGroups.length == 0) {
+            sceneData.radioGroups.push(new RadioGroup("RadioGroup"));
+        }
+        defaultRadioGroup = sceneData.radioGroups[0];
+    }
+
     function getRadioGroupAddHandle(groupId: String): Handle {
         if (!radioGroupAddHandles.exists(groupId)) {
             radioGroupAddHandles.set(groupId, new Handle({position: 0}));
@@ -331,11 +370,11 @@ class PropertiesPanel {
         return radioGroupAddHandles.get(groupId);
     }
 
-    function getGroupMembers(group: RadioGroup): Array<RadioButton> {
-        if (!radioGroupMembers.exists(group.id)) {
-            radioGroupMembers.set(group.id, []);
+    function getRadioGroupRenameHandle(groupId: String): Handle {
+        if (!radioGroupRenameHandles.exists(groupId)) {
+            radioGroupRenameHandles.set(groupId, new Handle({text: groupId}));
         }
-        return radioGroupMembers.get(group.id);
+        return radioGroupRenameHandles.get(groupId);
     }
 
     function createRadioGroup(requestedId: String): Void {
@@ -345,14 +384,13 @@ class PropertiesPanel {
         var uniqueId = getUniqueRadioGroupId(baseId);
 
         var group = new RadioGroup(uniqueId);
-        radioGroups.push(group);
-        radioGroupMembers.set(group.id, []);
+        sceneData.radioGroups.push(group);
         radioGroupAddHandles.set(group.id, new Handle({position: 0}));
         radioGroupNameHandle.text = uniqueId;
     }
 
     function getUniqueRadioGroupId(requestedId: String): String {
-        if (!radioGroupMembers.exists(requestedId)) return requestedId;
+        if (findRadioGroup(requestedId) == null) return requestedId;
 
         var prefix = requestedId;
         var nextIndex = 1;
@@ -364,7 +402,7 @@ class PropertiesPanel {
         }
 
         var candidate = prefix + "_" + nextIndex;
-        while (radioGroupMembers.exists(candidate)) {
+        while (findRadioGroup(candidate) != null) {
             nextIndex++;
             candidate = prefix + "_" + nextIndex;
         }
@@ -373,6 +411,7 @@ class PropertiesPanel {
     }
 
     function deleteRadioGroup(groupId: String): Void {
+        var radioGroups = sceneData.radioGroups;
         var index = -1;
         for (i in 0...radioGroups.length) {
             if (radioGroups[i].id == groupId) {
@@ -383,49 +422,65 @@ class PropertiesPanel {
         if (index < 0) return;
 
         var group = radioGroups[index];
-        var members = getGroupMembers(group).copy();
-        for (button in members) {
-            removeButtonFromGroup(group, button);
+        // Move all buttons to the default (first) group
+        var defaultGroup = radioGroups[0];
+        for (button in group.buttons.copy()) {
+            group.remove(button);
+            button.group = defaultGroup;
+            defaultGroup.add(button);
         }
 
         radioGroups.splice(index, 1);
-        radioGroupMembers.remove(groupId);
         radioGroupAddHandles.remove(groupId);
+        radioGroupRenameHandles.remove(groupId);
+    }
+
+    function renameRadioGroup(oldId: String, newId: String): Void {
+        var trimmedNewId = StringTools.trim(newId);
+        if (trimmedNewId == "" || trimmedNewId == oldId) return;
+
+        // Check for conflicts
+        if (findRadioGroup(trimmedNewId) != null) return;
+
+        var group = findRadioGroup(oldId);
+        if (group == null) return;
+
+        group.id = trimmedNewId;
+
+        // Update handle mappings
+        var addHandle = radioGroupAddHandles.get(oldId);
+        if (addHandle != null) {
+            radioGroupAddHandles.remove(oldId);
+            radioGroupAddHandles.set(trimmedNewId, addHandle);
+        }
+
+        var renameHandle = radioGroupRenameHandles.get(oldId);
+        if (renameHandle != null) {
+            radioGroupRenameHandles.remove(oldId);
+            radioGroupRenameHandles.set(trimmedNewId, renameHandle);
+        }
     }
 
     function addButtonToGroup(group: RadioGroup, button: RadioButton): Void {
         if (button == null || group == null || button.group == group) return;
 
         if (button.group != null) {
-            var previousMembers = radioGroupMembers.get(button.group.id);
-            if (previousMembers != null && previousMembers.indexOf(button) >= 0) {
-                previousMembers.remove(button);
-                button.group.remove(button);
-            }
+            button.group.remove(button);
         }
 
         button.group = group;
         group.add(button);
-
-        var members = getGroupMembers(group);
-        if (members.indexOf(button) < 0) members.push(button);
     }
 
     function removeButtonFromGroup(group: RadioGroup, button: RadioButton): Void {
         if (button == null || group == null) return;
 
-        var members = getGroupMembers(group);
-        var idx = members.indexOf(button);
-        if (idx >= 0) {
-            members.splice(idx, 1);
-            group.remove(button);
-        }
+        group.remove(button);
 
-        var fallbackId = sceneData.getElementKey(button);
-        if (fallbackId == null || fallbackId == "") fallbackId = "Radio";
-        var fallbackGroup = new RadioGroup(fallbackId + "_solo");
-        button.group = fallbackGroup;
-        fallbackGroup.add(button);
+        // Move to default (first) group instead of creating orphan solo groups
+        var defaultGroup = sceneData.radioGroups[0];
+        button.group = defaultGroup;
+        defaultGroup.add(button);
     }
 
     function drawProperties(uiBase: UIBase): Void {
@@ -747,6 +802,60 @@ class PropertiesPanel {
                 ElementEvents.propertyChanged.emit(button, "isToggle", button.isToggle, newToggle);
                 button.isToggle = newToggle;
             }
+        } else if (selectedElement is RadioButton) {
+            ui.text("Radio Button Properties", Center);
+            ui.separator();
+
+            var radioButton: RadioButton = cast(selectedElement, RadioButton);
+
+            radioButtonTextHandle.text = radioButton.text;
+            var newText: String = ui.textInput(radioButtonTextHandle, "Text", Right);
+            if (radioButtonTextHandle.changed) {
+                if (newText != null && newText != "") {
+                    ElementEvents.propertyChanged.emit(radioButton, "text", radioButton.text, newText);
+                    radioButton.text = newText;
+                }
+            }
+
+            radioButtonIsCheckedHandle.selected = radioButton.isChecked;
+            var newChecked = ui.check(radioButtonIsCheckedHandle, "Is Checked");
+            if (newChecked != radioButton.isChecked) {
+                ElementEvents.propertyChanged.emit(radioButton, "isChecked", radioButton.isChecked, newChecked);
+                if (newChecked) {
+                    radioButton.group.setActiveButton(radioButton);
+                } else {
+                    radioButton.isChecked = false;
+                    var checkSquare: Panel = radioButton.getChild(new TypeMatchBehaviour(Panel));
+                    checkSquare.setContextElement("");
+                }
+            }
+
+            var availableGroups = getAvailableRadioGroups(radioButton);
+            var groupNames: Array<String> = [];
+            var currentIndex = 0;
+            for (i in 0...availableGroups.length) {
+                groupNames.push(availableGroups[i].id);
+                if (radioButton.group != null && (availableGroups[i] == radioButton.group || availableGroups[i].id == radioButton.group.id)) {
+                    currentIndex = i;
+                }
+            }
+
+            if (groupNames.length == 0) {
+                groupNames.push("(none)");
+                radioButtonGroupHandle.position = 0;
+                ui.combo(radioButtonGroupHandle, groupNames, "Radio Group", true, Right);
+            } else {
+                radioButtonGroupHandle.position = currentIndex;
+                var newGroupIndex = ui.combo(radioButtonGroupHandle, groupNames, "Radio Group", true, Right);
+                if (radioButtonGroupHandle.changed && newGroupIndex >= 0 && newGroupIndex < availableGroups.length) {
+                    var newGroup = availableGroups[newGroupIndex];
+                    if (radioButton.group == null || (radioButton.group != newGroup && radioButton.group.id != newGroup.id)) {
+                        var oldGroupId = radioButton.group != null ? radioButton.group.id : "";
+                        addButtonToGroup(newGroup, radioButton);
+                        ElementEvents.propertyChanged.emit(radioButton, "radioGroup", oldGroupId, newGroup.id);
+                    }
+                }
+            }
         } else if (selectedElement is Checkbox) {
             ui.text("Checkbox Properties", Center);
             ui.separator();
@@ -958,7 +1067,20 @@ class PropertiesPanel {
     }
 
     public function onElementAdded(entry: TElementEntry): Void {
+        ensureRadioGroups();
         elementSizes.set(entry.element, new Vec2(entry.element.width, entry.element.height));
+
+        if (Std.isOfType(entry.element, RadioButton)) {
+            var radioButton: RadioButton = cast entry.element;
+            if (radioButton.group != null) {
+                // Ensure the button's group is registered globally
+                if (findRadioGroup(radioButton.group.id) == null) {
+                    sceneData.radioGroups.push(radioButton.group);
+                    radioGroupAddHandles.set(radioButton.group.id, new Handle({position: 0}));
+                    radioGroupRenameHandles.set(radioButton.group.id, new Handle({text: radioButton.group.id}));
+                }
+            }
+        }
     }
 
     public function onElementSelected(element: Element): Void {
@@ -1021,31 +1143,32 @@ class PropertiesPanel {
 
         if (Std.isOfType(element, RadioButton)) {
             var radioButton: RadioButton = cast element;
-            for (group in radioGroups) {
-                var members = getGroupMembers(group);
-                var idx = members.indexOf(radioButton);
-                if (idx >= 0) {
-                    members.splice(idx, 1);
-                    group.remove(radioButton);
-                }
+            if (radioButton.group != null) {
+                radioButton.group.remove(radioButton);
             }
         }
+    }
+
+    public static function getDefaultRadioGroup(): RadioGroup {
+        if (instance != null) instance.ensureRadioGroups();
+        return defaultRadioGroup;
     }
 
     public function onCanvasLoaded(): Void {
         scaleOnResizeHandle.selected = CanvasSettings.scaleOnResize;
 
-        radioGroups = [];
-        radioGroupMembers = new StringMap();
         radioGroupAddHandles = new StringMap();
+        radioGroupRenameHandles = new StringMap();
         radioGroupNameHandle.text = "RadioGroup";
+
+        ensureRadioGroups();
 
         if (CanvasSettings.autoScale) scaleOnResizeGroup.position = 0;
         else if (CanvasSettings.scaleHorizontal) scaleOnResizeGroup.position = 1;
         else if (CanvasSettings.scaleVertical) scaleOnResizeGroup.position = 2;
     }
 
-    public function setIcons(iconsImage: Image): Void {
-        icons = iconsImage;
+    public function setIcons(iconsImage: Dynamic): Void {
+        icons = cast iconsImage;
     }
 }

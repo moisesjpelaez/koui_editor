@@ -4,6 +4,7 @@ import arm.events.ElementEvents;
 import arm.events.SceneEvents;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.Element;
+import koui.utils.RadioGroup;
 
 typedef TSceneEntry = {
     var key: String;
@@ -21,6 +22,7 @@ class SceneData {
     public static var data: SceneData = new SceneData();
     public var scenes: Array<TSceneEntry> = [];
     public var currentScene: TSceneEntry;
+    public var radioGroups: Array<RadioGroup> = [];
 
     public function new() {
         ElementEvents.elementAdded.connect(onElementAdded);
