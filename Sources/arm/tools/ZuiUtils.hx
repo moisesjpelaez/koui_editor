@@ -39,25 +39,18 @@ class ZuiUtils {
 		var rect: TTileRect = ImageUtils.tile(tileX, tileY);
 		var state: State;
 
-		if (scale < 1.0) {
-			// Scaled icon: invisible hit area + manually drawn scaled icon
-			state = ui.image(icons, 0x00000000, null, rect.x, rect.y, Std.int(buttonH), Std.int(buttonH));
+		// Use a transparent hit area and draw icon manually so size tracks button/UI scale.
+		state = ui.image(icons, 0x00000000, buttonH, rect.x, rect.y, rect.w, rect.h);
 
-			var scaledW: Float = rect.w * scale;
-			var scaledH: Float = rect.h * scale;
-			var centerX: Float = startX + (buttonW - scaledW) * 0.5;
-			var centerY: Float = startY + (buttonH - scaledH) * 0.5;
+		var drawScale: Float = Math.max(0.0, Math.min(1.0, scale));
+		var iconSize: Float = Math.min(buttonW, buttonH) * drawScale;
+		var centerX: Float = startX + (buttonW - iconSize) * 0.5;
+		var centerY: Float = startY + (buttonH - iconSize) * 0.5;
 
-			ui.g.pipeline = ImageUtils.getPipeline();
-			ui.g.color = iconAccent;
-			ui.g.drawScaledSubImage(icons, rect.x, rect.y, rect.w, rect.h, centerX, centerY, scaledW, scaledH);
-			ui.g.pipeline = null;
-		} else {
-			// Full-size icon
-			ui.g.pipeline = ImageUtils.getPipeline();
-			state = ui.image(icons, iconAccent, null, rect.x, rect.y, rect.w, rect.h);
-			ui.g.pipeline = null;
-		}
+		ui.g.pipeline = ImageUtils.getPipeline();
+		ui.g.color = iconAccent;
+		ui.g.drawScaledSubImage(icons, rect.x, rect.y, rect.w, rect.h, centerX, centerY, iconSize, iconSize);
+		ui.g.pipeline = null;
 
 		// Hover and pressed visual feedback
 		if (!disabled && (state == State.Down || state == State.Started)) {

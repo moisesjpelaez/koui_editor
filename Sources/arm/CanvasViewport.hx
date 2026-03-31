@@ -39,7 +39,7 @@ class CanvasViewport {
 
 	public function new() {}
 
-	public function canvasControl(isInCanvas: Bool): Void {
+	public function canvasControl(isInCanvas: Bool, isInElementsPanel: Bool): Void {
 		var mouse: Mouse = Input.getMouse();
 		var keyboard: Keyboard = Input.getKeyboard();
 
@@ -73,7 +73,7 @@ class CanvasViewport {
 		}
 
 		// FIXME: elements flicker when zooming
-		if (isInCanvas && !isPanning) {
+		if (isInCanvas && !isPanning && !isInElementsPanel) {
 			if (mouse.wheelDelta < 0) {
 				currentScale += 0.1;
 				currentScale = Math.min(3.0, currentScale);

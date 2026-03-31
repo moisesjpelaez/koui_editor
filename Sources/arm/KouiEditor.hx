@@ -1,6 +1,7 @@
 package arm;
 
 import arm.data.SceneData;
+import arm.data.EditorSettings;
 import arm.events.ElementEvents;
 import arm.events.SceneEvents;
 import arm.base.Base;
@@ -110,6 +111,9 @@ class KouiEditor extends iron.Trait {
 			// Initialize canvas utilities
 			CanvasUtils.init();
 
+			// Initialize editor settings
+			EditorSettings.init();
+
 			// Create UIBase with the loaded font
 			uiBase = new UIBase(Assets.fonts.font_default);
 			viewport.uiBase = uiBase;
@@ -191,7 +195,7 @@ class KouiEditor extends iron.Trait {
 			canvasLoaded = true;
 		}
 		uiBase.update();
-		viewport.canvasControl(dragDrop.isInCanvas());
+		viewport.canvasControl(dragDrop.isInCanvas(), dragDrop.isInElementsPanel());
 
 		var keyboard: Keyboard = Input.getKeyboard();
 		var isTyping: Bool = uiBase.ui.isTyping;

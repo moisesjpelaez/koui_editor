@@ -3,6 +3,7 @@ package arm.panels;
 import arm.data.SceneData;
 import arm.events.ElementEvents;
 import arm.events.SceneEvents;
+import arm.base.Base;
 import arm.base.UIBase;
 import arm.tools.HierarchyUtils;
 import arm.tools.NameUtils;
@@ -27,6 +28,7 @@ class HierarchyPanel {
 	static inline var DROP_ZONE_BOTTOM: Float = 0.75;
 	static inline var GHOST_WIDTH: Float = 150;
 	static inline var GHOST_OFFSET: Float = 10;
+	static inline var RESIZE_GUTTER: Int = 4;
 
 	// Scene management
 	var sceneTabHandle: Handle;
@@ -97,11 +99,13 @@ class HierarchyPanel {
 			// Only track clicks that originated inside the hierarchy panel
 			if (!mouseDownOnItem && uiBase.ui.inputStarted) {
 				var mouse = Input.getMouse();
-				if (mouse.x >= params.tabx && mouse.x < params.tabx + params.w && mouse.y >= 0 && mouse.y < params.h0) {
+				var gutter: Int = Std.int(Math.max(2, RESIZE_GUTTER * uiBase.ui.SCALE()));
+				var inResizableGutter: Bool = mouse.x < params.tabx + gutter || mouse.y >= params.h0 - gutter;
+				if (!inResizableGutter && mouse.x >= params.tabx && mouse.x < params.tabx + params.w && mouse.y >= 0 && mouse.y < params.h0) {
 					clickedEmptySpace = true;
 				}
 			}
-			if (clickedEmptySpace && uiBase.ui.inputReleased && !isDragging) {
+			if (clickedEmptySpace && uiBase.ui.inputReleased && !isDragging && !Base.isResizing) {
 				clickedEmptySpace = false;
 				selectedElement = null;
 				selectedElements = [];
@@ -127,12 +131,12 @@ class HierarchyPanel {
 			SceneEvents.sceneChanged.emit(sceneName);
 		}
 
-		if (ZuiUtils.iconButton(uiBase.ui, icons, 1, 2, "Add Scene", false, false, 0.4)) {
+		if (ZuiUtils.iconButton(uiBase.ui, icons, 1, 2, "Add Scene", false, false, 0.7)) {
 			var newSceneName = NameUtils.generateUniqueName("Scene", sceneTabs);
 			SceneEvents.sceneAdded.emit(newSceneName);
 		}
 
-		if (ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete Scene", false, sceneTabs.length <= 1, 0.4)) {
+		if (ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete Scene", false, sceneTabs.length <= 1, 0.7)) {
 			var sceneName: String = sceneTabs[sceneTabHandle.position];
 			SceneEvents.sceneRemoved.emit(sceneName);
 		}
@@ -232,7 +236,7 @@ class HierarchyPanel {
 		// Delete icon button
 		if (entry.element != sceneData.currentScene.root) {
 			var deleteDisabled = entry.element == sceneData.currentScene.root;
-			var deleteClicked = ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete", false, deleteDisabled, 0.4);
+			var deleteClicked = ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete", false, deleteDisabled, 0.7);
 			if (deleteClicked) {
 				ElementEvents.elementRemoved.emit(entry.element);
 			}

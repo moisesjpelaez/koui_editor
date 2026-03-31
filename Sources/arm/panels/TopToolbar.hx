@@ -62,27 +62,31 @@ class TopToolbar {
 
 	public function draw(uiBase: UIBase): Void {
 		var ui: Zui = uiBase.ui;
+		var uiScale: Float = ui.SCALE();
+		var toolbarWidth: Int = Std.int(TOOLBAR_WIDTH * uiScale);
+		var toolbarHeight: Int = Std.int(TOOLBAR_HEIGHT * uiScale);
+		var buttonSize: Int = Std.int(BUTTON_SIZE * uiScale);
 
 		// Calculate center position
-		var centerX: Int = Std.int((App.w() - uiBase.getSidebarW()) / 2 - TOOLBAR_WIDTH / 2);
-		var topY: Int = 5;
+		var centerX: Int = Std.int((App.w() - uiBase.getSidebarW()) / 2 - toolbarWidth / 2);
+		var topY: Int = Std.int(5 * uiScale);
 
 		// Don't fill background, make it floating
 		var savedFillBg: Bool = ui.t.FILL_WINDOW_BG;
 		ui.t.FILL_WINDOW_BG = false;
 
-		if (ui.window(windowHandle, centerX, topY, TOOLBAR_WIDTH, TOOLBAR_HEIGHT, false)) {
+		if (ui.window(windowHandle, centerX, topY, toolbarWidth, toolbarHeight, false)) {
 			// Center elements vertically within the toolbar
-			var yOffset: Float = (TOOLBAR_HEIGHT - BUTTON_SIZE) / 2;
+			var yOffset: Float = (toolbarHeight - buttonSize) / 2;
 			ui._y += yOffset;
 
 			ui.row([
-				BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH,
-				BUTTON_SIZE / TOOLBAR_WIDTH, BUTTON_SIZE / TOOLBAR_WIDTH,
-				BUTTON_SIZE / TOOLBAR_WIDTH,
-				BUTTON_SIZE / TOOLBAR_WIDTH, (BUTTON_SIZE * 4) / TOOLBAR_WIDTH]);
+				buttonSize / toolbarWidth, buttonSize / toolbarWidth, buttonSize / toolbarWidth,
+				buttonSize / toolbarWidth, buttonSize / toolbarWidth,
+				buttonSize / toolbarWidth,
+				buttonSize / toolbarWidth, (buttonSize * 4) / toolbarWidth]);
 
-			ui._x += 8; // Small padding on the left
+			ui._x += 8 * uiScale; // Small padding on the left
 			if (iconButton(ui, 3, 1, "Clear Canvas")) {
 				CanvasUtils.clearCanvas();
 			}
@@ -92,7 +96,7 @@ class TopToolbar {
 			if (iconButton(ui, 3, 2, "Save Canvas")) {
 				CanvasUtils.saveCanvas();
 			}
-			hSeparator(ui);
+			hSeparator(ui, 1 * uiScale, 8 * uiScale);
 
 			var cm = CommandManager.instance;
 			if (iconButton(ui, 6, 2, "Undo", false, cm == null || !cm.canUndo())) {
@@ -107,18 +111,18 @@ class TopToolbar {
 					uiBase.hwnds[PanelProperties].redraws = 2;
 				}
 			}
-			hSeparator(ui);
+			hSeparator(ui, 1 * uiScale, 8 * uiScale);
 
 			if (iconButton(ui, 5, 0, "Reload Theme")) {
 				CanvasUtils.refreshTheme();
 			}
-			hSeparator(ui);
+			hSeparator(ui, 1 * uiScale, 8 * uiScale);
 
 			if (iconButton(ui, 0, 3, "Toggle Snapping", snappingEnabled)) {
 				snappingEnabled = !snappingEnabled;
                 snappingToggled.emit(snappingEnabled, snapValue);
 			}
-			ui._x += 4; // Small padding on the left
+			ui._x += 4 * uiScale; // Small padding on the left
 			snapValue = ui.slider(snapHandle, "Snap", 8, snapMaxValue, true, 1/8, true, Align.Right);
 			// Round to nearest multiple of 8
 			if (snapHandle.changed) {

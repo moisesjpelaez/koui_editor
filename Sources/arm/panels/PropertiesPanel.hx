@@ -10,6 +10,7 @@ import arm.commands.KeyRenameCommand;
 import arm.types.Enums;
 import arm.types.Types;
 import arm.base.UIBase;
+import arm.data.EditorSettings;
 import arm.tools.CanvasUtils;
 import arm.tools.ZuiUtils;
 
@@ -40,6 +41,7 @@ class PropertiesPanel {
     var expandOnResizeHandle: Handle;
     var scaleOnResizeHandle: Handle;
     var scaleOnResizeGroup: Handle;
+    var editorUiScaleHandle: Handle;
     // Properties
     var selectedElement: Element = null;
 
@@ -77,6 +79,7 @@ class PropertiesPanel {
         expandOnResizeHandle = new Handle({selected: true});
         scaleOnResizeHandle = new Handle({selected: true});
         scaleOnResizeGroup = new Handle({position: 0});
+        editorUiScaleHandle = new Handle({value: 1.0});
         // Initialize property handles
         nameHandle = new Handle({text: ""});
         tidHandle = new Handle({text: ""});
@@ -108,6 +111,11 @@ class PropertiesPanel {
     }
 
     public function draw(uiBase: UIBase, params: Dynamic): Void {
+        var enforcedScale: Float = EditorSettings.getEditorUIScale();
+        if (Math.abs(uiBase.ui.SCALE() - enforcedScale) > 0.0001) {
+            uiBase.ui.setScale(enforcedScale);
+        }
+
         if (uiBase.ui.window(uiBase.hwnds[PanelProperties], params.tabx, params.h0, params.w, params.h1)) {
             if (uiBase.ui.tab(tabHandle, "Properties")) {
                 if (selectedElement != null) {
@@ -122,6 +130,31 @@ class PropertiesPanel {
             }
 
             if (uiBase.ui.tab(tabHandle, "Settings")) {
+                uiBase.ui.text("Editor UI", Center);
+                uiBase.ui.separator();
+
+                var currentEditorScale: Float = EditorSettings.getEditorUIScale();
+                editorUiScaleHandle.value = currentEditorScale;
+
+                var newEditorScale: Float = uiBase.ui.slider(editorUiScaleHandle, "Scale", 0.5, 4.0, true, 100, true, Right);
+                if (editorUiScaleHandle.changed) {
+                    if (Math.isNaN(newEditorScale)) {
+                        newEditorScale = currentEditorScale;
+                    }
+                    newEditorScale = Math.round(newEditorScale * 100) / 100;
+                    newEditorScale = Math.max(0.5, Math.min(4.0, newEditorScale));
+                    editorUiScaleHandle.value = newEditorScale;
+                    EditorSettings.setEditorUIScale(newEditorScale);
+                    var appliedScale: Float = EditorSettings.getEditorUIScale();
+                    editorUiScaleHandle.value = appliedScale;
+                    uiBase.ui.setScale(appliedScale);
+                    uiBase.hwnds[PanelHierarchy].redraws = 2;
+                    uiBase.hwnds[PanelProperties].redraws = 2;
+                    uiBase.hwnds[PanelBottom].redraws = 2;
+                }
+
+                uiBase.ui._y += 4;
+                uiBase.ui.separator();
                 uiBase.ui.text("On Window Resize", Center);
                 uiBase.ui.separator();
 
@@ -154,6 +187,7 @@ class PropertiesPanel {
                     }
                 }
             }
+
         }
     }
 
@@ -170,7 +204,7 @@ class PropertiesPanel {
 
         ui.row([3/4, 1/4]);
         var requestedId = ui.textInput(radioGroupNameHandle, "Group ID", Right);
-        if (ZuiUtils.iconButton(ui, icons, 1, 2, "Create Radio Group", false, false, 0.4)) {
+        if (ZuiUtils.iconButton(ui, icons, 1, 2, "Create Radio Group", false, false, 0.7)) {
             createRadioGroup(requestedId);
             uiBase.hwnds[PanelProperties].redraws = 2;
         }
@@ -201,7 +235,7 @@ class PropertiesPanel {
 
             // Only allow deleting groups after the first one
             var canDelete = groupIndex > 0;
-            if (ZuiUtils.iconButton(ui, icons, 1, 3, "Delete group", false, !canDelete, 0.4)) {
+            if (ZuiUtils.iconButton(ui, icons, 1, 3, "Delete group", false, !canDelete, 0.7)) {
                 groupToDelete = group.id;
             }
 
@@ -231,7 +265,7 @@ class PropertiesPanel {
                     ui.row([5/6, 1/6]);
                     ui.text(label, Left);
 
-                    if (ZuiUtils.iconButton(ui, icons, 7, 0, "Set Active", group.activeButton == button, false, 0.4)) {
+                    if (ZuiUtils.iconButton(ui, icons, 7, 0, "Set Active", group.activeButton == button, false, 0.7)) {
                         group.setActiveButton(button);
                         uiBase.hwnds[PanelProperties].redraws = 2;
                     }
@@ -510,7 +544,7 @@ class PropertiesPanel {
                     posYHandle.text = Std.string(selectedElement.posY);
                 }
             }
-            if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Position", false, false, 0.4)) {
+            if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Position", false, false, 0.7)) {
                 ElementEvents.propertyChanged.emit(selectedElement, ["posX", "posY"], [selectedElement.posX, selectedElement.posY], [0, 0]);
                 selectedElement.posX = 0;
                 selectedElement.posY = 0;
@@ -555,7 +589,7 @@ class PropertiesPanel {
                     heightHandle.text = Std.string(selectedElement.height);
                 }
             }
-            if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.4)) {
+            if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.7)) {
                 var originalSize: Vec2 = elementSizes.get(selectedElement);
                 if (originalSize != null) {
                     ElementEvents.propertyChanged.emit(selectedElement, ["width", "height"], [selectedElement.width, selectedElement.height], [Std.int(originalSize.x), Std.int(originalSize.y)]);
@@ -781,6 +815,12 @@ class PropertiesPanel {
 
     public function onCanvasLoaded(): Void {
         scaleOnResizeHandle.selected = CanvasSettings.scaleOnResize;
+
+        var editorScale: Float = EditorSettings.getEditorUIScale();
+        editorUiScaleHandle.value = editorScale;
+        if (UIBase.inst != null && UIBase.inst.ui != null) {
+            UIBase.inst.ui.setScale(editorScale);
+        }
 
         radioGroupAddHandles = new StringMap();
         radioGroupRenameHandles = new StringMap();

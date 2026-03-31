@@ -66,6 +66,16 @@ class DragDropHandler {
 		return mouse.x > tabx && mouse.x < tabx + w && mouse.y > 0 && mouse.y < h0;
 	}
 
+	public function isInElementsPanel(): Bool {
+		var mouse: Mouse = Input.getMouse();
+		var uiScale: Float = uiBase.ui.SCALE();
+		var panelX: Int = Std.int(10 * uiScale);
+		var panelY: Int = Std.int(10 * uiScale);
+		var panelW: Int = Std.int(100 * uiScale);
+		var panelH: Int = App.h() - uiBase.getBottomH() - Std.int(20 * uiScale);
+		return mouse.x > panelX && mouse.x < panelX + panelW && mouse.y > panelY && mouse.y < panelY + panelH;
+	}
+
 	function isDynamicSized(element: Element): Bool {
 		var isDynamicWidth: Bool = element.style != null && element.style.size.minWidth != 0;
 		var isDynamicHeight: Bool = element.style != null && element.style.size.minHeight != 0;
