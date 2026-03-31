@@ -285,14 +285,19 @@ class KouiEditor extends iron.Trait {
 		g2.begin(false);
 
 		if (!sizeInit || viewport.viewReset) {
+			var resetScale = viewport.viewReset;
 			viewport.viewReset = false;
-			onResized();
+			applyResize(resetScale);
 			sizeInit = true;
 		}
 	}
 
 	function onResized() {
-		viewport.onResized(sizeInit, baseH);
+		applyResize(false);
+	}
+
+	function applyResize(resetScale: Bool) {
+		viewport.onResized(resetScale ? false : sizeInit, baseH);
 	}
 
 	function onPropertyChangedForUndo(element: Element, properties: Dynamic, oldValues: Dynamic, newValues: Dynamic): Void {
