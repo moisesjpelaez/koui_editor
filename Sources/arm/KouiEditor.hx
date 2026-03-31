@@ -337,10 +337,9 @@ class KouiEditor extends iron.Trait {
 				ElementEvents.elementSelected.emit(null);
 			}
 		} else if (mouseJustPressed && isInHierarchyPanel()) {
-			// Clicked in hierarchy panel - deselect current element
-			selectedElement = null;
+			// Clicked in hierarchy panel — clear canvas drag state only.
+			// The hierarchy panel emits its own elementSelected event.
 			draggedElement = null;
-			ElementEvents.elementSelected.emit(null);
 		} else if (mouseDown && draggedElement != null) {
 			// Calculate new position in TopLeft space
 			var elemX = Std.int(mouse.x - dragOffsetX);

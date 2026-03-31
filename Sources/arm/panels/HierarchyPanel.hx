@@ -9,6 +9,7 @@ import arm.tools.NameUtils;
 import arm.tools.ZuiUtils;
 import arm.types.Enums;
 import haxe.ds.ObjectMap;
+import iron.system.Input;
 import kha.Image;
 import koui.elements.Element;
 import zui.Zui;
@@ -27,7 +28,7 @@ class HierarchyPanel {
 	static inline var GHOST_OFFSET: Float = 10;
 
 	// Scene management
-	 var sceneTabHandle: Handle;
+	var sceneTabHandle: Handle;
 	var sceneCounter: Int = 1;
 
 	var sceneData: SceneData = SceneData.data;
@@ -37,7 +38,11 @@ class HierarchyPanel {
 
 	// Drag-drop state - use Element references instead of indices
     var selectedElement: Element = null;
+	var selectedElements: Array<Element> = [];
+	var shiftAnchorElement: Element = null;
 	var draggedItem: TElementEntry = null;
+	var mouseDownOnItem: Bool = false;
+	var clickedEmptySpace: Bool = false;
 	var dropTargetElement: Element = null;
 	var dropZone: DropZone = None;
 	var isDragging: Bool = false;
@@ -77,6 +82,7 @@ class HierarchyPanel {
 	}
 
 	public function draw(uiBase: UIBase, params: Dynamic): Void {
+		mouseDownOnItem = false;
 		if (uiBase.ui.window(uiBase.hwnds[PanelHierarchy], params.tabx, 0, params.w, params.h0)) {
 			drawSceneSelector(uiBase);
 			uiBase.ui.separator();
@@ -85,7 +91,21 @@ class HierarchyPanel {
             if (sceneData.currentScene != null) {
                 drawItem(uiBase, { key: sceneData.currentScene.key, element: sceneData.currentScene.root }, 0);
             }
+
+			// Click on empty space (no item captured the mouse-down) → deselect on release
+			if (!mouseDownOnItem && uiBase.ui.inputStarted) {
+				clickedEmptySpace = true;
+			}
+			if (clickedEmptySpace && uiBase.ui.inputReleased && !isDragging) {
+				clickedEmptySpace = false;
+				selectedElement = null;
+				selectedElements = [];
+				ElementEvents.elementSelected.emit(null);
+				uiBase.hwnds[PanelHierarchy].redraws = 2;
+				uiBase.hwnds[PanelProperties].redraws = 2;
+			}
 		}
+		if (!uiBase.ui.inputDown) clickedEmptySpace = false;
 
 		drawDragGhost(uiBase);
 		handleDragEnd(uiBase);
@@ -233,7 +253,7 @@ class HierarchyPanel {
 	}
 
     function drawItemButton(ui: Zui, name: String, element: Element) {
-		var isSelected: Bool = selectedElement == element;
+		var isSelected: Bool = selectedElements.indexOf(element) >= 0;
 
 		// Save theme colors
 		var savedCol: Int = ui.t.BUTTON_COL;
@@ -257,18 +277,51 @@ class HierarchyPanel {
 	function handleItemInteraction(uiBase: UIBase, entry: TElementEntry) {
 		var isRoot: Bool = sceneData.currentScene.root != null && entry.element == sceneData.currentScene.root;
 
-		// Selection on click start
-		if (uiBase.ui.isPushed) {
-			if (entry.element == sceneData.currentScene.root) return;
-            selectedElement = entry.element;
-			ElementEvents.elementSelected.emit(entry.element);
-
-			// Only allow dragging non-root elements
+		// Mouse down: begin drag tracking only (selection happens on release)
+		if (uiBase.ui.isPushed && uiBase.ui.inputStarted) {
+			mouseDownOnItem = true;
 			if (!isRoot) {
 				draggedItem = entry;
 				dragStartX = uiBase.ui.inputX;
 				dragStartY = uiBase.ui.inputY;
 			}
+			uiBase.hwnds[PanelHierarchy].redraws = 2;
+		}
+
+		// Mouse up: apply selection — but not if we just finished a drag drop
+		if (uiBase.ui.isReleased && !isDragging) {
+			draggedItem = null;
+			if (entry.element == sceneData.currentScene.root) return;
+
+			var shiftHeld: Bool = Input.getKeyboard().down("shift");
+			var ctrlHeld: Bool = Input.getKeyboard().down("control");
+			if (shiftHeld) {
+				var anchor: Element = shiftAnchorElement;
+				if (anchor == null) anchor = selectedElement;
+				if (anchor == null) anchor = entry.element;
+
+				var rangeSelection: Array<Element> = getShiftRangeSelection(anchor, entry.element);
+				if (rangeSelection.length == 0) rangeSelection = [entry.element];
+
+				selectedElements = mergeSelection(rangeSelection);
+				selectedElement = entry.element;
+				if (shiftAnchorElement == null) shiftAnchorElement = anchor;
+			} else if (ctrlHeld) {
+				var idx: Int = selectedElements.indexOf(entry.element);
+				if (idx >= 0) {
+					selectedElements.splice(idx, 1);
+					selectedElement = selectedElements.length > 0 ? selectedElements[selectedElements.length - 1] : null;
+				} else {
+					selectedElements.push(entry.element);
+					selectedElement = entry.element;
+				}
+				shiftAnchorElement = entry.element;
+			} else {
+				selectedElement = entry.element;
+				selectedElements = [entry.element];
+				shiftAnchorElement = entry.element;
+			}
+			ElementEvents.elementSelected.emit(selectedElement);
 
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 			uiBase.hwnds[PanelProperties].redraws = 2;
@@ -285,6 +338,105 @@ class HierarchyPanel {
 				uiBase.hwnds[PanelProperties].redraws = 2;
 			}
 		}
+	}
+
+	function getShiftRangeSelection(anchor: Element, target: Element): Array<Element> {
+		if (anchor == null || target == null) return [];
+
+		var siblingRange: Array<Element> = getSiblingRangeSelection(anchor, target);
+		if (siblingRange.length > 0) return siblingRange;
+
+		return getVisibleRangeSelection(anchor, target);
+	}
+
+	function mergeSelection(rangeSelection: Array<Element>): Array<Element> {
+		var merged: Array<Element> = selectedElements.copy();
+		for (element in rangeSelection) {
+			if (merged.indexOf(element) < 0) merged.push(element);
+		}
+
+		var visible: Array<Element> = getVisibleHierarchyElements();
+		merged.sort(function(a, b) {
+			var ia: Int = visible.indexOf(a);
+			var ib: Int = visible.indexOf(b);
+			if (ia < 0 && ib < 0) return 0;
+			if (ia < 0) return 1;
+			if (ib < 0) return -1;
+			return ia - ib;
+		});
+
+		return merged;
+	}
+
+	function getSiblingRangeSelection(anchor: Element, target: Element): Array<Element> {
+		var anchorParent: Element = HierarchyUtils.getParentElement(anchor);
+		var targetParent: Element = HierarchyUtils.getParentElement(target);
+		if (anchorParent == null || targetParent == null || anchorParent != targetParent) return [];
+
+		var siblings: Array<Element> = getVisibleHierarchyChildren(anchorParent);
+		var iAnchor: Int = siblings.indexOf(anchor);
+		var iTarget: Int = siblings.indexOf(target);
+		if (iAnchor < 0 || iTarget < 0) return [];
+
+		var start: Int = iAnchor < iTarget ? iAnchor : iTarget;
+		var end: Int = iAnchor > iTarget ? iAnchor : iTarget;
+		var result: Array<Element> = [];
+		for (i in start...end + 1) result.push(siblings[i]);
+		return result;
+	}
+
+	function getVisibleRangeSelection(anchor: Element, target: Element): Array<Element> {
+		var visible: Array<Element> = getVisibleHierarchyElements();
+		var iAnchor: Int = visible.indexOf(anchor);
+		var iTarget: Int = visible.indexOf(target);
+		if (iAnchor < 0 || iTarget < 0) return [];
+
+		var start: Int = iAnchor < iTarget ? iAnchor : iTarget;
+		var end: Int = iAnchor > iTarget ? iAnchor : iTarget;
+		var result: Array<Element> = [];
+		for (i in start...end + 1) result.push(visible[i]);
+		return result;
+	}
+
+	function getVisibleHierarchyElements(): Array<Element> {
+		var result: Array<Element> = [];
+		var currentScene = sceneData.currentScene;
+		if (currentScene == null || currentScene.root == null) return result;
+
+		collectVisibleElements(currentScene.root, result, true);
+		return result;
+	}
+
+	function collectVisibleElements(element: Element, out: Array<Element>, isRoot: Bool): Void {
+		if (element == null) return;
+		if (!isRoot) out.push(element);
+
+		var children: Array<Element> = getVisibleHierarchyChildren(element);
+		if (children.length == 0) return;
+
+		var isExpanded: Bool = expanded.exists(element) ? expanded.get(element) : true;
+		if (!isExpanded) return;
+
+		for (child in children) {
+			collectVisibleElements(child, out, false);
+		}
+	}
+
+	function getVisibleHierarchyChildren(parent: Element): Array<Element> {
+		var currentScene = sceneData.currentScene;
+		if (currentScene == null || parent == null) return [];
+
+		var children: Array<Element> = [];
+		var allChildren: Array<Element> = HierarchyUtils.getChildren(parent);
+		for (child in allChildren) {
+			for (entry in currentScene.elements) {
+				if (entry.element == child) {
+					children.push(child);
+					break;
+				}
+			}
+		}
+		return children;
 	}
 
     function drawDragGhost(uiBase: UIBase) {
@@ -305,7 +457,9 @@ class HierarchyPanel {
 
 		uiBase.ui.g.color = 0xFFFFFFFF;
 		uiBase.ui.g.font = uiBase.ui.ops.font;
-		uiBase.ui.g.drawString(draggedItem.key, ghostX + 8, ghostY + 4);
+		var dragCount: Int = (selectedElements.length > 1 && selectedElements.indexOf(draggedItem.element) >= 0) ? selectedElements.length : 1;
+		var dragLabel: String = dragCount > 1 ? '${draggedItem.key} (+${dragCount - 1})' : draggedItem.key;
+		uiBase.ui.g.drawString(dragLabel, ghostX + 8, ghostY + 4);
 
 		uiBase.hwnds[PanelHierarchy].redraws = 2;
 		uiBase.hwnds[PanelProperties].redraws = 2;
@@ -316,6 +470,25 @@ class HierarchyPanel {
 
 		if (dropTargetElement != null && dropZone != None) {
 			performDrop();
+		}
+
+		// Select the dragged element when the drag ends
+		if (draggedItem != null) {
+			var ctrlHeld: Bool = Input.getKeyboard().down("control");
+			var wasMultiSelected: Bool = selectedElements.length > 1 && selectedElements.indexOf(draggedItem.element) >= 0;
+			if (ctrlHeld) {
+				if (selectedElements.indexOf(draggedItem.element) < 0) {
+					selectedElements.push(draggedItem.element);
+				}
+				selectedElement = draggedItem.element;
+			} else if (wasMultiSelected) {
+				// Keep the full multi-selection after dropping multiple selected elements.
+				selectedElement = draggedItem.element;
+			} else {
+				selectedElement = draggedItem.element;
+				selectedElements = [draggedItem.element];
+			}
+			ElementEvents.elementSelected.emit(selectedElement);
 		}
 
 		isDragging = false;
@@ -375,8 +548,34 @@ class HierarchyPanel {
 
 	function performDrop() {
 		if (draggedItem == null || dropTargetElement == null || dropZone == None) return;
-		if (draggedItem.element == dropTargetElement) return;
-		ElementEvents.elementDropped.emit(draggedItem.element, dropTargetElement, dropZone);
+
+		// Determine which elements to drop
+		var isMulti: Bool = selectedElements.length > 1 && selectedElements.indexOf(draggedItem.element) >= 0;
+		var elemsToDrop: Array<Element> = isMulti ? selectedElements.copy() : [draggedItem.element];
+
+		// Filter out the target itself and any ancestor of the target
+		elemsToDrop = elemsToDrop.filter(e -> e != dropTargetElement && !HierarchyUtils.isDescendant(dropTargetElement, e));
+		if (elemsToDrop.length == 0) return;
+
+		// Sort by scene order so relative order is preserved
+		var sceneElements = sceneData.currentScene.elements;
+		elemsToDrop.sort(function(a, b) {
+			var ia = -1; var ib = -1;
+			for (i in 0...sceneElements.length) {
+				if (sceneElements[i].element == a) ia = i;
+				if (sceneElements[i].element == b) ib = i;
+			}
+			return ia - ib;
+		});
+
+		// For BeforeSibling: normal order → each inserts before target, pushing earlier ones ahead
+		// For AfterSibling:  reverse order → each inserts after target, pulling earlier ones forward
+		// For AsChild: order doesn't matter
+		if (dropZone == AfterSibling) elemsToDrop.reverse();
+
+		for (elem in elemsToDrop) {
+			ElementEvents.elementDropped.emit(elem, dropTargetElement, dropZone);
+		}
 	}
 
     function registerChildren(parent: Element): Void {
@@ -399,6 +598,14 @@ class HierarchyPanel {
 
     public function onElementSelected(element: Element): Void {
         selectedElement = element;
+		if (element == null) {
+			selectedElements = [];
+			shiftAnchorElement = null;
+		} else if (selectedElements.indexOf(element) < 0) {
+			// External selection (e.g. canvas click) — reset to single
+			selectedElements = [element];
+			shiftAnchorElement = element;
+		}
 		if (selectedElement == null) draggedItem = null;
     }
 
