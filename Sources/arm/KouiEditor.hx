@@ -23,7 +23,6 @@ import arm.commands.SceneRemoveCommand;
 import arm.commands.SceneRenameCommand;
 import arm.commands.ElementAddCommand;
 import arm.commands.ElementRemoveCommand;
-import arm.commands.KeyRenameCommand;
 import arm.editors.ElementRegistry;
 import arm.editors.LabelEditor;
 import arm.editors.ImagePanelEditor;
