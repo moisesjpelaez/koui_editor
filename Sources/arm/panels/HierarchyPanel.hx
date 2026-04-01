@@ -32,7 +32,6 @@ class HierarchyPanel {
 
 	// Scene management
 	var sceneTabHandle: Handle;
-	var sceneCounter: Int = 1;
 
 	var sceneData: SceneData = SceneData.data;
 

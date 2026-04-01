@@ -16,7 +16,7 @@ class ZuiUtils {
 	 * @param tooltip Tooltip text shown on hover
 	 * @param highlight If true, uses highlight color for the icon
 	 * @param disabled If true, icon is dimmed and clicks are ignored
-	 * @param scale Icon scale factor (1.0 = full size, 0.4 = 40%)
+	 * @param scale Icon scale factor (1.0 = full size)
 	 * @return True if the button was clicked
 	 */
 	public static function iconButton(ui: Zui, icons: Image, tileX: Int, tileY: Int, tooltip: String,

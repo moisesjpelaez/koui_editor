@@ -32,7 +32,7 @@ class EditorSettings {
 				var loaded: TEditorSettings = Json.parse(jsonString);
 
 				if (loaded.editorUIScale != null) {
-					data.editorUIScale = loaded.editorUIScale;
+					data.editorUIScale = sanitizeScale(loaded.editorUIScale);
 				}
 			} catch (e: Dynamic) {
 				trace("Failed to load editor settings: " + Std.string(e));
