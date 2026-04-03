@@ -91,8 +91,8 @@ class KouiEditor extends iron.Trait {
 
 		// Register element editors (order matters: specific types before their parent classes)
 		ElementRegistry.register(new LabelEditor());
-		ElementRegistry.register(new PanelEditor());
 		ElementRegistry.register(new ImagePanelEditor());
+		ElementRegistry.register(new PanelEditor());
 		ElementRegistry.register(new ButtonEditor());
 		ElementRegistry.register(new RadioButtonEditor());
 		ElementRegistry.register(new CheckboxEditor());
