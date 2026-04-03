@@ -4,8 +4,6 @@ import arm.data.SceneData;
 import arm.events.ElementEvents;
 import arm.tools.HierarchyUtils;
 import koui.elements.Element;
-import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.Layout.Anchor;
 
 class ElementAddCommand implements ICommand {
 	var element: Element;
@@ -32,10 +30,8 @@ class ElementAddCommand implements ICommand {
 	}
 
 	public function execute(): Void {
-		// Re-add to parent
-		if (Std.isOfType(parentElement, AnchorPane)) {
-			cast(parentElement, AnchorPane).add(element, Anchor.TopLeft);
-		}
+		// Re-add to parent regardless of layout/container type.
+		HierarchyUtils.moveAsChild(element, parentElement);
 
 		// Re-add to SceneData
 		var sceneData = SceneData.data;

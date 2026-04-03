@@ -5,8 +5,6 @@ import arm.events.ElementEvents;
 import arm.tools.HierarchyUtils;
 import arm.types.Types;
 import koui.elements.Element;
-import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.Layout.Anchor;
 
 class ElementRemoveCommand implements ICommand {
 	var element: Element;
@@ -62,10 +60,8 @@ class ElementRemoveCommand implements ICommand {
 	}
 
 	public function undo(): Void {
-		// Re-add to parent
-		if (Std.isOfType(parentElement, AnchorPane)) {
-			cast(parentElement, AnchorPane).add(element, Anchor.TopLeft);
-		}
+		// Re-add to parent regardless of layout/container type.
+		HierarchyUtils.moveAsChild(element, parentElement);
 
 		// Re-add all entries to SceneData
 		var sceneData = SceneData.data;
