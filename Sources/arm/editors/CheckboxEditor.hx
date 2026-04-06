@@ -28,8 +28,6 @@ class CheckboxEditor implements IElementEditor {
 	function get_category(): String return "Buttons";
 	function get_isComposite(): Bool return true;
 
-	public function matches(element: Element): Bool return Std.isOfType(element, Checkbox);
-
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return new Checkbox("New Checkbox");
 	}

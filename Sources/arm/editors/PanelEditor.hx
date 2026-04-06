@@ -19,8 +19,6 @@ class PanelEditor implements IElementEditor {
 	function get_category(): String return "Basic";
 	function get_isComposite(): Bool return false;
 
-	public function matches(element: Element): Bool return Std.isOfType(element, Panel);
-
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return new Panel();
 	}

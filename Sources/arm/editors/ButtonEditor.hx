@@ -26,8 +26,6 @@ class ButtonEditor implements IElementEditor {
 	function get_category(): String return "Buttons";
 	function get_isComposite(): Bool return true;
 
-	public function matches(element: Element): Bool return Std.isOfType(element, Button);
-
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return new Button("New Button");
 	}

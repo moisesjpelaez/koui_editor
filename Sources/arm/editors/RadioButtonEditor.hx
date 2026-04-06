@@ -30,8 +30,6 @@ class RadioButtonEditor implements IElementEditor {
 	function get_category(): String return "Buttons";
 	function get_isComposite(): Bool return true;
 
-	public function matches(element: Element): Bool return Std.isOfType(element, RadioButton);
-
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		var group: RadioGroup = null;
 		if (radioGroups != null && radioGroups.length > 0) {

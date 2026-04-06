@@ -28,8 +28,6 @@ class ProgressbarEditor implements IElementEditor {
 	function get_category(): String return "Misc.";
 	function get_isComposite(): Bool return true;
 
-	public function matches(element: Element): Bool return Std.isOfType(element, Progressbar);
-
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return new Progressbar(0, 100);
 	}

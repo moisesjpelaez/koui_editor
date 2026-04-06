@@ -31,8 +31,6 @@ class SliderEditor implements IElementEditor {
 	function get_category(): String return "Misc.";
 	function get_isComposite(): Bool return true;
 
-	public function matches(element: Element): Bool return Std.isOfType(element, Slider);
-
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return new Slider(0, 100);
 	}

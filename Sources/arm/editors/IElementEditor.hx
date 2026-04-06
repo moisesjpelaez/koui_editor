@@ -25,9 +25,6 @@ interface IElementEditor {
 	/** Whether this element type has internal children that shouldn't be individually selectable (e.g. Button, Checkbox). */
 	var isComposite(get, never): Bool;
 
-	/** Returns true if this editor handles the given element instance. */
-	function matches(element: Element): Bool;
-
 	/** Create a default instance for the ElementsPanel palette. */
 	function createDefault(?radioGroups: Array<RadioGroup>): Element;
 

@@ -19,8 +19,6 @@ class RowLayoutEditor implements IElementEditor {
 	function get_category(): String return "Layout";
 	function get_isComposite(): Bool return false;
 
-	public function matches(element: Element): Bool return Std.isOfType(element, RowLayout);
-
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return new RowLayout(0, 0, 200, 100, 0);
 	}

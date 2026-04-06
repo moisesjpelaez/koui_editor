@@ -28,8 +28,6 @@ class ImagePanelEditor implements IElementEditor {
 	function get_category(): String return "Basic";
 	function get_isComposite(): Bool return false;
 
-	public function matches(element: Element): Bool return Std.isOfType(element, ImagePanel);
-
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		var imagePanel = new ImagePanel(null);
 		imagePanel.width = 32;

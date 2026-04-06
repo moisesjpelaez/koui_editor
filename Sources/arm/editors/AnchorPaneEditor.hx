@@ -19,8 +19,6 @@ class AnchorPaneEditor implements IElementEditor {
 	function get_category(): String return "Layout";
 	function get_isComposite(): Bool return false;
 
-	public function matches(element: Element): Bool return Std.isOfType(element, AnchorPane);
-
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		var pane = new AnchorPane(0, 0, 200, 200);
 		pane.setTID("_fixed_anchorpane");

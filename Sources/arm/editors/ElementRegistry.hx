@@ -26,12 +26,9 @@ class ElementRegistry {
 
 	/** Find the editor that handles a given element instance. */
 	public static function getForElement(element: Element): IElementEditor {
-		for (editor in editors) {
-			if (editor.matches(element)) {
-				return editor;
-			}
-		}
-		return null;
+		var className: String = Type.getClassName(Type.getClass(element));
+		var short: String = className.substr(className.lastIndexOf(".") + 1);
+		return byTypeName.get(short);
 	}
 
 	/** Get the type name string for an element instance. */

@@ -24,8 +24,6 @@ class LabelEditor implements IElementEditor {
 	function get_category(): String return "Basic";
 	function get_isComposite(): Bool return false;
 
-	public function matches(element: Element): Bool return Std.isOfType(element, Label);
-
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return new Label("New Label");
 	}
