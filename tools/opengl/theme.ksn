@@ -78,9 +78,6 @@
 		color: Color
 		offsetX: Int
 		offsetY: Int
-	?textBorder:
-		color: Color
-		size: Int
 	?slider:
 		buttonWidth: Int
 		textOffsetX: Int
