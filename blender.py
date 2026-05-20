@@ -20,6 +20,7 @@ _original_arm_new_canvas_execute = None
 _original_export_trait_code = None
 _original_fetch_script_names = None
 
+
 def get_os():
     import platform
     s = platform.system()
@@ -45,38 +46,7 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
         sdk_koui_path = os.path.join(_KOUI_EDITOR_DIR, 'tools', ext) if sdk_path else ""
 
         if sdk_koui_path and os.path.exists(sdk_koui_path):
-            koui_editor_path = sdk_koui_path
-            print(f"Koui Editor: Using SDK build at {koui_editor_path}")
-
-            project_path = arm.utils.get_fp()
-
-            assets_dir = os.path.join(project_path, 'Assets')
-            if not os.path.exists(assets_dir):
-                os.makedirs(assets_dir)
-                print(f"Koui Editor: Created Assets directory")
-
-            theme_dir = os.path.join(project_path, assets_dir, 'koui_canvas')
-            if not os.path.exists(theme_dir):
-                os.makedirs(theme_dir)
-                print(f"Koui Editor: Created Assets/koui_canvas directory")
-
-            # Ensure ui_override.ksn exists in project Assets directory
-            ui_override_project = os.path.join(theme_dir, 'ui_override.ksn')
-            if not os.path.exists(ui_override_project):
-                # Copy default from library
-                ui_override_default = os.path.join(_KOUI_EDITOR_DIR, 'Assets', 'koui_canvas', 'ui_override.ksn')
-                if os.path.exists(ui_override_default):
-                    import shutil
-                    shutil.copy2(ui_override_default, ui_override_project)
-                    print(f"Koui Editor: Copied default ui_override.ksn to project Assets")
-
-            # Ensure ui_override.ksn exists in build directory
-            ui_override_build = os.path.join(koui_editor_path, 'ui_override.ksn')
-            if not os.path.exists(ui_override_build):
-                if os.path.exists(ui_override_project):
-                    import shutil
-                    shutil.copy2(ui_override_project, ui_override_build)
-                    print(f"Koui Editor: Copied ui_override.ksn to build directory")
+            setup_assets_dir()
         else:
             self.report({'ERROR'},
                 f'Koui Editor not found.\n'
@@ -347,6 +317,13 @@ def register():
     except Exception as e:
         log.warn(f"Koui Editor: Could not patch fetch_script_names: {e}")
 
+    # Ensure Assets/koui_canvas exist and default files are copied on import
+    try:
+        if bpy.data.filepath:
+            setup_assets_dir()
+    except Exception as e:
+        log.warn(f"Koui Editor: Could not initialise Assets directory on register: {e}")
+
     log.info("Koui Editor: Registered")
 
 
@@ -397,3 +374,27 @@ def unregister():
         except RuntimeError:
             # Class may already be unregistered during script reload
             pass
+
+
+def setup_assets_dir():
+    project_path = arm.utils.get_fp()
+
+    assets_dir = os.path.join(project_path, 'Assets')
+    if not os.path.exists(assets_dir):
+        os.makedirs(assets_dir)
+        print(f"Koui Editor: Created Assets directory")
+
+    theme_dir = os.path.join(project_path, assets_dir, 'koui_canvas')
+    if not os.path.exists(theme_dir):
+        os.makedirs(theme_dir)
+        print(f"Koui Editor: Created Assets/koui_canvas directory")
+
+    # Ensure ui_override.ksn exists in project Assets directory
+    ui_override_project = os.path.join(theme_dir, 'ui_override.ksn')
+    if not os.path.exists(ui_override_project):
+        # Copy default from library
+        ui_override_default = os.path.join(_KOUI_EDITOR_DIR, 'Assets', 'koui_canvas', 'ui_override.ksn')
+        if os.path.exists(ui_override_default):
+            import shutil
+            shutil.copy2(ui_override_default, ui_override_project)
+            print(f"Koui Editor: Copied default ui_override.ksn to project Assets")
