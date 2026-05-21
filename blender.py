@@ -46,6 +46,8 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
         sdk_koui_path = os.path.join(_KOUI_EDITOR_DIR, 'tools', ext) if sdk_path else ""
 
         if sdk_koui_path and os.path.exists(sdk_koui_path):
+            koui_editor_path = sdk_koui_path
+            print(f"Koui Editor: Using SDK build at {koui_editor_path}")
             setup_assets_dir()
         else:
             self.report({'ERROR'},
