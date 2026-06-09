@@ -65,8 +65,10 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
         # Ensure canvas_name is not empty
         canvas_name = self.canvas_name if self.canvas_name else "UntitledCanvas"
 
-        # Get project directory (where the .blend file is)
-        project_dir = os.path.dirname(bpy.data.filepath) if bpy.data.filepath else os.getcwd()
+        # Get project root (respects arm_project_root, falls back to blend file directory).
+        # os.path.normpath resolves any ".." segments (e.g. from a relative arm_project_root
+        # like "//../../") so Krom receives a clean absolute path.
+        project_dir = os.path.normpath(arm.utils.get_fp()) if bpy.data.filepath else os.getcwd()
 
         uiscale = str(arm.utils.get_ui_scale())
         cmd = [krom_path, koui_editor_path, koui_editor_path, canvas_name, uiscale]
