@@ -271,18 +271,18 @@ def register():
                             handled_indices.add(idx)
                             log.info(f"Koui Editor: Using KouiCanvas for '{canvas_name}'")
 
-                # Temporarily disable handled traits before calling original
+                # Temporarily disable handled traits before calling original.
                 original_enabled = {}
                 for idx in handled_indices:
                     original_enabled[idx] = bobject.arm_traitlist[idx].enabled_prop
-                    bobject.arm_traitlist[idx].enabled_prop = False
+                    bobject.arm_traitlist[idx]["enabled_prop"] = False
 
                 # Call original for all other traits
                 _original_export_trait_code(self, bobject, o)
 
                 # Restore enabled state
                 for idx, enabled in original_enabled.items():
-                    bobject.arm_traitlist[idx].enabled_prop = enabled
+                    bobject.arm_traitlist[idx]["enabled_prop"] = enabled
 
             exporter.ArmoryExporter.export_traits = patched_export_traits
             log.info("Koui Editor: Patched export_traits to support KouiCanvas")
