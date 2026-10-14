@@ -127,15 +127,6 @@ class CanvasUtils {
 
 					if (error != null) {
 						trace('Theme reload ERROR: ${error}');
-					} else {
-						var buildPath: String = projectDir + buildPath + "/ui_override.ksn";
-						try {
-							var bytes: haxe.io.Bytes = haxe.io.Bytes.ofString(themeContent);
-							Krom.fileSaveBytes(buildPath, bytes.getData());
-							// Theme reloaded successfully
-						} catch (e: Dynamic) {
-							trace('Theme reloaded but failed to copy to build directory: ${e}');
-						}
 					}
 				});
 			});
