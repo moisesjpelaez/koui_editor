@@ -187,10 +187,10 @@ class CanvasUtils {
 
 		var cmd: String;
 		if (kha.System.systemId == "Windows") {
-			// List .ttf files, output just filenames
-			cmd = 'cmd /c dir /b "' + fontsDir + '\\*.ttf" > "' + listFile + '" 2>nul';
+			// List .ttf and .otf files, output just filenames
+			cmd = 'cmd /c dir /b "' + fontsDir + '\\*.ttf" "' + fontsDir + '\\*.otf" > "' + listFile + '" 2>nul';
 		} else {
-			cmd = 'ls -1 "' + fontsDir + '"/*.ttf > "' + listFile + '" 2>/dev/null || true';
+			cmd = 'ls -1 "' + fontsDir + '"/*.ttf "' + fontsDir + '"/*.otf > "' + listFile + '" 2>/dev/null || true';
 		}
 
 		Krom.sysCommand(cmd);
@@ -207,7 +207,8 @@ class CanvasUtils {
 
 		for (line in listContent.split("\n")) {
 			var trimmed: String = StringTools.trim(line);
-			if (trimmed.length > 0 && StringTools.endsWith(trimmed.toLowerCase(), ".ttf")) {
+			var lower: String = trimmed.toLowerCase();
+			if (trimmed.length > 0 && (StringTools.endsWith(lower, ".ttf") || StringTools.endsWith(lower, ".otf"))) {
 				// On Windows, dir /b gives just filename; on Linux ls -1 gives full path
 				var filename: String = trimmed;
 				var slashIdx: Int = Std.int(Math.max(filename.lastIndexOf("/"), filename.lastIndexOf("\\")));
