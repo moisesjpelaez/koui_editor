@@ -40,21 +40,3 @@ _fixed_anchorpane > _anchorpane:
 	size:
 		minHeight: 0
 		minWidth: 0
-
-button > _button:
-	font:
-		family: "bahiana_regular"
-
-logo_text > _label:
-	font:
-		size: 42
-
-title > _label:
-	font:
-		size: 72
-		family: "rocks_g_regular"
-
-menu_title > _label:
-	font:
-		size: 52
-		family: "rocks_g_regular"
