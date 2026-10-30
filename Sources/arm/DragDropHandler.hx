@@ -1,10 +1,9 @@
 package arm;
 
 import arm.base.UIBase;
+import arm.data.History;
 import arm.data.SceneData;
 import arm.data.Selection;
-import arm.editors.ElementRegistry;
-import arm.events.ElementEvents;
 import arm.panels.TopToolbar;
 import arm.types.Enums.PanelHandle;
 
@@ -15,13 +14,9 @@ import iron.system.Input.Mouse;
 
 import koui.Koui;
 import koui.elements.Element;
-import koui.elements.Panel;
 import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.GridLayout;
-import koui.elements.layouts.Layout;
 import koui.elements.layouts.Layout.Anchor;
-import koui.elements.layouts.RowLayout;
 
 import iron.App;
 
@@ -31,16 +26,13 @@ class DragDropHandler {
 	var viewport: CanvasViewport;
 	var topToolbar: TopToolbar;
 
-	// Drag state
+	// Drag state: the element's position and the mouse position when the drag started
 	var draggedElement: Element = null;
-	var dragAnchor: Anchor = TopLeft;
 	var wasMouseDown: Bool = false;
-	var dragOffsetX: Int = 0;
-	var dragOffsetY: Int = 0;
-	var anchorOffsetX: Int = 0;
-	var anchorOffsetY: Int = 0;
-	var dragStartX: Float = 0;
-	var dragStartY: Float = 0;
+	var dragStartX: Int = 0;
+	var dragStartY: Int = 0;
+	var dragMouseX: Float = 0;
+	var dragMouseY: Float = 0;
 
 	var borderSize: Int = 8;
 
@@ -87,32 +79,17 @@ class DragDropHandler {
 		var rootPane: AnchorPane = SceneData.data.getRoot();
 		if (rootPane == null) return;
 
-		// FIXME: elements flicker on mouse start and release
 		var mouse: Mouse = Input.getMouse();
 		var mouseDown: Bool = mouse.down();
 		var mouseJustPressed: Bool = mouseDown && !wasMouseDown;
 
 		if (mouseJustPressed && isInCanvas()) {
-			var element: Element = getElementAtPositionUnclipped(Std.int(mouse.x), Std.int(mouse.y));
+			var clickedElement: Element = viewport.getElementAt(Std.int(mouse.x), Std.int(mouse.y));
 			var keyboard: Keyboard = Input.getKeyboard();
 			var toggle: Bool = keyboard.down("control");
 			var additive: Bool = keyboard.down("shift");
 
-			if (element != null && element != rootPane) {
-				var clickedElement: Element;
-				// Select parent element instead of internal children of composite types
-				var parentEditor = ElementRegistry.getForElement(element.parent);
-				if ((parentEditor != null && parentEditor.isComposite) || (element is Panel && element.parent != rootPane)) {
-					clickedElement = element.parent;
-				}
-				// Select parent AnchorPane instead of child AnchorPane (but not if parent is rootPane)
-				else if (element is AnchorPane && element.layout is AnchorPane && element.layout != rootPane) {
-					clickedElement = cast(element.layout, Element);
-				}
-				else {
-					clickedElement = element;
-				}
-
+			if (clickedElement != null) {
 				// Ctrl toggles and Shift adds to the selection; neither starts a drag
 				if (toggle || additive) {
 					toggle ? Selection.toggle(clickedElement) : Selection.add(clickedElement);
@@ -127,18 +104,10 @@ class DragDropHandler {
 					return;
 				}
 				draggedElement = clickedElement;
-
-				// Store original anchor and switch to TopLeft BEFORE calculating offset
-				dragAnchor = draggedElement.getAnchorResolved();
-				draggedElement.anchor = TopLeft;
-				draggedElement.invalidateElem();
-
-				// Now calculate offset using the element's screen position (drawX/drawY)
-				dragOffsetX = Std.int(mouse.x - draggedElement.posX * Koui.uiScale);
-				dragOffsetY = Std.int(mouse.y - draggedElement.posY * Koui.uiScale);
-
 				dragStartX = draggedElement.posX;
 				dragStartY = draggedElement.posY;
+				dragMouseX = mouse.x;
+				dragMouseY = mouse.y;
 			} else {
 				// Clicking empty space clears the selection, unless adding to it
 				if (!toggle && !additive) Selection.clear();
@@ -149,69 +118,29 @@ class DragDropHandler {
 			// The hierarchy panel updates the selection itself.
 			draggedElement = null;
 		} else if (mouseDown && draggedElement != null) {
-			// Calculate new position in TopLeft space
-			var elemX = Std.int(mouse.x - dragOffsetX);
-			var elemY = Std.int(mouse.y - dragOffsetY);
+			// Positions are in canvas units: the mouse movement divided by the zoom.
+			// The anchor stays as it is; Koui lays the element out before drawing.
+			var newX: Float = dragStartX + (mouse.x - dragMouseX) / Koui.uiScale * dragDirection(draggedElement, true);
+			var newY: Float = dragStartY + (mouse.y - dragMouseY) / Koui.uiScale * dragDirection(draggedElement, false);
 
 			// Apply position snapping if enabled
-			if (topToolbar.snappingEnabled && rootPane != null) {
-				var snapValue = topToolbar.snapValue;
-				elemX -= Std.int(elemX % (snapValue * Koui.uiScale));
-				elemY -= Std.int(elemY % (snapValue * Koui.uiScale));
+			if (topToolbar.snappingEnabled) {
+				var snapValue: Float = topToolbar.snapValue;
+				newX = Math.round(newX / snapValue) * snapValue;
+				newY = Math.round(newY / snapValue) * snapValue;
 			}
 
-			anchorOffsetX = elemX;
-			anchorOffsetY = elemY;
-
-			// Get parent dimensions for anchor calculations
-			var parentWidth: Int = draggedElement.parent != null ? draggedElement.parent.drawWidth : rootPane.drawWidth;
-			var parentHeight: Int = draggedElement.parent != null ? draggedElement.parent.drawHeight : rootPane.drawHeight;
-
-			// Adjust position to simulate dragging from the original anchor point
-			switch (dragAnchor) {
-				case TopCenter:
-					elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
-				case TopRight:
-					elemX += parentWidth - draggedElement.drawWidth;
-				case MiddleLeft:
-					elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
-				case MiddleCenter:
-					elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
-					elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
-				case MiddleRight:
-					elemX += parentWidth - draggedElement.drawWidth;
-					elemY += Std.int(parentHeight * 0.5 - draggedElement.drawHeight * 0.5);
-				case BottomLeft:
-					elemY += parentHeight - draggedElement.drawHeight;
-				case BottomCenter:
-					elemX += Std.int(parentWidth * 0.5 - draggedElement.drawWidth * 0.5);
-					elemY += parentHeight - draggedElement.drawHeight;
-				case BottomRight:
-					elemX += parentWidth - draggedElement.drawWidth;
-					elemY += parentHeight - draggedElement.drawHeight;
-				default: // TopLeft - no adjustment
-			}
-
-			if (draggedElement is Layout) {
-				draggedElement.setPosition(Std.int(elemX / Koui.uiScale), Std.int(elemY / Koui.uiScale));
-				draggedElement.drawX = Std.int(draggedElement.posX * Koui.uiScale);
-				draggedElement.drawY = Std.int(draggedElement.posY * Koui.uiScale);
-				draggedElement.layout.elemUpdated(draggedElement);
-			} else {
-				draggedElement.setPosition(Std.int(elemX), Std.int(elemY));
-				draggedElement.invalidateElem();
-			}
+			// Koui resets the laid-out position when a position is set to its current value
+			// (without laying it out again), so only set what changed
+			if (Math.round(newX) != draggedElement.posX) draggedElement.posX = Math.round(newX);
+			if (Math.round(newY) != draggedElement.posY) draggedElement.posY = Math.round(newY);
 		} else {
 			if (draggedElement != null) {
-				draggedElement.anchor = dragAnchor; // Restore original anchor
-				draggedElement.setPosition(Std.int(anchorOffsetX / Koui.uiScale), Std.int(anchorOffsetY / Koui.uiScale));
-				if (draggedElement is Layout) draggedElement.layout.elemUpdated(draggedElement);
-				draggedElement.invalidateElem();
-
+				if (draggedElement.posX != dragStartX || draggedElement.posY != dragStartY) {
+					History.edited("Move");
+				}
 				uiBase.hwnds[PanelHierarchy].redraws = 2;
 				uiBase.hwnds[PanelProperties].redraws = 2;
-
-				ElementEvents.propertyChanged.emit(draggedElement, ["posX", "posY"], [dragStartX, dragStartY], [draggedElement.posX, draggedElement.posY]);
 			}
 			draggedElement = null;
 		}
@@ -220,53 +149,20 @@ class DragDropHandler {
 	}
 
 	/**
-	 * Custom method to get elements at a position without clipping to rootPane bounds.
-	 * This allows selecting elements that are positioned outside the rootPane's visible area.
+	 * +1 if increasing the element's position moves it right (or down), -1 if
+	 * it moves it left (or up): in a GridLayout cell, right- and bottom-anchored
+	 * elements are positioned from the cell's far edge.
 	 */
-	function getElementAtPositionUnclipped(x: Int, y: Int): Null<Element> {
-		var rootPane: AnchorPane = SceneData.data.getRoot();
-		if (rootPane == null) return null;
-
-		// Transform screen coordinates to rootPane space (accounting for pan and scale)
-		// rootPane.layoutX/layoutY already include the pan offset and are in screen coordinates
-		var relX: Int = x - rootPane.layoutX;
-		var relY: Int = y - rootPane.layoutY;
-
-		// Reverse to ensure that the topmost element is selected
-		var sortedElements: Array<Element> = rootPane.elements.copy();
-		sortedElements.reverse();
-
-		for (element in sortedElements) {
-			if (!element.visible) {
-				continue;
-			}
-
-			// For GridLayout/RowLayout/ColLayout, check bounds manually since they may be empty
-			if (Std.isOfType(element, GridLayout) || Std.isOfType(element, RowLayout) || Std.isOfType(element, ColLayout)) {
-				// Check if mouse is within the layout's bounds (relative to rootPane)
-				if (relX >= element.layoutX && relX <= element.layoutX + element.drawWidth &&
-					relY >= element.layoutY && relY <= element.layoutY + element.drawHeight) {
-					return element;
-				}
-				continue;
-			}
-
-			// Check if element has children (recursively check them with relative coords)
-			var hit: Null<Element> = element.getElementAtPosition(relX, relY);
-			if (hit != null) return hit;
-
-			// Check the element itself - element.layoutX/Y are relative to rootPane
-			// So we need to check against relX/relY (mouse position relative to rootPane)
-			if (relX >= element.layoutX && relX <= element.layoutX + element.drawWidth &&
-				relY >= element.layoutY && relY <= element.layoutY + element.drawHeight) {
-				return element;
-			}
+	static function dragDirection(element: Element, horizontal: Bool): Int {
+		if (!Std.isOfType(element.layout, GridLayout)) return 1;
+		return switch (element.getAnchorResolved()) {
+			case TopRight | MiddleRight | BottomRight if (horizontal): -1;
+			case BottomLeft | BottomCenter | BottomRight if (!horizontal): -1;
+			default: 1;
 		}
-
-		return null;
 	}
 
 	public function drawSelectedElements(g2: kha.graphics2.Graphics) {
-		viewport.drawSelection(g2, draggedElement);
+		viewport.drawSelection(g2);
 	}
 }

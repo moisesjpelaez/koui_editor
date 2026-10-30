@@ -7,7 +7,6 @@ import arm.panels.TopToolbar;
 
 import iron.App;
 import iron.Scene;
-import iron.math.Vec2;
 import iron.system.Input;
 
 import kha.graphics2.Graphics;
@@ -16,9 +15,14 @@ import koui.Koui;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
-import koui.elements.layouts.GridLayout;
-import koui.elements.layouts.Layout;
 import koui.elements.layouts.RowLayout;
+
+typedef TScreenRect = {
+	var x: Int;
+	var y: Int;
+	var w: Int;
+	var h: Int;
+}
 
 @:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane)
 class CanvasViewport {
@@ -70,17 +74,9 @@ class CanvasViewport {
 			Krom.setMouseCursor(0);
 		}
 
-		// FIXME: elements flicker when zooming
-		if (isInCanvas && !isPanning && !isInElementsPanel) {
-			if (mouse.wheelDelta < 0) {
-				currentScale += 0.1;
-				currentScale = Math.min(3.0, currentScale);
-				Koui.uiScale = currentScale;
-			} else if (mouse.wheelDelta > 0) {
-				currentScale -= 0.1;
-				currentScale = Math.max(0.25, currentScale);
-				Koui.uiScale = currentScale;
-			}
+		if (isInCanvas && !isPanning && !isInElementsPanel && mouse.wheelDelta != 0) {
+			var newScale: Float = mouse.wheelDelta < 0 ? Math.min(3.0, currentScale + 0.1) : Math.max(0.25, currentScale - 0.1);
+			if (newScale != currentScale) zoomAt(mouse.x, mouse.y, newScale);
 		}
 
 		if (keyboard.started("f") && isInCanvas) resetCanvasView();
@@ -92,6 +88,25 @@ class CanvasViewport {
 		applyPan();
 
 		viewReset = true;
+	}
+
+	/** Zooms to `newScale`, keeping the canvas point under the screen point (`x`, `y`) where it is. */
+	public function zoomAt(x: Float, y: Float, newScale: Float): Void {
+		var rootPane: AnchorPane = sceneData.getRoot();
+		if (rootPane == null) return;
+
+		var ratio: Float = newScale / currentScale;
+		var targetX: Float = x - (x - rootPane.drawX) * ratio;
+		var targetY: Float = y - (y - rootPane.drawY) * ratio;
+
+		currentScale = newScale;
+		Koui.uiScale = newScale;
+
+		// Lay the root out at the new scale, then pan by whatever is still off
+		applyPan();
+		canvasPanX += targetX - rootPane.drawX;
+		canvasPanY += targetY - rootPane.drawY;
+		applyPan();
 	}
 
 	/** Places the current scene's root at the view's pan offset, e.g. after switching scenes or an undo. */
@@ -186,70 +201,71 @@ class CanvasViewport {
 	}
 
 	/** Outlines every selected element. */
-	public function drawSelection(g2: Graphics, draggedElement: Element): Void {
-		for (element in Selection.elements) {
-			drawSelectedElement(g2, element, draggedElement);
-		}
-	}
-
-	function drawSelectedElement(g2: Graphics, selectedElement: Element, draggedElement: Element): Void {
+	public function drawSelection(g2: Graphics): Void {
 		var rootPane: AnchorPane = sceneData.getRoot();
-		if (rootPane != null && selectedElement != null && selectedElement != rootPane) {
-			var thickness: Int = 2;
-			g2.color = 0xff469cff;
+		if (rootPane == null) return;
 
-			var x: Int = draggedElement != selectedElement || selectedElement is Layout ? selectedElement.drawX + rootPane.drawX : Std.int(selectedElement.drawX / Koui.uiScale) + rootPane.drawX;
-			var y: Int = draggedElement != selectedElement || selectedElement is Layout ? selectedElement.drawY + rootPane.drawY : Std.int(selectedElement.drawY / Koui.uiScale) + rootPane.drawY;
-			var w: Int = selectedElement.drawWidth;
-			var h: Int = selectedElement.drawHeight;
-
-			var finalPos: Vec2 = sumLayout(selectedElement, 0, 0, rootPane);
-			if (selectedElement.layout != rootPane) {
-				x += Std.int(finalPos.x);
-				y += Std.int(finalPos.y);
-			}
-
-			g2.fillRect(x, y, w, thickness);
-			g2.fillRect(x, y + h - thickness, w, thickness);
-			g2.fillRect(x, y + thickness, thickness, h - thickness * 2);
-			g2.fillRect(x + w - thickness, y + thickness, thickness, h - thickness * 2);
+		g2.color = 0xff469cff;
+		for (element in Selection.elements) {
+			if (element != rootPane) drawOutline(g2, getScreenRect(element), 2);
 		}
 	}
 
-	function sumLayout(elem: Element, x: Int, y: Int, rootPane: AnchorPane): Vec2 {
-		if (elem.layout != null && elem.layout != rootPane) {
-			return sumLayout(elem.layout, x + elem.layout.drawX, y + elem.layout.drawY, rootPane);
-		} else {
-			return new Vec2(x, y);
+	/** The rectangle `element` is drawn in, in screen pixels: every parent draws its children translated by its own position. */
+	public function getScreenRect(element: Element): TScreenRect {
+		var x: Int = 0;
+		var y: Int = 0;
+		var current: Element = element;
+		while (current != null) {
+			x += current.drawX;
+			y += current.drawY;
+			current = current.parent;
 		}
+		return { x: x, y: y, w: element.drawWidth, h: element.drawHeight };
+	}
+
+	/**
+	 * The top-most user element of the current scene at the screen point
+	 * (`x`, `y`), at any depth, or null. Internal parts (a Button's label) are
+	 * not user elements, so clicking them finds their element.
+	 */
+	public function getElementAt(x: Int, y: Int): Null<Element> {
+		var rootPane: AnchorPane = sceneData.getRoot();
+		return rootPane != null ? findElementAt(rootPane, x, y) : null;
+	}
+
+	function findElementAt(parent: Element, x: Int, y: Int): Null<Element> {
+		var children: Array<Element> = sceneData.getChildren(parent);
+		// Later children are drawn on top
+		var i: Int = children.length;
+		while (i > 0) {
+			var child: Element = children[--i];
+			if (!child.visible) continue;
+
+			var rect: TScreenRect = getScreenRect(child);
+			if (x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h) {
+				var inner: Null<Element> = findElementAt(child, x, y);
+				return inner != null ? inner : child;
+			}
+		}
+		return null;
+	}
+
+	function drawOutline(g2: Graphics, rect: TScreenRect, thickness: Int): Void {
+		g2.fillRect(rect.x, rect.y, rect.w, thickness);
+		g2.fillRect(rect.x, rect.y + rect.h - thickness, rect.w, thickness);
+		g2.fillRect(rect.x, rect.y + thickness, thickness, rect.h - thickness * 2);
+		g2.fillRect(rect.x + rect.w - thickness, rect.y + thickness, thickness, rect.h - thickness * 2);
 	}
 
 	public function drawLayoutElements(g2: Graphics): Void {
 		var rootPane: AnchorPane = sceneData.getRoot();
 		if (rootPane == null) return;
 
-		var thickness: Int = 1;
 		g2.color = 0xff808080;
-
 		for (elem in sceneData.getElements()) {
-			if (elem == rootPane) continue;
-
 			if (elem is AnchorPane || elem is RowLayout || elem is ColLayout) {
-				var x: Int = elem.drawX + rootPane.drawX;
-				var y: Int = elem.drawY + rootPane.drawY;
-				var w: Int = elem.drawWidth;
-				var h: Int = elem.drawHeight;
-
-				var finalPos: Vec2 = sumLayout(elem, 0, 0, rootPane);
-				if (elem.layout != rootPane) {
-					x += Std.int(finalPos.x);
-					y += Std.int(finalPos.y);
-				}
-
-				g2.fillRect(x, y, w, thickness);
-				g2.fillRect(x, y + h - thickness, w, thickness);
-				g2.fillRect(x, y + thickness, thickness, h - thickness * 2);
-				g2.fillRect(x + w - thickness, y + thickness, thickness, h - thickness * 2);
+				drawOutline(g2, getScreenRect(elem), 1);
 			}
 		}
 	}
