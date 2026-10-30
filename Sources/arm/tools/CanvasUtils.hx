@@ -1,11 +1,14 @@
 package arm.tools;
 
 import arm.data.CanvasSettings;
+import arm.data.History;
 import arm.data.SceneData;
 import arm.data.Selection;
 import arm.events.SceneEvents;
 import arm.events.ElementEvents;
-import arm.tools.ElementUtils;
+import arm.canvas.CanvasElements;
+import arm.canvas.CanvasLoader;
+import arm.editors.ElementRegistry;
 import arm.types.Types;
 
 import haxe.Json;
@@ -19,10 +22,9 @@ import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
 import koui.utils.RadioGroup;
+import koui.utils.SceneManager;
 
 class CanvasUtils {
-	static inline var FORMAT_VERSION: String = "1.3";
-
 	// Canvas name from command line args (e.g., "MyCanvas")
 	public static var canvasName: String = "UntitledCanvas";
 
@@ -82,13 +84,7 @@ class CanvasUtils {
 	 * Returns empty string if not found.
 	 */
 	public static function getImageName(image: kha.Image): String {
-		if (image == null) return "";
-		for (key in Koui.imageMap.keys()) {
-			if (Koui.imageMap.get(key) == image) {
-				return key;
-			}
-		}
-		return "";
+		return CanvasElements.getImageName(image);
 	}
 
 	/**
@@ -340,6 +336,7 @@ class CanvasUtils {
 		try {
 			var bytes: haxe.io.Bytes = haxe.io.Bytes.ofString(jsonString);
 			Krom.fileSaveBytes(path, bytes.getData());
+			History.markSaved();
 		} catch (e: Dynamic) {
 			trace('Failed to save canvas: ${e}');
 		}
@@ -347,6 +344,7 @@ class CanvasUtils {
 
 	/**
 	 * Loads the canvas from Bundled/koui_canvas/[canvasName].json if it exists.
+	 * If the file can't be loaded, the current canvas is kept.
 	 */
 	public static function loadCanvas(): Void {
 		var blob: js.lib.ArrayBuffer = Krom.loadBlob(getCanvasPath());
@@ -356,20 +354,20 @@ class CanvasUtils {
 		}
 
 		try {
-			var jsonString: String = haxe.io.Bytes.ofData(blob).toString();
-			var canvasData: TCanvasData = Json.parse(jsonString);
-
+			var canvasData: TCanvasData = Json.parse(haxe.io.Bytes.ofData(blob).toString());
 			deserializeCanvas(canvasData);
-			SceneEvents.canvasLoaded.emit();
 		} catch (e: Dynamic) {
-			trace('Failed to parse canvas: ${e}');
+			trace('Failed to load canvas "${canvasName}": ${e}');
+			return;
 		}
+		History.reset();
+		SceneEvents.canvasLoaded.emit();
 	}
 
 	/**
 	 * Serializes the current canvas state to a TCanvasData structure.
 	 */
-	static function serializeCanvas(): TCanvasData {
+	public static function serializeCanvas(): TCanvasData {
 		var scenesData: Array<TSceneData> = [];
 
 		// Serialize each scene
@@ -384,7 +382,7 @@ class CanvasUtils {
 
 		return {
 			name: canvasName,
-			version: FORMAT_VERSION,
+			version: CanvasLoader.VERSION,
 			canvas: {
 				width: canvasWidth,
 				height: canvasHeight,
@@ -407,87 +405,67 @@ class CanvasUtils {
 	static function serializeScene(scene: TSceneEntry): TSceneData {
 		var elementsData: Array<TElementData> = [];
 
-		// Serialize elements in hierarchy order (depth-first traversal)
-		serializeElementsRecursive(scene.root, scene.keys, elementsData);
+		// Serialize elements in hierarchy order (depth-first traversal), parents first
+		serializeChildren(scene.root, "", scene, true, elementsData);
 
 		return {
 			key: scene.key,
-			active: scene.active,
+			// The scene shown when loading is the one shown when saving
+			active: scene == sceneData.currentScene,
 			elements: elementsData
 		};
 	}
 
 	static function serializeRadioGroups(): Array<TRadioGroupData> {
-		var groups = sceneData.radioGroups;
-
-		// Find active button key by searching all scenes
-		var findElementKey = function(element: Element): Null<String> {
-			if (element == null) return null;
-			for (scene in sceneData.scenes) {
-				var key: Null<String> = scene.keys.get(element);
-				if (key != null) return key;
-			}
-			return null;
-		};
-
-		return [for (group in groups) {
+		return [for (group in sceneData.radioGroups) {
 			id: group.id,
-			activeButtonKey: findElementKey(group.activeButton)
+			activeButton: findElementRef(group.activeButton)
 		}];
 	}
 
+	/** Where `element` is in the canvas, or null if it is not in any scene. */
+	static function findElementRef(element: Null<Element>): Null<TElementRef> {
+		if (element == null) return null;
+		for (scene in sceneData.scenes) {
+			if (scene.keys.exists(element)) {
+				return { scene: scene.key, path: CanvasLoader.getPath(element, scene.root, scene.keys) };
+			}
+		}
+		return null;
+	}
+
 	/**
-	 * Recursively serializes elements in hierarchy order.
+	 * Serializes the elements inside `parent`, and theirs, in hierarchy order.
+	 * `parentPath` is the path saved as the children's parent.
 	 */
-	static function serializeElementsRecursive(parent: Element, elementKeyMap: Map<Element, String>, output: Array<TElementData>): Void {
-		// Get children of this parent
-		var children: Array<Element> = HierarchyUtils.getChildren(parent);
+	static function serializeChildren(parent: Element, parentPath: String, scene: TSceneEntry, withFocus: Bool, output: Array<TElementData>): Void {
+		for (child in sceneData.getChildren(parent, scene)) {
+			var elementData: Null<TElementData> = serializeElement(child, scene.keys.get(child), parentPath, scene, withFocus);
+			if (elementData == null) continue;
 
-		for (child in children) {
-			// Skip internal children (like Button's _label)
-			if (HierarchyUtils.shouldSkipInternalChild(parent, child)) {
-				continue;
-			}
-
-			var key: Null<String> = elementKeyMap.get(child);
-			if (key != null) {
-				var elementData: TElementData = serializeElement({key: key, element: child}, elementKeyMap);
-				if (elementData != null) {
-					output.push(elementData);
-				}
-
-				// Recursively serialize children of this element
-				serializeElementsRecursive(child, elementKeyMap, output);
-			}
+			output.push(elementData);
+			serializeChildren(child, CanvasLoader.joinPath(parentPath, elementData.key), scene, withFocus, output);
 		}
 	}
 
 	/**
-	 * Serializes a single element to TElementData.
+	 * Serializes a single element. Returns null (and skips its children) for a
+	 * type a canvas can't contain.
 	 */
-	public static function serializeElement(entry: {key: String, element: Element}, elementKeyMap: Map<Element, String>): TElementData {
-		var element: Element = entry.element;
-		var type: String = getElementType(element);
-
-		if (type == "Unknown") {
-			trace('Skipping unknown element type: ${entry.key}');
+	static function serializeElement(element: Element, key: String, parentPath: String, scene: TSceneEntry, withFocus: Bool): Null<TElementData> {
+		var type: Null<String> = CanvasElements.getType(element);
+		if (type == null) {
+			trace('Skipping element "${key}": canvases can not contain its type');
 			return null;
 		}
 
-		// Get parent key
-		var parentKey: Null<String> = null;
-		var parent: Element = HierarchyUtils.getParentElement(element);
-		if (parent != null && elementKeyMap.exists(parent)) {
-			parentKey = elementKeyMap.get(parent);
-		}
-
-		var getElemKey = function(elem: Null<Element>): Null<String> {
-			if (elem == null) return null;
-			return elementKeyMap.get(elem);
+		var focusPath = function(target: Null<Element>): Null<String> {
+			if (!withFocus || target == null || !scene.keys.exists(target)) return null;
+			return CanvasLoader.getPath(target, scene.root, scene.keys);
 		};
 
 		return {
-			key: entry.key,
+			key: key,
 			type: type,
 			tID: element.getTID(),
 			posX: element.posX,
@@ -497,12 +475,12 @@ class CanvasUtils {
 			anchor: cast element.anchor,
 			visible: element.visible,
 			disabled: element.disabled,
-			parentKey: parentKey,
-			focusUp: getElemKey(element.focusUp),
-			focusDown: getElemKey(element.focusDown),
-			focusLeft: getElemKey(element.focusLeft),
-			focusRight: getElemKey(element.focusRight),
-			properties: serializeTypeProperties(element, type)
+			parent: parentPath,
+			focusUp: focusPath(element.focusUp),
+			focusDown: focusPath(element.focusDown),
+			focusLeft: focusPath(element.focusLeft),
+			focusRight: focusPath(element.focusRight),
+			properties: CanvasElements.serializeProperties(element)
 		};
 	}
 
@@ -510,237 +488,119 @@ class CanvasUtils {
 	 * Returns the type string for an element.
 	 */
 	public static function getElementType(element: Element): String {
-		return ElementUtils.getElementType(element);
+		return ElementRegistry.getElementType(element);
 	}
 
 	/**
-	 * Serializes type-specific properties.
-	 */
-	static function serializeTypeProperties(element: Element, type: String): Dynamic {
-		return ElementUtils.serializeProperties(element, type);
-	}
-
-	/**
-	 * Deserializes a canvas from TCanvasData and rebuilds the editor state.
+	 * Rebuilds the editor from `canvasData`. Throws if the data can't be loaded,
+	 * before anything is changed, so the current canvas is kept.
 	 */
 	static function deserializeCanvas(canvasData: TCanvasData): Void {
-		// Clear existing scenes (and remove from SceneManager/Koui)
+		checkBuildable(canvasData);
+
+		var activeSceneKey: String = null;
+		for (sceneDataEntry in canvasData.scenes) {
+			if (sceneDataEntry.active) {
+				activeSceneKey = sceneDataEntry.key;
+				break;
+			}
+		}
+		rebuildCanvas(canvasData, activeSceneKey);
+	}
+
+	/**
+	 * Replaces the editor's canvas with `canvasData`, which must be valid, and
+	 * shows the scene `sceneKey` (or the last scene if it is null). Used by
+	 * loading and by undo/redo.
+	 */
+	public static function rebuildCanvas(canvasData: TCanvasData, sceneKey: Null<String>): Void {
+		// Remove and free the existing scenes
 		clearCanvas();
 
 		// Load canvas settings
-		if (canvasData.canvas.settings != null) {
-			CanvasSettings.expandOnResize = canvasData.canvas.settings.expandOnResize;
-			CanvasSettings.scaleOnResize = canvasData.canvas.settings.scaleOnResize;
-			CanvasSettings.autoScale = canvasData.canvas.settings.autoScale;
-			CanvasSettings.scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
-			CanvasSettings.scaleVertical = canvasData.canvas.settings.scaleVertical;
-		}
+		CanvasSettings.expandOnResize = canvasData.canvas.settings.expandOnResize;
+		CanvasSettings.scaleOnResize = canvasData.canvas.settings.scaleOnResize;
+		CanvasSettings.autoScale = canvasData.canvas.settings.autoScale;
+		CanvasSettings.scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
+		CanvasSettings.scaleVertical = canvasData.canvas.settings.scaleVertical;
 
-		// Build global radio group map from canvas-level data
-		var radioGroupMap: Map<String, RadioGroup> = new Map();
-		sceneData.radioGroups = [];
+		// Radio groups are shared by all scenes; the editor always has at least one
+		var radioGroups: Array<RadioGroup> = CanvasLoader.createRadioGroups(canvasData);
+		if (radioGroups.length == 0) radioGroups.push(new RadioGroup("RadioGroup"));
+		var radioGroupMap: Map<String, RadioGroup> = [for (group in radioGroups) group.id => group];
 
-		if (canvasData.radioGroups != null) {
-			for (radioGroupData in canvasData.radioGroups) {
-				if (radioGroupData == null || radioGroupData.id == null || radioGroupData.id == "") continue;
-				if (!radioGroupMap.exists(radioGroupData.id)) {
-					var group = new RadioGroup(radioGroupData.id);
-					radioGroupMap.set(radioGroupData.id, group);
-					sceneData.radioGroups.push(group);
-				}
-			}
-		}
-
-		if (sceneData.radioGroups.length == 0) {
-			var defaultGroup = new RadioGroup("RadioGroup");
-			radioGroupMap.set(defaultGroup.id, defaultGroup);
-			sceneData.radioGroups.push(defaultGroup);
-		}
-
-		// Deserialize each scene, sharing the global radio group map
-		var activeSceneKey: String = null;
-		var allElementMaps: Array<Map<String, Element>> = [];
+		var builtScenes: Map<String, TBuiltScene> = new Map();
 		for (sceneDataEntry in canvasData.scenes) {
-			var elementMap = deserializeScene(sceneDataEntry, canvasData.canvas.width, canvasData.canvas.height, radioGroupMap);
-			allElementMaps.push(elementMap);
-			if (sceneDataEntry.active) {
-				activeSceneKey = sceneDataEntry.key;
-			}
+			// Emit sceneAdded - this triggers KouiEditor.onSceneAdded which properly sets up the scene
+			SceneEvents.sceneAdded.emit(sceneDataEntry.key);
+			var scene: TSceneEntry = sceneData.currentScene;
+
+			var keys: Map<Element, String> = CanvasLoader.buildScene(sceneDataEntry, scene.root, radioGroupMap);
+			for (element => key in keys) sceneData.registerElement(element, key, scene);
+			builtScenes.set(scene.key, { root: scene.root, keys: keys });
 		}
 
-		// Restore active buttons (search across all scenes' element maps)
-		if (canvasData.radioGroups != null) {
-			for (radioGroupData in canvasData.radioGroups) {
-				if (radioGroupData == null || radioGroupData.activeButtonKey == null) continue;
-				var group = radioGroupMap.get(radioGroupData.id);
-				if (group == null) continue;
-
-				for (elementMap in allElementMaps) {
-					var targetElement = elementMap.get(radioGroupData.activeButtonKey);
-					var targetButton: RadioButton = Std.downcast(targetElement, RadioButton);
-					if (targetButton != null) {
-						group.setActiveButton(targetButton);
-						break;
-					}
-				}
-			}
+		// Radio buttons may have created groups the canvas didn't list
+		for (group in radioGroupMap) {
+			if (radioGroups.indexOf(group) < 0) radioGroups.push(group);
 		}
+		sceneData.radioGroups = radioGroups;
+		CanvasLoader.applyActiveButtons(canvasData, radioGroupMap, builtScenes);
 
 		// If no scenes were loaded, create a default scene
 		if (sceneData.scenes.length == 0) {
-			SceneEvents.sceneAdded.emit("Scene");
-		} else if (activeSceneKey != null) {
-			// Switch to the active scene
-			SceneEvents.sceneChanged.emit(activeSceneKey);
+			SceneEvents.sceneAdded.emit("Scene_1");
 		}
+		if (sceneKey == null || sceneData.getScene(sceneKey) == null) sceneKey = sceneData.currentScene.key;
+		SceneEvents.sceneChanged.emit(sceneKey);
 
 		Selection.clear();
 	}
 
-	/**
-	 * Deserializes a single scene from TSceneData.
-	 * Returns the element map for active button restoration.
-	 */
-	static function deserializeScene(sceneDataEntry: TSceneData, canvasWidth: Int, canvasHeight: Int, radioGroupMap: Map<String, RadioGroup>): Map<String, Element> {
-		// Emit sceneAdded - this triggers KouiEditor.onSceneAdded which properly sets up the scene
-		SceneEvents.sceneAdded.emit(sceneDataEntry.key);
+	/** Builds `canvasData` into throwaway panes, so invalid data throws before the editor is changed. */
+	static function checkBuildable(canvasData: TCanvasData): Void {
+		var radioGroupMap: Map<String, RadioGroup> = [for (group in CanvasLoader.createRadioGroups(canvasData)) group.id => group];
+		var builtScenes: Map<String, TBuiltScene> = new Map();
+		var roots: Array<AnchorPane> = [];
 
-		// Get the scene that was just created by the event handler
-		var scene: TSceneEntry = sceneData.currentScene;
-
-		// First pass: create all elements in order (use array to handle duplicate keys)
-		var createdElements: Array<Element> = [];
-		for (elemData in sceneDataEntry.elements) {
-			var element: Element = createElementFromData(elemData, radioGroupMap);
-			createdElements.push(element);
-		}
-
-		// Build a map for parent lookup (parents are serialized before children)
-		var elementMap: Map<String, Element> = new Map();
-		for (i in 0...sceneDataEntry.elements.length) {
-			if (createdElements[i] != null) {
-				elementMap.set(sceneDataEntry.elements[i].key, createdElements[i]);
+		try {
+			for (sceneDataEntry in canvasData.scenes) {
+				if (builtScenes.exists(sceneDataEntry.key)) throw 'two scenes are named "${sceneDataEntry.key}"';
+				var root: AnchorPane = new AnchorPane(0, 0, canvasData.canvas.width, canvasData.canvas.height);
+				roots.push(root);
+				builtScenes.set(sceneDataEntry.key, { root: root, keys: CanvasLoader.buildScene(sceneDataEntry, root, radioGroupMap) });
 			}
+			CanvasLoader.applyActiveButtons(canvasData, radioGroupMap, builtScenes);
+		} catch (e: Dynamic) {
+			for (root in roots) root.destroy();
+			throw e;
 		}
-
-		// Second pass: add elements to correct parents with correct anchors
-		for (i in 0...sceneDataEntry.elements.length) {
-			var elemData = sceneDataEntry.elements[i];
-			var element = createdElements[i];
-			if (element == null) continue;
-
-			// Register element in scene data with the loaded key
-			sceneData.registerElement(element, elemData.key, scene);
-
-			// Find the parent element
-			var parent: Element = null;
-			if (elemData.parentKey != null && elementMap.exists(elemData.parentKey)) {
-				parent = elementMap.get(elemData.parentKey);
-			}
-
-			// Set the anchor before adding to parent
-			element.anchor = cast elemData.anchor;
-
-			// Add to parent (or root if no parent)
-			if (parent != null) {
-				HierarchyUtils.moveAsChild(element, parent);
-			} else {
-				// Root-level element - add to scene root
-				scene.root.add(element, cast elemData.anchor);
-			}
-		}
-
-		// Third pass: resolve focus connections
-		for (i in 0...sceneDataEntry.elements.length) {
-			var elemData = sceneDataEntry.elements[i];
-			var element = createdElements[i];
-			if (element == null) continue;
-
-			if (elemData.focusUp != null) element.focusUp = elementMap.get(elemData.focusUp);
-			if (elemData.focusDown != null) element.focusDown = elementMap.get(elemData.focusDown);
-			if (elemData.focusLeft != null) element.focusLeft = elementMap.get(elemData.focusLeft);
-			if (elemData.focusRight != null) element.focusRight = elementMap.get(elemData.focusRight);
-		}
-
-		return elementMap;
+		for (root in roots) root.destroy();
 	}
 
 	/**
-	 * Creates an element from TElementData.
-	 */
-	public static function createElementFromData(data: TElementData, ?radioGroupMap: Map<String, RadioGroup>): Element {
-		return ElementUtils.createElement(
-			data.type,
-			data.posX,
-			data.posY,
-			data.width,
-			data.height,
-			data.anchor,
-			data.visible,
-			data.disabled,
-			data.tID,
-			data.properties,
-			radioGroupMap
-		);
-	}
-
-	/**
-	 * Recursively serializes an element and all its user-facing children into a flat array.
-	 * The root element's parentKey is set to null; children reference their parent's key.
+	 * Serializes an element and all its user-facing children into a flat array.
+	 * The element's parent is saved as "", its children's parents as paths
+	 * starting at the element. Focus links are not copied.
 	 */
 	public static function serializeElementTree(element: Element): Array<TElementData> {
 		var result: Array<TElementData> = [];
 		var scene = sceneData.currentScene;
-		if (scene == null) return result;
+		if (scene == null || !scene.keys.exists(element)) return result;
 
-		var elementKeyMap: Map<Element, String> = scene.keys;
-		var rootKey: Null<String> = elementKeyMap.get(element);
-		if (rootKey == null) return result;
-
-		// Serialize the root element with parentKey = null
-		var rootData: TElementData = serializeElement({key: rootKey, element: element}, elementKeyMap);
+		var rootData: Null<TElementData> = serializeElement(element, scene.keys.get(element), "", scene, false);
 		if (rootData == null) return result;
-		rootData.parentKey = null; // Force root to have no parent in clipboard
-		rootData.focusUp = null;
-		rootData.focusDown = null;
-		rootData.focusLeft = null;
-		rootData.focusRight = null;
 		result.push(rootData);
 
-		// Recursively serialize children
-		serializeChildrenRecursive(element, elementKeyMap, result);
+		serializeChildren(element, rootData.key, scene, false, result);
 
 		return result;
 	}
 
 	/**
-	 * Helper: recursively serializes children of a parent element.
-	 */
-	static function serializeChildrenRecursive(parent: Element, elementKeyMap: Map<Element, String>, output: Array<TElementData>): Void {
-		var children: Array<Element> = HierarchyUtils.getChildren(parent);
-		for (child in children) {
-			if (HierarchyUtils.shouldSkipInternalChild(parent, child)) continue;
-
-			var key: Null<String> = elementKeyMap.get(child);
-			if (key == null) continue;
-
-			var elemData: TElementData = serializeElement({key: key, element: child}, elementKeyMap);
-			if (elemData == null) continue;
-			// Clear focus nav links — they reference elements by key that won't exist after paste
-			elemData.focusUp = null;
-			elemData.focusDown = null;
-			elemData.focusLeft = null;
-			elemData.focusRight = null;
-			output.push(elemData);
-
-			serializeChildrenRecursive(child, elementKeyMap, output);
-		}
-	}
-
-	/**
 	 * Pastes elements from clipboard data into the current scene.
 	 * Creates new elements with unique names and restores parent-child relationships.
-	 * If targetParent is a layout container, the root element is pasted as its child.
+	 * If targetParent is a layout container, each copied tree is pasted into it.
 	 */
 	public static function pasteElements(clipboardData: Array<TElementData>, ?targetParent: Element): Void {
 		var scene = sceneData.currentScene;
@@ -755,26 +615,23 @@ class CanvasUtils {
 		// Collect ALL existing keys in the scene for global uniqueness
 		var allSceneKeys: Array<String> = [for (key in scene.keys) key];
 
-		// Map from original clipboard key -> new element (for restoring parent-child)
-		var keyToElement: Map<String, Element> = new Map();
-		// Map from original clipboard key -> final unique key (for parentKey remapping)
-		var keyToNewKey: Map<String, String> = new Map();
+		// Pasted radio buttons join the canvas' groups
+		var radioGroupMap: Map<String, RadioGroup> = [for (group in sceneData.radioGroups) group.id => group];
+
+		// Map from a copied element's path (within its copied tree) to its new element
+		var pathToElement: Map<String, Element> = new Map();
 		var pastedRoots: Array<Element> = [];
 
 		for (elemData in clipboardData) {
-			// The clipboard can hold several copied trees; names only need to be unique within each
-			if (elemData.parentKey == null) keyToElement = new Map();
+			// The clipboard can hold several copied trees; paths only need to be unique within each
+			var isTreeRoot: Bool = elemData.parent == "";
+			if (isTreeRoot) pathToElement = new Map();
 
-			var element: Element = createElementFromData(elemData);
+			var parent: Element = isTreeRoot ? pasteParent : pathToElement.get(elemData.parent);
+			if (parent == null) continue;
+
+			var element: Element = CanvasElements.create(elemData, radioGroupMap);
 			if (element == null) continue;
-
-			element.anchor = cast elemData.anchor;
-
-			// Resolve the parent element for this entry
-			var parent: Element = pasteParent;
-			if (elemData.parentKey != null && keyToElement.exists(elemData.parentKey)) {
-				parent = keyToElement.get(elemData.parentKey);
-			}
 
 			// Ensure key is globally unique within the scene
 			var proposedKey: String = elemData.key;
@@ -785,41 +642,34 @@ class CanvasUtils {
 			}
 			allSceneKeys.push(proposedKey);
 
-			keyToElement.set(elemData.key, element);
-			keyToNewKey.set(elemData.key, proposedKey);
+			pathToElement.set(CanvasLoader.joinPath(elemData.parent, elemData.key), element);
 
-			if (elemData.parentKey == null) {
-				// Root element
+			if (isTreeRoot) {
 				if (pasteParent == scene.root) {
 					element.setPosition(elemData.posX + 10, elemData.posY + 10);
 					scene.root.add(element, cast elemData.anchor);
 				} else {
 					HierarchyUtils.moveAsChild(element, pasteParent);
 				}
-				sceneData.registerElement(element, proposedKey, scene);
 				pastedRoots.push(element);
 			} else {
 				// Child element — add to its parent
 				HierarchyUtils.moveAsChild(element, parent);
-				sceneData.registerElement(element, proposedKey, scene);
 			}
+			sceneData.registerElement(element, proposedKey, scene);
 		}
 
 		Selection.setAll(pastedRoots);
 	}
 
 	/**
-	 * Clears all elements from all scenes and removes all scenes.
+	 * Removes all scenes and frees their elements, leaving no scene. Callers
+	 * create or load scenes right after.
 	 */
 	public static function clearCanvas(): Void {
-		// Remove all scenes by emitting sceneRemoved (like the Delete Scene button does)
-		var scenesToRemove: Array<TSceneEntry> = sceneData.scenes.copy();
-		for (scene in scenesToRemove) {
-			// Clear element bookkeeping
-			scene.keys.clear();
-
-			// Emit scene removed - KouiEditor.onSceneRemoved will call SceneManager.removeScene
-			SceneEvents.sceneRemoved.emit(scene.key);
+		for (scene in sceneData.scenes) {
+			SceneManager.removeScene(scene.key);
+			scene.root.destroy();
 		}
 
 		// Clear the scenes array and reset current scene
@@ -827,5 +677,12 @@ class CanvasUtils {
 		sceneData.currentScene = null;
 
 		Selection.clear();
+	}
+
+	/** The toolbar's Clear Canvas: removes everything and leaves one empty scene, as one undoable step. */
+	public static function clearToEmptyScene(): Void {
+		clearCanvas();
+		SceneEvents.sceneAdded.emit("Scene_1");
+		History.edited("Clear canvas");
 	}
 }

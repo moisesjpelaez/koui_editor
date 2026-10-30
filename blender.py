@@ -192,7 +192,7 @@ def register():
                 render_settings = bpy.context.scene.render
                 empty_canvas = {
                     "name": self.canvas_name,
-                    "version": "1.1",
+                    "version": "2.0",
                     "canvas": {
                         "width": render_settings.resolution_x,
                         "height": render_settings.resolution_y,
@@ -204,11 +204,12 @@ def register():
                             "scaleVertical": False
                         }
                     },
+                    "radioGroups": [],
                     "scenes": [
                         {
                             "key": "Scene_1",
-                            "elements": [],
-                            "active": True
+                            "active": True,
+                            "elements": []
                         }
                     ]
                 }

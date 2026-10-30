@@ -25,12 +25,6 @@ class AnchorPaneEditor implements IElementEditor {
 		return pane;
 	}
 
-	public function createFromData(posX: Int, posY: Int, width: Int, height: Int, properties: Dynamic, ?radioGroupMap: Map<String, RadioGroup>): Element {
-		return new AnchorPane(posX, posY, width, height);
-	}
-
-	public function serializeProperties(element: Element): Dynamic return {};
-
 	public function initHandles(): Void {}
 	public function syncHandles(element: Element): Void {}
 	public function drawProperties(ui: Zui, element: Element): Void {}

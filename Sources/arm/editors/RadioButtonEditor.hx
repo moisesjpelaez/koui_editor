@@ -40,36 +40,6 @@ class RadioButtonEditor implements IElementEditor {
 		return new RadioButton(group, "New Radio");
 	}
 
-	public function createFromData(posX: Int, posY: Int, width: Int, height: Int, properties: Dynamic, ?radioGroupMap: Map<String, RadioGroup>): Element {
-		var text: String = properties != null && properties.text != null ? properties.text : "";
-		var groupId: String = properties != null && properties.radioGroup != null ? properties.radioGroup : "RadioGroup";
-		var group: RadioGroup = null;
-		if (radioGroupMap != null) {
-			group = radioGroupMap.get(groupId);
-			if (group == null) {
-				group = new RadioGroup(groupId);
-				radioGroupMap.set(groupId, group);
-			}
-		} else {
-			group = new RadioGroup(groupId);
-		}
-
-		var radioButton = new RadioButton(group, text);
-		if (properties != null && properties.isChecked != null && properties.isChecked) {
-			radioButton.group.setActiveButton(radioButton);
-		}
-		return radioButton;
-	}
-
-	public function serializeProperties(element: Element): Dynamic {
-		var radioButton: RadioButton = cast element;
-		return {
-			text: radioButton.text,
-			isChecked: radioButton.isChecked,
-			radioGroup: radioButton.group != null ? radioButton.group.id : ""
-		};
-	}
-
 	public function initHandles(): Void {
 		textHandle = new Handle();
 		isCheckedHandle = new Handle();

@@ -1,18 +1,20 @@
 package arm.panels;
 
+import arm.canvas.CanvasLoader;
 import arm.data.CanvasSettings;
+import arm.data.History;
 import arm.data.SceneData;
 import arm.data.Selection;
 import arm.events.SceneEvents;
 import arm.events.ElementEvents;
 import arm.editors.ElementRegistry;
-import arm.commands.CommandManager;
-import arm.commands.KeyRenameCommand;
 import arm.types.Enums;
 import arm.types.Types;
 import arm.base.UIBase;
 import arm.data.EditorSettings;
 import arm.tools.CanvasUtils;
+import arm.tools.HierarchyUtils;
+import arm.tools.NameUtils;
 import arm.tools.ZuiUtils;
 
 import iron.math.Vec2;
@@ -69,7 +71,8 @@ class PropertiesPanel {
     var sceneData: SceneData = SceneData.data;
 
     // Initial values for reset functionality
-    var elementSizes: ObjectMap<Element, Vec2> = new ObjectMap();
+    /** Size of each element when first selected, by "scene:path", for "Reset Size". */
+    var elementSizes: Map<String, Vec2> = new Map();
 
     var icons: Image;
 
@@ -107,7 +110,6 @@ class PropertiesPanel {
 
         ElementEvents.elementAdded.connect(onElementAdded);
         ElementEvents.selectionChanged.connect(onSelectionChanged);
-        ElementEvents.elementRemoved.connect(onElementRemoved);
         SceneEvents.canvasLoaded.connect(onCanvasLoaded);
     }
 
@@ -186,6 +188,9 @@ class PropertiesPanel {
                         CanvasSettings.scaleHorizontal = false;
                         CanvasSettings.scaleVertical = true;
                     }
+                }
+                if (expandOnResizeHandle.changed || scaleOnResizeHandle.changed || scaleOnResizeGroup.changed) {
+                    History.edited("Change canvas settings");
                 }
             }
 
@@ -268,6 +273,7 @@ class PropertiesPanel {
 
                     if (ZuiUtils.iconButton(ui, icons, 7, 0, "Set Active", group.activeButton == button, false, 0.7)) {
                         group.setActiveButton(button);
+                        History.edited("Set active radio button");
                         uiBase.hwnds[PanelProperties].redraws = 2;
                     }
                 }
@@ -339,6 +345,7 @@ class PropertiesPanel {
 
         var group = new RadioGroup(uniqueId);
         sceneData.radioGroups.push(group);
+        History.edited("Add radio group");
         radioGroupAddHandles.set(group.id, new Handle({position: 0}));
         radioGroupNameHandle.text = uniqueId;
     }
@@ -385,6 +392,7 @@ class PropertiesPanel {
         }
 
         radioGroups.splice(index, 1);
+        History.edited("Delete radio group");
         radioGroupAddHandles.remove(groupId);
         radioGroupRenameHandles.remove(groupId);
     }
@@ -400,6 +408,7 @@ class PropertiesPanel {
         if (group == null) return;
 
         group.id = trimmedNewId;
+        History.edited("Rename radio group");
 
         // Update handle mappings
         var addHandle = radioGroupAddHandles.get(oldId);
@@ -424,6 +433,7 @@ class PropertiesPanel {
 
         button.group = group;
         group.add(button);
+        History.edited("Change radio group");
     }
 
     function removeButtonFromGroup(group: RadioGroup, button: RadioButton): Void {
@@ -435,6 +445,7 @@ class PropertiesPanel {
         var defaultGroup = sceneData.radioGroups[0];
         button.group = defaultGroup;
         defaultGroup.add(button);
+        History.edited("Change radio group");
     }
 
     function drawProperties(uiBase: UIBase): Void {
@@ -464,12 +475,16 @@ class PropertiesPanel {
         nameHandle.text = elemName;
         var newName: String = ui.textInput(nameHandle, "Key", Right);
         if (nameHandle.changed) {
-            if (newName != null && newName != "" && newName != elemName) {
-                sceneData.updateElementKey(selectedElement, newName);
-                if (!CommandManager.instance.isUndoRedoing) {
-                    CommandManager.instance.record(new KeyRenameCommand(selectedElement, elemName, newName));
+            // "/" separates the names in an element's path
+            if (newName != null && newName != "" && newName != elemName && newName.indexOf("/") < 0) {
+                // Names are unique among siblings; a taken name gets a free number instead
+                var uniqueName: String = NameUtils.ensureUniqueName(newName, selectedElement, HierarchyUtils.getParentElement(selectedElement));
+                if (uniqueName != elemName) {
+                    sceneData.updateElementKey(selectedElement, uniqueName);
+                    History.edited("Rename");
                 }
             }
+            nameHandle.text = sceneData.getElementKey(selectedElement);
             uiBase.hwnds[PanelHierarchy].redraws = 2;
             uiBase.hwnds[PanelProperties].redraws = 2;
         }
@@ -588,7 +603,7 @@ class PropertiesPanel {
                 }
             }
             if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.7)) {
-                var originalSize: Vec2 = elementSizes.get(selectedElement);
+                var originalSize: Vec2 = elementSizes.get(sizeKey(selectedElement));
                 if (originalSize != null) {
                     ElementEvents.propertyChanged.emit(selectedElement, ["width", "height"], [selectedElement.width, selectedElement.height], [Std.int(originalSize.x), Std.int(originalSize.y)]);
                     selectedElement.width = Std.int(originalSize.x);
@@ -720,7 +735,6 @@ class PropertiesPanel {
 
     public function onElementAdded(entry: TElementEntry): Void {
         ensureRadioGroups();
-        elementSizes.set(entry.element, new Vec2(entry.element.width, entry.element.height));
 
         if (Std.isOfType(entry.element, RadioButton)) {
             var radioButton: RadioButton = cast entry.element;
@@ -742,8 +756,8 @@ class PropertiesPanel {
         // Update all handles with the new element's values
         if (element != null) {
             // Register element size if not already tracked (for elements loaded from file)
-            if (!elementSizes.exists(element)) {
-                elementSizes.set(element, new Vec2(element.width, element.height));
+            if (!elementSizes.exists(sizeKey(element))) {
+                elementSizes.set(sizeKey(element), new Vec2(element.width, element.height));
             }
 
             var elemName: String = sceneData.getElementKey(element);
@@ -777,15 +791,9 @@ class PropertiesPanel {
         }
     }
 
-    public function onElementRemoved(element: Element): Void {
-        elementSizes.remove(element);
-
-        if (Std.isOfType(element, RadioButton)) {
-            var radioButton: RadioButton = cast element;
-            if (radioButton.group != null) {
-                radioButton.group.remove(radioButton);
-            }
-        }
+    function sizeKey(element: Element): String {
+        var scene: TSceneEntry = sceneData.currentScene;
+        return scene.key + ":" + CanvasLoader.getPath(element, scene.root, scene.keys);
     }
 
     public static function getDefaultRadioGroup(): RadioGroup {

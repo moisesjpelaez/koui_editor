@@ -1,18 +1,12 @@
 package armory.trait.internal;
 
+import arm.canvas.CanvasLoader;
+import arm.tools.HierarchyUtils;
 import arm.types.Types;
 import iron.App;
 import iron.Trait;
 import koui.Koui;
 import koui.elements.Element;
-import koui.elements.Button;
-import koui.elements.Checkbox;
-import koui.elements.ImagePanel;
-import koui.elements.Label;
-import koui.elements.Panel;
-import koui.elements.Progressbar;
-import koui.elements.RadioButton;
-import koui.elements.Slider;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.GridLayout;
@@ -21,7 +15,6 @@ import koui.elements.layouts.RowLayout;
 import koui.events.FocusEvent;
 import koui.events.MouseEvent.MouseClickEvent;
 import koui.events.MouseEvent.MouseHoverEvent;
-import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
 import koui.utils.RadioGroup;
 import koui.utils.SceneManager;
 
@@ -29,8 +22,8 @@ import koui.utils.SceneManager;
 private typedef TKouiScene = {
 	var key: String;
 	var root: AnchorPane;
-	var elements: Map<String, Element>;
-	var elementKeys: Map<Element, String>;
+	/** The name of each element; elements are found by path through the tree. */
+	var keys: Map<Element, String>;
 }
 
 /**
@@ -140,6 +133,7 @@ class KouiCanvas extends Trait {
 	function onRemove(): Void {
 		// Clean up when trait is removed
 		SceneManager.clearScenes();
+		for (scene in scenes) scene.root.destroy();
 		scenes.clear();
 		currentScene = null;
 		if (expandOnResize) App.resized.disconnect(onAppResized);
@@ -150,13 +144,11 @@ class KouiCanvas extends Trait {
 	 */
 	private function buildCanvas(canvasData: TCanvasData): Void {
 		// Settings
-		if (canvasData.canvas.settings != null) {
-			expandOnResize = canvasData.canvas.settings.expandOnResize;
-			scaleOnResize = canvasData.canvas.settings.scaleOnResize;
-			autoScale = canvasData.canvas.settings.autoScale;
-			scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
-			scaleVertical = canvasData.canvas.settings.scaleVertical;
-		}
+		expandOnResize = canvasData.canvas.settings.expandOnResize;
+		scaleOnResize = canvasData.canvas.settings.scaleOnResize;
+		autoScale = canvasData.canvas.settings.autoScale;
+		scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
+		scaleVertical = canvasData.canvas.settings.scaleVertical;
 		if (expandOnResize) {
 			App.resized.connect(onAppResized);
 			baseH = canvasData.canvas.height;
@@ -164,39 +156,19 @@ class KouiCanvas extends Trait {
 			onAppResized(App.w(), App.h());
 		}
 
-		// Build global radio groups from canvas-level data
-		if (canvasData.radioGroups != null) {
-			for (radioGroupData in canvasData.radioGroups) {
-				if (radioGroupData == null || radioGroupData.id == null || radioGroupData.id == "") continue;
-				if (!radioGroups.exists(radioGroupData.id)) {
-					radioGroups.set(radioGroupData.id, new RadioGroup(radioGroupData.id));
-				}
-			}
+		// Radio groups are shared by all scenes
+		for (group in CanvasLoader.createRadioGroups(canvasData)) {
+			radioGroups.set(group.id, group);
 		}
 
 		// Build each scene
+		var builtScenes: Map<String, TBuiltScene> = new Map();
 		for (sceneData in canvasData.scenes) {
 			buildScene(sceneData, canvasData.canvas.width, canvasData.canvas.height);
+			var kouiScene: TKouiScene = scenes.get(sceneData.key);
+			builtScenes.set(sceneData.key, { root: kouiScene.root, keys: kouiScene.keys });
 		}
-
-		// Restore active buttons from canvas-level radio group data
-		if (canvasData.radioGroups != null) {
-			for (radioGroupData in canvasData.radioGroups) {
-				if (radioGroupData == null || radioGroupData.activeButtonKey == null) continue;
-				var group = radioGroups.get(radioGroupData.id);
-				if (group == null) continue;
-
-				// Search all scenes for the target element
-				for (kouiScene in scenes) {
-					var targetElement = kouiScene.elements.get(radioGroupData.activeButtonKey);
-					var targetButton: RadioButton = Std.downcast(targetElement, RadioButton);
-					if (targetButton != null) {
-						group.setActiveButton(targetButton);
-						break;
-					}
-				}
-			}
-		}
+		CanvasLoader.applyActiveButtons(canvasData, radioGroups, builtScenes);
 
 		// Activate the scene marked as active (if any)
 		for (sceneData in canvasData.scenes) {
@@ -211,249 +183,28 @@ class KouiCanvas extends Trait {
 	 * Build a single scene from JSON data.
 	 */
 	private function buildScene(sceneData: TSceneData, canvasWidth: Int, canvasHeight: Int): Void {
-		var sceneKey: String = sceneData.key;
-
-		// Create scene storage
 		var kouiScene: TKouiScene = {
-			key: sceneKey,
+			key: sceneData.key,
 			root: null,
-			elements: new Map(),
-			elementKeys: new Map()
+			keys: new Map()
 		};
 
 		// Use SceneManager to create the scene
-		SceneManager.addScene(sceneKey, function(scenePane: AnchorPane) {
+		SceneManager.addScene(sceneData.key, function(scenePane: AnchorPane) {
 			scenePane.setSize(canvasWidth, canvasHeight);
 			kouiScene.root = scenePane;
-			kouiScene.elements.set(sceneKey, scenePane);
-
-			// First pass: create all elements in order
-			var createdElements: Array<Element> = [];
-			for (elemData in sceneData.elements) {
-				var element: Element = createElementFromData(elemData);
-				createdElements.push(element);
-			}
-
-			// Build a map for parent lookup (parents are serialized before children)
-			var elementMap: Map<String, Element> = new Map();
-			for (i in 0...sceneData.elements.length) {
-				if (createdElements[i] != null) {
-					var key = sceneData.elements[i].key;
-					elementMap.set(key, createdElements[i]);
-					kouiScene.elements.set(key, createdElements[i]);
-					kouiScene.elementKeys.set(createdElements[i], key);
-				}
-			}
-
-			// Track row/column indices for RowLayout/ColLayout
-			var layoutIndices: Map<Element, Int> = new Map();
-
-			// Second pass: parent elements correctly
-			for (i in 0...sceneData.elements.length) {
-				var elemData = sceneData.elements[i];
-				var element = createdElements[i];
-				if (element == null) continue;
-
-				element.anchor = cast elemData.anchor;
-
-				var parent: Element = scenePane;
-				if (elemData.parentKey != null && elementMap.exists(elemData.parentKey)) {
-					parent = elementMap.get(elemData.parentKey);
-				}
-
-				if (Std.isOfType(parent, RowLayout)) {
-					var row: RowLayout = cast parent;
-					var grid: GridLayout = cast row;
-					var idx: Int = layoutIndices.exists(parent) ? layoutIndices.get(parent) : 0;
-					while (grid.amountRows <= idx) {
-						addRowToGrid(grid);
-					}
-					row.addToRow(element, idx);
-					layoutIndices.set(parent, idx + 1);
-				} else if (Std.isOfType(parent, ColLayout)) {
-					var col: ColLayout = cast parent;
-					var grid: GridLayout = cast col;
-					var idx: Int = layoutIndices.exists(parent) ? layoutIndices.get(parent) : 0;
-					while (grid.amountCols <= idx) {
-						addColumnToGrid(grid);
-					}
-					col.addToColumn(element, idx);
-					layoutIndices.set(parent, idx + 1);
-				} else if (Std.isOfType(parent, AnchorPane)) {
-					var anchorPane: AnchorPane = cast parent;
-					anchorPane.add(element, cast elemData.anchor);
-				} else {
-					element.parent = parent;
-					parent.children.push(element);
-				}
-			}
-
-			// Third pass: resolve focus connections
-			for (i in 0...sceneData.elements.length) {
-				var elemData = sceneData.elements[i];
-				var element = createdElements[i];
-				if (element == null) continue;
-
-				if (elemData.focusUp != null) element.focusUp = elementMap.get(elemData.focusUp);
-				if (elemData.focusDown != null) element.focusDown = elementMap.get(elemData.focusDown);
-				if (elemData.focusLeft != null) element.focusLeft = elementMap.get(elemData.focusLeft);
-				if (elemData.focusRight != null) element.focusRight = elementMap.get(elemData.focusRight);
-			}
-
-			// Final pass: resize all RowLayout/ColLayout elements
-			for (element in createdElements) {
-				if (element == null) continue;
-				if (Std.isOfType(element, RowLayout) || Std.isOfType(element, ColLayout)) {
-					var grid: GridLayout = cast element;
-					grid.resize(grid.layoutWidth, grid.layoutHeight);
-				}
-			}
+			kouiScene.keys = CanvasLoader.buildScene(sceneData, scenePane, radioGroups);
 		});
 
-		// Store scene
-		scenes.set(sceneKey, kouiScene);
-	}
-
-	/**
-	 * Create an element from JSON data.
-	 */
-	private function createElementFromData(data: TElementData): Element {
-		var element: Element = null;
-
-		switch (data.type) {
-			case "Label":
-				var label: Label = new Label(data.properties.text != null ? data.properties.text : "");
-				if (data.properties.alignmentHor != null) {
-					label.alignmentHor = cast data.properties.alignmentHor;
-				}
-				if (data.properties.alignmentVert != null) {
-					label.alignmentVert = cast data.properties.alignmentVert;
-				}
-				element = label;
-
-			case "Button":
-				var button: Button = new Button(data.properties.text != null ? data.properties.text : "");
-				if (data.properties.isToggle != null) {
-					button.isToggle = data.properties.isToggle;
-				}
-				if (data.properties.isPressed != null) {
-					button.isPressed = data.properties.isPressed;
-				}
-				element = button;
-
-			case "Checkbox":
-				var checkbox: Checkbox = new Checkbox(data.properties.text != null ? data.properties.text : "");
-				if (data.properties.isChecked != null) {
-					checkbox.isChecked = data.properties.isChecked;
-					// Update the internal Panel's visual state
-					var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
-					checkSquare.setContextElement(checkbox.isChecked ? "checked" : "");
-				}
-				element = checkbox;
-
-			case "RadioButton":
-				var groupId: String = data.properties != null && data.properties.radioGroup != null ? data.properties.radioGroup : "RadioGroup";
-				var group = radioGroups.get(groupId);
-				if (group == null) {
-					group = new RadioGroup(groupId);
-					radioGroups.set(groupId, group);
-				}
-
-				var radioButton: RadioButton = new RadioButton(group, data.properties.text != null ? data.properties.text : "");
-				if (data.properties.isChecked != null && data.properties.isChecked) {
-					group.setActiveButton(radioButton);
-				}
-				element = radioButton;
-
-			case "Progressbar":
-				var minVal: Float = data.properties.minValue != null ? data.properties.minValue : 0.0;
-				var maxVal: Float = data.properties.maxValue != null ? data.properties.maxValue : 1.0;
-				var progressbar: Progressbar = new Progressbar(minVal, maxVal);
-				if (data.properties.value != null) {
-					progressbar.value = data.properties.value;
-				}
-				if (data.properties.text != null) {
-					progressbar.text = data.properties.text;
-				}
-				if (data.properties.precision != null) {
-					progressbar.precision = data.properties.precision;
-				}
-				element = progressbar;
-
-			case "AnchorPane":
-				element = new AnchorPane(data.posX, data.posY, data.width, data.height);
-
-			case "RowLayout":
-				element = new RowLayout(data.posX, data.posY, data.width, data.height, 0);
-
-			case "ColLayout":
-				element = new ColLayout(data.posX, data.posY, data.width, data.height, 0);
-
-			case "Panel":
-				element = new Panel();
-
-			case "ImagePanel":
-				var imagePanel: ImagePanel = new ImagePanel(null);
-				if (data.properties != null) {
-					if (data.properties.imageName != null && data.properties.imageName != "") {
-						var img: kha.Image = Koui.getImage(data.properties.imageName);
-						if (img != null) {
-							imagePanel.image = img;
-						}
-					}
-					if (data.properties.scale != null) {
-						imagePanel.scale = data.properties.scale;
-					}
-				}
-				element = imagePanel;
-
-			case "Slider":
-				var minVal: Float = data.properties.minValue != null ? data.properties.minValue : 0.0;
-				var maxVal: Float = data.properties.maxValue != null ? data.properties.maxValue : 1.0;
-				var slider: Slider = new Slider(minVal, maxVal);
-				if (data.properties.value != null) {
-					slider.value = data.properties.value;
-				}
-				if (data.properties.precision != null) {
-					slider.precision = data.properties.precision;
-				}
-				if (data.properties.orientation != null) {
-					slider.orientation = cast data.properties.orientation;
-				}
-				element = slider;
-
-			// TODO: Add more element types as needed:
-			// case "TextInput": ...
-			// case "Dropdown": ...
-
-			default:
-				trace('[KouiCanvas] Unknown element type: ${data.type}');
-				return null;
-		}
-
-		// Apply common properties
-		if (element != null) {
-			element.posX = data.posX;
-			element.posY = data.posY;
-			element.width = data.width;
-			element.height = data.height;
-			element.anchor = cast data.anchor;
-			element.visible = data.visible;
-			element.disabled = data.disabled;
-			if (data.tID != null && data.tID != "") {
-				element.setTID(data.tID);
-			}
-		}
-
-		return element;
+		scenes.set(sceneData.key, kouiScene);
 	}
 
 	function onAppResized(w: Int, h: Int): Void {
 		if (scaleOnResize) {
 			if (scaleHorizontal) {
-				Koui.uiScale = w / baseH;
+				Koui.uiScale = w / baseW;
 			} else if (scaleVertical) {
-				Koui.uiScale = h / baseW;
+				Koui.uiScale = h / baseH;
 			} else {
 				var scaleW = w / baseW;
 				var scaleH = h / baseH;
@@ -524,266 +275,96 @@ class KouiCanvas extends Trait {
 	}
 
 	// -------------------------------------------------------------------------
-	// Element Access (Current Scene)
+	// Element Access
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Get an element by its key or hierarchical path from the current scene.
+	 * Get an element by its path: the element names from the scene root down,
+	 * joined by "/".
 	 *
-	 * Supports both simple keys and paths:
-	 * - "player_ui" (simple key - only works for root-level elements)
-	 * - "player_ui/health_bar" (path - for nested elements)
-	 * - "menu/buttons/play_button" (nested path)
+	 * - "player_ui" (an element directly in the scene root)
+	 * - "player_ui/health_bar" (nested element)
+	 * - "menu/buttons/play_button" (nested deeper)
 	 *
-	 * @param key The element's key or path
+	 * @param path The element's path
+	 * @param sceneName The scene to look in; the current scene if omitted
 	 * @return The element, or null if not found
 	 */
-	public function getElement(key: String): Null<Element> {
-		if (currentScene == null) {
-			trace('[KouiCanvas] No scene active');
-			return null;
-		}
+	public function getElement(path: String, ?sceneName: String): Null<Element> {
+		var scene: TKouiScene = getSceneForAccess(sceneName);
+		if (scene == null) return null;
 
-		// Check if it's a path (contains "/")
-		if (key.indexOf("/") >= 0) {
-			return getElementByPath(key);
-		}
-
-		// Simple key lookup - only allowed for root-level elements
-		var element: Element = currentScene.elements.get(key);
+		var element: Element = CanvasLoader.findByPath(scene.root, scene.keys, path);
 		if (element == null) {
-			trace('[KouiCanvas] Element not found: "$key" in scene "${currentScene.key}"');
-			return null;
+			trace('[KouiCanvas] Element not found: "$path" in scene "${scene.key}" (nested elements need their path, e.g. "parent/$path")');
 		}
-
-		// Verify it's a direct child of root (root's elements have root as their layout)
-		if (element.layout != currentScene.root) {
-			trace('[KouiCanvas] Element "$key" is nested and must be accessed via path (e.g., "parent/$key")');
-			return null;
-		}
-
 		return element;
 	}
 
 	/**
-	 * Get an element by its key or path from the current scene, cast to a specific type.
+	 * Get an element by its path, cast to a specific type.
 	 * Returns null if the element doesn't exist or isn't of the requested type.
-	 *
-	 * Supports both simple keys (root-level only) and paths:
-	 * - "MyButton" (root-level button)
-	 * - "menu/buttons/MyButton" (nested button)
 	 *
 	 * Example:
 	 * ```haxe
 	 * var button = canvas.getElementAs(Button, "menu/buttons/play_button");
-	 * if (button != null) button.text = "Clicked!";
+	 * var score = canvas.getElementAs(Label, "score", "hud");
 	 * ```
 	 *
 	 * @param cls The class type to cast to
-	 * @param key The element's key or path
+	 * @param path The element's path
+	 * @param sceneName The scene to look in; the current scene if omitted
 	 * @return The element cast to type T, or null
 	 */
-	public function getElementAs<T: Element>(cls: Class<T>, key: String): Null<T> {
-		// getElement handles both key and path, and enforces root-level for simple keys
-		var element: Element = getElement(key);
+	public function getElementAs<T: Element>(cls: Class<T>, path: String, ?sceneName: String): Null<T> {
+		var element: Element = getElement(path, sceneName);
 		if (element == null) return null;
 		var casted = Std.downcast(element, cls);
-		if (casted == null) trace('[KouiCanvas] Element "$key" is not of type ${Type.getClassName(cls)}');
+		if (casted == null) trace('[KouiCanvas] Element "$path" is not of type ${Type.getClassName(cls)}');
 		return casted;
 	}
 
 	/**
-	 * Get all element paths in the current scene.
-	 * Returns absolute paths for all elements (e.g., "player_ui/health_bar").
-	 * Root-level elements return just their key.
+	 * Get all element paths in a scene (e.g., "player_ui/health_bar").
+	 * Elements directly in the scene root return just their name.
 	 *
+	 * @param sceneName The scene to list; the current scene if omitted
 	 * @return Array of all element paths
 	 */
-	public function getElementKeys(): Array<String> {
-		if (currentScene == null) return [];
+	public function getElementKeys(?sceneName: String): Array<String> {
+		var scene: TKouiScene = getSceneForAccess(sceneName);
+		if (scene == null) return [];
 		var paths: Array<String> = [];
-		collectElementPaths(currentScene.root, "", paths);
+		collectElementPaths(scene, scene.root, "", paths);
 		return paths;
 	}
 
 	/**
 	 * Internal helper to recursively collect element paths.
 	 */
-	private function collectElementPaths(parent: Element, parentPath: String, output: Array<String>): Void {
-		var children = getChildrenOf(parent);
-		for (child in children) {
-			var childKey = currentScene.elementKeys.get(child);
+	private function collectElementPaths(scene: TKouiScene, parent: Element, parentPath: String, output: Array<String>): Void {
+		for (child in HierarchyUtils.getChildren(parent)) {
+			var childKey = scene.keys.get(child);
 			if (childKey == null) continue;
 
 			// Build the full path
-			var fullPath = parentPath == "" ? childKey : parentPath + "/" + childKey;
+			var fullPath = CanvasLoader.joinPath(parentPath, childKey);
 			output.push(fullPath);
 
 			// Recursively collect from this child's children
-			collectElementPaths(child, fullPath, output);
+			collectElementPaths(scene, child, fullPath, output);
 		}
 	}
 
-	/**
-	 * Internal helper to traverse hierarchy by path.
-	 */
-	private function getElementByPath(path: String): Null<Element> {
-		var parts = path.split("/");
-		var current: Element = currentScene.root;
-
-		for (i in 0...parts.length) {
-			var key = parts[i];
-			var found = false;
-
-			// Get children of current element
-			var children = getChildrenOf(current);
-			for (child in children) {
-				// Look up this child's key
-				var childKey = currentScene.elementKeys.get(child);
-				if (childKey == key) {
-					current = child;
-					found = true;
-					break;
-				}
-			}
-
-			if (!found) {
-				trace('[KouiCanvas] Path not found: "$path" (failed at "$key")');
-				return null;
-			}
+	/** The named scene, or the current one if `sceneName` is null; traces why if there is none. */
+	private function getSceneForAccess(sceneName: Null<String>): Null<TKouiScene> {
+		if (sceneName == null) {
+			if (currentScene == null) trace('[KouiCanvas] No scene active');
+			return currentScene;
 		}
-
-		return current;
-	}
-
-	/**
-	 * Internal helper to get children of an element.
-	 */
-	private function getChildrenOf(parent: Element): Array<Element> {
-		if (parent == null) return [];
-		if (Std.isOfType(parent, AnchorPane)) return untyped parent.elements;
-		// GridLayout/RowLayout/ColLayout use 2D Vector, need to flatten
-		if (Std.isOfType(parent, GridLayout) || Std.isOfType(parent, RowLayout) || Std.isOfType(parent, ColLayout)) {
-			var grid: GridLayout = cast parent;
-			var flattened = new Array<Element>();
-			for (row in grid.elements) {
-				for (element in row) {
-					if (element != null) flattened.push(element);
-				}
-			}
-			return flattened;
-		}
-		return parent.children;
-	}
-
-	/**
-	 * Internal helper to get children of an element in a specific scene.
-	 */
-	private function getChildrenOfInScene(scene: TKouiScene, parent: Element): Array<Element> {
-		if (parent == null) return [];
-		if (Std.isOfType(parent, AnchorPane)) return untyped parent.elements;
-		// GridLayout/RowLayout/ColLayout use 2D Vector, need to flatten
-		if (Std.isOfType(parent, GridLayout) || Std.isOfType(parent, RowLayout) || Std.isOfType(parent, ColLayout)) {
-			var grid: GridLayout = cast parent;
-			var flattened = new Array<Element>();
-			for (row in grid.elements) {
-				for (element in row) {
-					if (element != null) flattened.push(element);
-				}
-			}
-			return flattened;
-		}
-		return parent.children;
-	}
-
-	// -------------------------------------------------------------------------
-	// Cross-Scene Element Access
-	// -------------------------------------------------------------------------
-
-	/**
-	 * Get an element by its key from a specific scene.
-	 * Use this for cross-scene element access.
-	 * Supports path-based access (e.g., "parent/child/element").
-	 *
-	 * @param sceneName The scene to look in
-	 * @param key The element's unique key or path
-	 * @return The element, or null if not found
-	 */
-	public function getElementFromScene(sceneName: String, key: String): Null<Element> {
 		var scene: TKouiScene = scenes.get(sceneName);
-		if (scene == null) {
-			trace('[KouiCanvas] Scene not found: "$sceneName"');
-			return null;
-		}
-
-		// Support path-based access
-		if (key.indexOf('/') != -1) {
-			var parts: Array<String> = key.split('/');
-			var current: Element = scene.root;
-
-			for (i in 0...parts.length) {
-				var part: String = parts[i];
-				if (part == '') continue;
-
-				var children: Array<Element> = getChildrenOfInScene(scene, current);
-				var found: Bool = false;
-				for (child in children) {
-					var childKey: String = scene.elementKeys.get(child);
-					if (childKey == part) {
-						current = child;
-						found = true;
-						break;
-					}
-				}
-
-				if (!found) {
-					trace('[KouiCanvas] Path element not found: "$part" in path "$key" (scene "$sceneName")');
-					return null;
-				}
-			}
-
-			return current;
-		}
-
-		// Simple key - must be root-level
-		var element: Element = scene.elements.get(key);
-		if (element == null) {
-			trace('[KouiCanvas] Element not found: "$key" in scene "$sceneName"');
-			return null;
-		}
-		if (element.layout != scene.root) {
-			trace('[KouiCanvas] Element "$key" exists in scene "$sceneName" but is not at root level. Use path instead: "${scene.elementKeys.get(element)}"');
-			return null;
-		}
-		return element;
-	}
-
-	/**
-	 * Get an element by its key from a specific scene, cast to a specific type.
-	 * Use this for cross-scene element access with type safety.
-	 * Returns null if the element doesn't exist or isn't of the requested type.
-	 *
-	 * Supports both simple keys (root-level only) and paths:
-	 * - "MyButton" (root-level button)
-	 * - "menu/buttons/MyButton" (nested button)
-	 *
-	 * Example:
-	 * ```haxe
-	 * var button = canvas.getElementFromSceneAs(Button, "hud", "menu/buttons/play_button");
-	 * if (button != null) button.text = "Clicked!";
-	 * ```
-	 *
-	 * @param cls The class type to cast to
-	 * @param sceneName The scene to look in
-	 * @param key The element's unique key or path
-	 * @return The element cast to type T, or null
-	 */
-	public function getElementFromSceneAs<T: Element>(cls: Class<T>, sceneName: String, key: String): Null<T> {
-		var element: Element = getElementFromScene(sceneName, key);
-		if (element == null) return null;
-		var casted = Std.downcast(element, cls);
-		if (casted == null) trace('[KouiCanvas] Element "$key" in scene "$sceneName" is not of type ${Type.getClassName(cls)}');
-		return casted;
+		if (scene == null) trace('[KouiCanvas] Scene not found: "$sceneName"');
+		return scene;
 	}
 
 	// -------------------------------------------------------------------------
@@ -869,22 +450,26 @@ class KouiCanvas extends Trait {
 			return false;
 		}
 
-		if (scene.elements.exists(key)) {
-			trace('[KouiCanvas] Element key "$key" already exists in scene "$sceneName"');
-			return false;
-		}
 		element.anchor = anchor;
 
 		// Find parent
 		var parent: Element = null;
 		if (parentKey != null) {
-			parent = getElementFromScene(sceneName, parentKey);
+			parent = getElement(parentKey, sceneName);
 			if (parent == null) {
 				trace('[KouiCanvas] Parent not found: "$parentKey" in scene "$sceneName"');
 				return false;
 			}
 		} else {
 			parent = scene.root;
+		}
+
+		// Names only need to be unique among siblings
+		for (sibling in HierarchyUtils.getChildren(parent)) {
+			if (scene.keys.get(sibling) == key) {
+				trace('[KouiCanvas] Element key "$key" already exists in "${parentKey != null ? parentKey : sceneName}"');
+				return false;
+			}
 		}
 
 		// Add to parent layout
@@ -898,9 +483,8 @@ class KouiCanvas extends Trait {
 			return false;
 		}
 
-		// Register in scene maps
-		scene.elements.set(key, element);
-		scene.elementKeys.set(element, key);
+		// Register in scene
+		scene.keys.set(element, key);
 
 		return true;
 	}
@@ -918,7 +502,7 @@ class KouiCanvas extends Trait {
 		var scene: TKouiScene = scenes.get(sceneName);
 		if (scene == null) return false;
 
-		var element: Element = getElementFromScene(sceneName, keyOrPath);
+		var element: Element = getElement(keyOrPath, sceneName);
 		if (element == null) return false;
 
 		var parent: Element = element.layout;
@@ -959,21 +543,7 @@ class KouiCanvas extends Trait {
 		var scene: TKouiScene = scenes.get(sceneName);
 		if (scene == null) return false;
 
-		// Support path-based lookup
-		var element: Element = null;
-		var key: String = keyOrPath;
-
-		if (keyOrPath.indexOf("/") >= 0) {
-			// Path-based: use getElementFromScene
-			element = getElementFromScene(sceneName, keyOrPath);
-			// Extract the final key from path
-			var parts = keyOrPath.split("/");
-			key = parts[parts.length - 1];
-		} else {
-			// Simple key lookup
-			element = scene.elements.get(keyOrPath);
-		}
-
+		var element: Element = CanvasLoader.findByPath(scene.root, scene.keys, keyOrPath);
 		if (element == null) return false;
 
 		// Remove from parent layout
@@ -986,9 +556,8 @@ class KouiCanvas extends Trait {
 			}
 		}
 
-		// Remove from scene maps
-		scene.elements.remove(key);
-		scene.elementKeys.remove(element);
+		// Remove from scene
+		scene.keys.remove(element);
 
 		return true;
 	}
@@ -1010,49 +579,6 @@ class KouiCanvas extends Trait {
 	// This would allow reloading the canvas JSON at runtime for development
 	// public function reloadCanvas(): Void { ... }
 
-	// =========================================================================
-	// GridLayout Helpers (for RowLayout/ColLayout deserialization)
-	// =========================================================================
-
-	/**
-	 * Add a row to a GridLayout (used for RowLayout deserialization).
-	 * Creates a new row at the end with null elements.
-	 */
-	private static function addRowToGrid(grid: GridLayout): Void {
-		var newRow = new haxe.ds.Vector<Element>(grid.amountCols);
-		for (i in 0...grid.amountCols) {
-			newRow[i] = null;
-		}
-
-		var newElements = new haxe.ds.Vector<haxe.ds.Vector<Element>>(grid.amountRows + 1);
-		for (i in 0...grid.amountRows) {
-			newElements[i] = grid.elements[i];
-		}
-		newElements[grid.amountRows] = newRow;
-
-		grid.elements = newElements;
-		grid.amountRows++;
-	}
-
-	/**
-	 * Add a column to a GridLayout (used for ColLayout deserialization).
-	 * Creates a new column at the end with null elements.
-	 */
-	private static function addColumnToGrid(grid: GridLayout): Void {
-		// Rebuild the elements Vector with an additional column
-		var newElements = new haxe.ds.Vector<haxe.ds.Vector<Element>>(grid.amountRows);
-		for (i in 0...grid.amountRows) {
-			var newRow = new haxe.ds.Vector<Element>(grid.amountCols + 1);
-			for (j in 0...grid.amountCols) {
-				newRow[j] = grid.elements[i][j];
-			}
-			newRow[grid.amountCols] = null;
-			newElements[i] = newRow;
-		}
-
-		grid.elements = newElements;
-		grid.amountCols++;
-	}
 }
 
 class ElementExt {

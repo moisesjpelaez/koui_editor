@@ -8,7 +8,9 @@ import zui.Zui;
  * Contract for element type editors in the Koui Editor.
  *
  * Each element type (Button, Label, Slider, etc.) implements this interface
- * to provide its factory, serialization, and property panel UI.
+ * to provide its palette default and property panel UI. Creating elements
+ * from canvas data and saving them is shared with the game runtime, see
+ * `arm.canvas.CanvasElements`.
  * Common properties (posX, posY, width, height, anchor, visible, disabled, tID, focus)
  * are handled by the framework — implementations only deal with type-specific concerns.
  */
@@ -27,16 +29,6 @@ interface IElementEditor {
 
 	/** Create a default instance for the ElementsPanel palette. */
 	function createDefault(?radioGroups: Array<RadioGroup>): Element;
-
-	/**
-	 * Create an element from deserialized data.
-	 * Position/size are provided because some types (layouts) need them at construction time.
-	 * Common properties (anchor, visible, disabled, tID) are applied by the caller.
-	 */
-	function createFromData(posX: Int, posY: Int, width: Int, height: Int, properties: Dynamic, ?radioGroupMap: Map<String, RadioGroup>): Element;
-
-	/** Serialize type-specific properties to a Dynamic for JSON output. */
-	function serializeProperties(element: Element): Dynamic;
 
 	/** Initialize Zui handles for the property panel. Called once at registration. */
 	function initHandles(): Void;

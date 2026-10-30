@@ -2,6 +2,7 @@ package arm;
 
 import arm.data.SceneData;
 import arm.data.EditorSettings;
+import arm.data.History;
 import arm.data.Selection;
 import arm.events.ElementEvents;
 import arm.events.SceneEvents;
@@ -18,13 +19,6 @@ import arm.tools.HierarchyUtils;
 import arm.tools.NameUtils;
 import arm.types.Enums;
 import arm.types.Types;
-import arm.commands.CommandManager;
-import arm.commands.PropertyChangeCommand;
-import arm.commands.SceneAddCommand;
-import arm.commands.SceneRemoveCommand;
-import arm.commands.SceneRenameCommand;
-import arm.commands.ElementAddCommand;
-import arm.commands.ElementRemoveCommand;
 import arm.editors.ElementRegistry;
 import arm.editors.LabelEditor;
 import arm.editors.ImagePanelEditor;
@@ -80,12 +74,8 @@ class KouiEditor extends iron.Trait {
 	var canvasWidth: Int = 1024;
 	var canvasHeight: Int = 576;
 
-	var commandManager: CommandManager;
-
 	public function new() {
 		super();
-
-		commandManager = new CommandManager();
 
 		// Register element editors
 		ElementRegistry.register(new LabelEditor());
@@ -151,7 +141,7 @@ class KouiEditor extends iron.Trait {
 			ElementEvents.selectionChanged.connect(onSelectionChanged);
 			ElementEvents.elementDropped.connect(onElementDropped);
 			ElementEvents.elementRemoved.connect(onElementRemoved);
-			ElementEvents.propertyChanged.connect(onPropertyChangedForUndo);
+			ElementEvents.propertyChanged.connect(onPropertyChanged);
 
 			SceneEvents.sceneAdded.connect(onSceneAdded);
 			SceneEvents.sceneChanged.connect(onSceneChanged);
@@ -180,16 +170,22 @@ class KouiEditor extends iron.Trait {
 		};
 		sceneData.scenes.push(s);
 		sceneData.currentScene = s;
-		hierarchyPanel.onElementAdded({ key: sceneName, element: scene });
 	}
 
 	function update() {
 		if (uiBase == null) return;
 		if (!canvasLoaded) { // HACK: ensure canvas is loaded after Koui init
 			CanvasUtils.loadCanvas();
-			commandManager.clear();
+			History.reset();
 			canvasLoaded = true;
 		}
+
+		// Record last frame's edits, unless a drag is still going on
+		var mouse: Mouse = Input.getMouse();
+		if (!mouse.down("left") && !mouse.down("right") && !mouse.down("middle")) {
+			History.commitPending();
+		}
+
 		uiBase.update();
 		viewport.canvasControl(dragDrop.isInCanvas(), dragDrop.isInElementsPanel());
 
@@ -217,7 +213,7 @@ class KouiEditor extends iron.Trait {
 
 		// Undo (Ctrl+Z)
 		if (!isTyping && keyboard.down("control") && !keyboard.down("shift") && keyboard.started("z")) {
-			if (commandManager.undo()) {
+			if (History.undo()) {
 				hierarchyPanel.updateTabPosition();
 				uiBase.hwnds[PanelHierarchy].redraws = 2;
 				uiBase.hwnds[PanelProperties].redraws = 2;
@@ -226,7 +222,7 @@ class KouiEditor extends iron.Trait {
 
 		// Redo (Ctrl+Shift+Z or Ctrl+Y)
 		if (!isTyping && keyboard.down("control") && (keyboard.down("shift") && keyboard.started("z") || keyboard.started("y"))) {
-			if (commandManager.redo()) {
+			if (History.redo()) {
 				hierarchyPanel.updateTabPosition();
 				uiBase.hwnds[PanelHierarchy].redraws = 2;
 				uiBase.hwnds[PanelProperties].redraws = 2;
@@ -261,6 +257,7 @@ class KouiEditor extends iron.Trait {
 		if (Clipboard.clipboardData.length == 0) return;
 
 		CanvasUtils.pasteElements(Clipboard.clipboardData, Selection.primary);
+		History.edited("Paste");
 		if (Clipboard.isCut) {
 			Clipboard.clipboardData = [];
 			Clipboard.isCut = false;
@@ -318,31 +315,9 @@ class KouiEditor extends iron.Trait {
 		viewport.onResized(resetScale ? false : sizeInit, baseH);
 	}
 
-	function onPropertyChangedForUndo(element: Element, properties: Dynamic, oldValues: Dynamic, newValues: Dynamic): Void {
-		if (commandManager.isUndoRedoing) return;
-
-		var props: Array<String>;
-		var olds: Array<Dynamic>;
-		var news: Array<Dynamic>;
-
-		if (Std.isOfType(properties, String)) {
-			props = [cast properties];
-			olds = [oldValues];
-			news = [newValues];
-		} else {
-			props = cast properties;
-			olds = cast oldValues;
-			news = cast newValues;
-		}
-
-		// Skip if nothing actually changed (e.g. click without drag)
-		var hasChange = false;
-		for (i in 0...props.length) {
-			if (olds[i] != news[i]) { hasChange = true; break; }
-		}
-		if (!hasChange) return;
-
-		commandManager.record(new PropertyChangeCommand(element, props, olds, news));
+	function onPropertyChanged(element: Element, properties: Dynamic, oldValues: Dynamic, newValues: Dynamic): Void {
+		var names: String = Std.isOfType(properties, String) ? properties : (properties: Array<String>).join(", ");
+		History.edited('Change $names');
 	}
 
 	function onSelectionChanged(): Void {
@@ -372,6 +347,7 @@ class KouiEditor extends iron.Trait {
 		if (target == rootPane) {
 			var rootFirstElement: Element = cast(target, AnchorPane).elements[0];
 			if (rootFirstElement != element) HierarchyUtils.moveRelativeToTarget(element, rootFirstElement, true);
+			History.edited("Move");
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 			uiBase.hwnds[PanelProperties].redraws = 2;
 			return;
@@ -404,6 +380,7 @@ class KouiEditor extends iron.Trait {
 		if (uniqueName != currentName) {
 			sceneData.updateElementKey(element, uniqueName);
 		}
+		History.edited("Move");
 
 		uiBase.hwnds[PanelHierarchy].redraws = 2;
 		uiBase.hwnds[PanelProperties].redraws = 2;
@@ -421,85 +398,56 @@ class KouiEditor extends iron.Trait {
 		sceneData.updateElementKey(entry.element, uniqueName);
 
 		Selection.select(entry.element);
-
-		// Record for undo (SceneData.onElementAdded already pushed the entry via event)
-		if (!commandManager.isUndoRedoing) {
-			commandManager.record(new ElementAddCommand(entry.element, uniqueName, rootPane));
-		}
+		History.edited("Add element");
 	}
 
 	function onElementRemoved(element: Element): Void {
-		if (commandManager.isUndoRedoing) return; // Commands handle removal directly
-
-		// Collect ALL entries for this element and its descendants BEFORE removing
-		var allEntries = collectDescendantEntries(element);
-		var parentElement = HierarchyUtils.getParentElement(element);
-
-		// Remove all entries from SceneData (since SceneData is no longer auto-connected)
-		for (entry in allEntries) {
-			sceneData.onElementRemoved(entry.element);
+		// Forget the element and everything inside it
+		for (descendant in collectDescendants(element)) {
+			sceneData.unregisterElement(descendant);
 		}
 
-		// Detach from parent (children stay attached to element)
+		// Detach first: Row/ColLayouts close the gap; then free the elements
 		HierarchyUtils.detachFromCurrentParent(element);
+		element.destroy();
 
 		Selection.refresh();
-
-		// Record for undo
-		var key = allEntries.length > 0 ? allEntries[0].key : "";
-		commandManager.record(new ElementRemoveCommand(element, key, parentElement, 0, allEntries));
+		History.edited("Delete");
 	}
 
-	/** Recursively collect TElementEntry records for an element and all its descendants. */
-	function collectDescendantEntries(element: Element): Array<TElementEntry> {
-		var result: Array<TElementEntry> = [];
-		var key: Null<String> = sceneData.getElementKey(element);
-		if (key == null) return result;
-
-		result.push({key: key, element: element});
+	/** `element` and the user elements inside it. */
+	function collectDescendants(element: Element): Array<Element> {
+		var result: Array<Element> = [element];
 		for (child in sceneData.getChildren(element)) {
-			for (childEntry in collectDescendantEntries(child)) {
-				result.push(childEntry);
-			}
+			for (descendant in collectDescendants(child)) result.push(descendant);
 		}
-
 		return result;
 	}
 
 	function onSceneAdded(sceneName: String): Void {
-		if (commandManager.isUndoRedoing) return; // Commands handle scene creation directly
-
 		SceneManager.addScene(sceneName, (scene) -> setupRootScene(scene, sceneName));
 		SceneManager.setScene(sceneName);
+		viewport.applyPan();
 		Selection.clear();
 		hierarchyPanel.updateTabPosition();
-
-		// Find the just-created scene entry and record for undo
-		var scene: TSceneEntry = sceneData.getScene(sceneName);
-		if (scene != null) {
-			commandManager.record(new SceneAddCommand(sceneName, scene));
-		}
+		History.edited("Add scene");
 	}
 
 	function onSceneChanged(sceneName: String): Void {
 		SceneManager.setScene(sceneName);
+		viewport.applyPan();
 		// The selection belongs to the scene that was shown before
 		Selection.clear();
 	}
 
 	function onSceneNameChanged(oldKey: String, newKey: String): Void {
-		if (commandManager.isUndoRedoing) return; // Commands handle renaming directly
-
 		SceneManager.renameScene(oldKey, newKey);
 		sceneData.currentScene.key = newKey;
-
-		commandManager.record(new SceneRenameCommand(oldKey, newKey));
+		History.edited("Rename scene");
 	}
 
 	function onSceneRemoved(sceneName: String): Void {
-		if (commandManager.isUndoRedoing) return; // Commands handle removal directly
-
-		// Capture backup BEFORE removal
+		// Find the scene
 		var sceneEntry: TSceneEntry = null;
 		var sceneIndex: Int = 0;
 		for (i in 0...sceneData.scenes.length) {
@@ -512,8 +460,9 @@ class KouiEditor extends iron.Trait {
 
 		if (sceneEntry == null) return;
 
-		// Remove from SceneManager
+		// Remove from SceneManager and free its elements
 		SceneManager.removeScene(sceneName);
+		sceneEntry.root.destroy();
 
 		// Remove from SceneData
 		sceneEntry.active = false;
@@ -529,8 +478,6 @@ class KouiEditor extends iron.Trait {
 
 		Selection.clear();
 		hierarchyPanel.updateTabPosition();
-
-		// Record for undo
-		commandManager.record(new SceneRemoveCommand(sceneName, sceneEntry, sceneIndex));
+		History.edited("Delete scene");
 	}
 }

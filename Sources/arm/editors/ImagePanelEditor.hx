@@ -35,30 +35,6 @@ class ImagePanelEditor implements IElementEditor {
 		return imagePanel;
 	}
 
-	public function createFromData(posX: Int, posY: Int, width: Int, height: Int, properties: Dynamic, ?radioGroupMap: Map<String, RadioGroup>): Element {
-		var imagePanel = new ImagePanel(null);
-		if (properties != null) {
-			if (properties.imageName != null && properties.imageName != "") {
-				var img: kha.Image = Koui.getImage(properties.imageName);
-				if (img != null) {
-					imagePanel.image = img;
-				}
-			}
-			if (properties.scale != null) {
-				imagePanel.scale = properties.scale;
-			}
-		}
-		return imagePanel;
-	}
-
-	public function serializeProperties(element: Element): Dynamic {
-		var imagePanel: ImagePanel = cast element;
-		return {
-			imageName: CanvasUtils.getImageName(imagePanel.image),
-			scale: imagePanel.scale
-		};
-	}
-
 	public function initHandles(): Void {
 		imageHandle = new Handle();
 		scaleHandle = new Handle();

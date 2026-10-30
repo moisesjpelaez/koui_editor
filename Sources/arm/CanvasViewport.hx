@@ -58,12 +58,7 @@ class CanvasViewport {
 
 			canvasPanX += deltaX;
 			canvasPanY += deltaY;
-
-			rootPane.posX = Std.int(canvasPanX / Koui.uiScale);
-			rootPane.posY = Std.int(canvasPanY / Koui.uiScale);
-			rootPane.drawX = Std.int(rootPane.posX * Koui.uiScale);
-			rootPane.drawY = Std.int(rootPane.posY * Koui.uiScale);
-			Koui.anchorPane.elemUpdated(rootPane);
+			applyPan();
 
 			panStartX = mouse.x;
 			panStartY = mouse.y;
@@ -92,19 +87,23 @@ class CanvasViewport {
 	}
 
 	public function resetCanvasView(): Void {
-		var rootPane: AnchorPane = sceneData.getRoot();
-		if (rootPane == null) return;
-
 		canvasPanX = 0;
 		canvasPanY = 0;
+		applyPan();
+
+		viewReset = true;
+	}
+
+	/** Places the current scene's root at the view's pan offset, e.g. after switching scenes or an undo. */
+	public function applyPan(): Void {
+		var rootPane: AnchorPane = sceneData.getRoot();
+		if (rootPane == null) return;
 
 		rootPane.posX = Std.int(canvasPanX / Koui.uiScale);
 		rootPane.posY = Std.int(canvasPanY / Koui.uiScale);
 		rootPane.drawX = Std.int(rootPane.posX * Koui.uiScale);
 		rootPane.drawY = Std.int(rootPane.posY * Koui.uiScale);
 		Koui.anchorPane.elemUpdated(rootPane);
-
-		viewReset = true;
 	}
 
 	public function onResized(sizeInit: Bool, baseH: Int): Void {

@@ -32,28 +32,6 @@ class CheckboxEditor implements IElementEditor {
 		return new Checkbox("New Checkbox");
 	}
 
-	public function createFromData(posX: Int, posY: Int, width: Int, height: Int, properties: Dynamic, ?radioGroupMap: Map<String, RadioGroup>): Element {
-		var text: String = properties != null && properties.text != null ? properties.text : "";
-		var checkbox = new Checkbox(text);
-		if (properties != null) {
-			if (properties.isChecked != null) {
-				checkbox.isChecked = properties.isChecked;
-				var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
-				if (checkSquare != null)
-					checkSquare.setContextElement(checkbox.isChecked ? "checked" : "");
-			}
-		}
-		return checkbox;
-	}
-
-	public function serializeProperties(element: Element): Dynamic {
-		var checkbox: Checkbox = cast element;
-		return {
-			text: checkbox.text,
-			isChecked: checkbox.isChecked
-		};
-	}
-
 	public function initHandles(): Void {
 		textHandle = new Handle();
 		isCheckedHandle = new Handle();

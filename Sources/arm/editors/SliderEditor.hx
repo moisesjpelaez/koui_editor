@@ -35,29 +35,6 @@ class SliderEditor implements IElementEditor {
 		return new Slider(0, 100);
 	}
 
-	public function createFromData(posX: Int, posY: Int, width: Int, height: Int, properties: Dynamic, ?radioGroupMap: Map<String, RadioGroup>): Element {
-		var minVal: Float = properties != null && properties.minValue != null ? properties.minValue : 0.0;
-		var maxVal: Float = properties != null && properties.maxValue != null ? properties.maxValue : 1.0;
-		var slider = new Slider(minVal, maxVal);
-		if (properties != null) {
-			if (properties.value != null) slider.value = properties.value;
-			if (properties.precision != null) slider.precision = properties.precision;
-			if (properties.orientation != null) slider.orientation = cast properties.orientation;
-		}
-		return slider;
-	}
-
-	public function serializeProperties(element: Element): Dynamic {
-		var slider: Slider = cast element;
-		return {
-			value: slider.value,
-			minValue: slider.minValue,
-			maxValue: slider.maxValue,
-			precision: slider.precision,
-			orientation: cast slider.orientation
-		};
-	}
-
 	public function initHandles(): Void {
 		orientationHandle = new Handle();
 		minValueHandle = new Handle();

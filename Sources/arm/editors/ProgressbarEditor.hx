@@ -32,29 +32,6 @@ class ProgressbarEditor implements IElementEditor {
 		return new Progressbar(0, 100);
 	}
 
-	public function createFromData(posX: Int, posY: Int, width: Int, height: Int, properties: Dynamic, ?radioGroupMap: Map<String, RadioGroup>): Element {
-		var minVal: Float = properties != null && properties.minValue != null ? properties.minValue : 0.0;
-		var maxVal: Float = properties != null && properties.maxValue != null ? properties.maxValue : 1.0;
-		var progressbar = new Progressbar(minVal, maxVal);
-		if (properties != null) {
-			if (properties.value != null) progressbar.value = properties.value;
-			if (properties.text != null) progressbar.text = properties.text;
-			if (properties.precision != null) progressbar.precision = properties.precision;
-		}
-		return progressbar;
-	}
-
-	public function serializeProperties(element: Element): Dynamic {
-		var progressbar: Progressbar = cast element;
-		return {
-			value: progressbar.value,
-			minValue: progressbar.minValue,
-			maxValue: progressbar.maxValue,
-			text: progressbar.text,
-			precision: progressbar.precision
-		};
-	}
-
 	public function initHandles(): Void {
 		textHandle = new Handle();
 		minValueHandle = new Handle();

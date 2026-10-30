@@ -30,25 +30,6 @@ class ButtonEditor implements IElementEditor {
 		return new Button("New Button");
 	}
 
-	public function createFromData(posX: Int, posY: Int, width: Int, height: Int, properties: Dynamic, ?radioGroupMap: Map<String, RadioGroup>): Element {
-		var text: String = properties != null && properties.text != null ? properties.text : "";
-		var button = new Button(text);
-		if (properties != null) {
-			if (properties.isToggle != null) button.isToggle = properties.isToggle;
-			if (properties.isPressed != null) button.isPressed = properties.isPressed;
-		}
-		return button;
-	}
-
-	public function serializeProperties(element: Element): Dynamic {
-		var button: Button = cast element;
-		return {
-			text: button.text,
-			isToggle: button.isToggle,
-			isPressed: button.isPressed
-		};
-	}
-
 	public function initHandles(): Void {
 		textHandle = new Handle();
 		isToggleHandle = new Handle();

@@ -1,7 +1,7 @@
 package arm.panels;
 
 import arm.base.UIBase;
-import arm.commands.CommandManager;
+import arm.data.History;
 import arm.tools.CanvasUtils;
 import arm.tools.ImageUtils;
 import arm.tools.ZuiUtils;
@@ -88,7 +88,7 @@ class TopToolbar {
 
 			ui._x += 8 * uiScale; // Small padding on the left
 			if (iconButton(ui, 3, 1, "Clear Canvas")) {
-				CanvasUtils.clearCanvas();
+				CanvasUtils.clearToEmptyScene();
 			}
 			if (iconButton(ui, 2, 2, "Load Canvas")) {
 				CanvasUtils.loadCanvas();
@@ -98,15 +98,14 @@ class TopToolbar {
 			}
 			hSeparator(ui, 1 * uiScale, 8 * uiScale);
 
-			var cm = CommandManager.instance;
-			if (iconButton(ui, 6, 2, "Undo", false, cm == null || !cm.canUndo())) {
-				if (cm.undo()) {
+			if (iconButton(ui, 6, 2, "Undo", false, !History.canUndo())) {
+				if (History.undo()) {
 					uiBase.hwnds[PanelHierarchy].redraws = 2;
 					uiBase.hwnds[PanelProperties].redraws = 2;
 				}
 			}
-			if (iconButton(ui, 7, 2, "Redo", false, cm == null || !cm.canRedo())) {
-				if (cm.redo()) {
+			if (iconButton(ui, 7, 2, "Redo", false, !History.canRedo())) {
+				if (History.redo()) {
 					uiBase.hwnds[PanelHierarchy].redraws = 2;
 					uiBase.hwnds[PanelProperties].redraws = 2;
 				}

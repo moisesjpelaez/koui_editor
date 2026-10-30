@@ -28,19 +28,6 @@ class LabelEditor implements IElementEditor {
 		return new Label("New Label");
 	}
 
-	public function createFromData(posX: Int, posY: Int, width: Int, height: Int, properties: Dynamic, ?radioGroupMap: Map<String, RadioGroup>): Element {
-		var text: String = properties != null && properties.text != null ? properties.text : "";
-		var label = new Label(text);
-		return label;
-	}
-
-	public function serializeProperties(element: Element): Dynamic {
-		var label: Label = cast element;
-		return {
-			text: label.text
-		};
-	}
-
 	public function initHandles(): Void {
 		textHandle = new Handle();
 	}

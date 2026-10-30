@@ -1,5 +1,6 @@
 package arm.panels;
 
+import arm.canvas.CanvasLoader;
 import arm.data.SceneData;
 import arm.data.Selection;
 import arm.events.ElementEvents;
@@ -37,7 +38,8 @@ class HierarchyPanel {
 	var sceneData: SceneData = SceneData.data;
 
 	// Expand/collapse state - keyed by element reference
-	var expanded: ObjectMap<Element, Bool> = new ObjectMap();
+	// Collapsed elements by "scene:path", so the state survives an undo (which recreates elements)
+	var collapsed: Map<String, Bool> = new Map();
 
 	// Drag-drop state - use Element references instead of indices
 	var draggedItem: TElementEntry = null;
@@ -54,7 +56,6 @@ class HierarchyPanel {
 	public function new() {
 		sceneTabHandle = new Handle();
 
-		ElementEvents.elementAdded.connect(onElementAdded);
 		ElementEvents.selectionChanged.connect(onSelectionChanged);
 
 		SceneEvents.sceneAdded.connect(onSceneAdded);
@@ -144,7 +145,7 @@ class HierarchyPanel {
 		// Only user elements, not internal parts like a Button's label
 		var children: Array<Element> = sceneData.getChildren(entry.element);
 		var hasChildren: Bool = children.length > 0;
-		var isExpanded: Bool = expanded.exists(entry.element) ? expanded.get(entry.element) : true;
+		var isExpanded: Bool = !collapsed.exists(expandKey(entry.element));
 
 		// Cache window coordinates
 		var winX: Float = uiBase.ui._windowX;
@@ -177,7 +178,7 @@ class HierarchyPanel {
 
 		// Expand/collapse button
 		if (hasChildren && uiBase.ui.button(isExpanded ? "v" : ">")) {
-			expanded.set(entry.element, !isExpanded);
+			isExpanded ? collapsed.set(expandKey(entry.element), true) : collapsed.remove(expandKey(entry.element));
 		}
 
 		// For root element, show scene name as text input for renaming
@@ -387,7 +388,7 @@ class HierarchyPanel {
 		var children: Array<Element> = getVisibleHierarchyChildren(element);
 		if (children.length == 0) return;
 
-		var isExpanded: Bool = expanded.exists(element) ? expanded.get(element) : true;
+		var isExpanded: Bool = !collapsed.exists(expandKey(element));
 		if (!isExpanded) return;
 
 		for (child in children) {
@@ -525,32 +526,14 @@ class HierarchyPanel {
 		}
 	}
 
-    function registerChildren(parent: Element): Void {
-        var children: Array<Element> = HierarchyUtils.getChildren(parent);
-
-        if (children != null && children.length > 0) {
-            expanded.set(parent, false);
-        }
-
-        for (child in children) {
-            // Skip internal children (e.g., Button's _label)
-            if (HierarchyUtils.shouldSkipInternalChild(parent, child)) {
-                continue;
-            }
-
-            // Recursively register expand state for nested children
-            registerChildren(child);
-        }
-    }
+	function expandKey(element: Element): String {
+		var scene: TSceneEntry = sceneData.currentScene;
+		return scene.key + ":" + CanvasLoader.getPath(element, scene.root, scene.keys);
+	}
 
 	function onSelectionChanged(): Void {
 		if (Selection.isEmpty()) draggedItem = null;
 	}
-
-    public function onElementAdded(entry: TElementEntry): Void {
-		if (sceneData.currentScene == null || entry.element == sceneData.currentScene.root) return;
-        registerChildren(entry.element);
-    }
 
     public function setIcons(iconsImage: Image): Void {
         icons = iconsImage;
