@@ -201,12 +201,8 @@ class HierarchyPanel {
 					}
 				}
 
-				// Check for conflicts and ensure uniqueness
-				if (otherScenes.indexOf(newName) != -1) {
-					var parts: Array<String> = newName.split("_");
-					var baseName: String = parts[0];
-					newName = NameUtils.generateUniqueName(baseName, otherScenes, "_");
-				}
+				// A taken name gets the next free number
+				newName = NameUtils.nextUniqueName(newName, otherScenes);
 
 				var oldName: String = sceneTabs[currentIdx];
 				SceneEvents.sceneNameChanged.emit(oldName, newName);

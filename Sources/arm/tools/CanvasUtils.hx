@@ -612,9 +612,6 @@ class CanvasUtils {
 			pasteParent = targetParent;
 		}
 
-		// Collect ALL existing keys in the scene for global uniqueness
-		var allSceneKeys: Array<String> = [for (key in scene.keys) key];
-
 		// Pasted radio buttons join the canvas' groups
 		var radioGroupMap: Map<String, RadioGroup> = [for (group in sceneData.radioGroups) group.id => group];
 
@@ -633,14 +630,9 @@ class CanvasUtils {
 			var element: Element = CanvasElements.create(elemData, radioGroupMap);
 			if (element == null) continue;
 
-			// Ensure key is globally unique within the scene
-			var proposedKey: String = elemData.key;
-			if (allSceneKeys.indexOf(proposedKey) != -1) {
-				var parts: Array<String> = proposedKey.split("_");
-				var baseName: String = parts[0];
-				proposedKey = NameUtils.generateUniqueName(baseName, allSceneKeys, "_");
-			}
-			allSceneKeys.push(proposedKey);
+			// Names are unique among siblings: a copied tree's root gets a free name in
+			// the container it's pasted into; the elements inside it keep theirs
+			var proposedKey: String = isTreeRoot ? NameUtils.nextUniqueName(elemData.key, NameUtils.getSiblingNames(null, pasteParent)) : elemData.key;
 
 			pathToElement.set(CanvasLoader.joinPath(elemData.parent, elemData.key), element);
 
