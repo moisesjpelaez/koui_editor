@@ -16,6 +16,7 @@ import haxe.Json;
 import koui.Koui;
 import koui.elements.Button;
 import koui.elements.Element;
+import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.RadioButton;
 import koui.elements.layouts.AnchorPane;
@@ -34,6 +35,9 @@ class CanvasUtils {
 	public static var projectExt: String = "";
 
 	static var sceneData: SceneData = SceneData.data;
+
+	/** Names of images the project doesn't have, by ImagePanel, so saving keeps them. */
+	static var missingImageNames: Map<ImagePanel, String> = new Map();
 
 	/**
 	 * Initializes the canvas name from command line arguments.
@@ -464,6 +468,11 @@ class CanvasUtils {
 			return CanvasLoader.getPath(target, scene.root, scene.keys);
 		};
 
+		var properties: Dynamic = CanvasElements.serializeProperties(element);
+		if (type == "ImagePanel" && properties.imageName == "" && missingImageNames.exists(cast element)) {
+			properties.imageName = missingImageNames.get(cast element);
+		}
+
 		return {
 			key: key,
 			type: type,
@@ -480,7 +489,7 @@ class CanvasUtils {
 			focusDown: focusPath(element.focusDown),
 			focusLeft: focusPath(element.focusLeft),
 			focusRight: focusPath(element.focusRight),
-			properties: CanvasElements.serializeProperties(element)
+			properties: properties
 		};
 	}
 
@@ -506,6 +515,31 @@ class CanvasUtils {
 			}
 		}
 		rebuildCanvas(canvasData, activeSceneKey);
+
+		var reported: Array<String> = [];
+		for (name in missingImageNames) {
+			if (reported.indexOf(name) >= 0) continue;
+			reported.push(name);
+			trace('Image "${name}" is not in the project; its name is kept when saving');
+		}
+	}
+
+	/** If `data` is an ImagePanel whose image the project doesn't have, remembers the image's name for saving. */
+	static function rememberMissingImage(element: Null<Element>, data: TElementData): Void {
+		if (element == null || data.type != "ImagePanel") return;
+		var name: String = data.properties.imageName;
+		var panel: ImagePanel = cast element;
+		if (name != "" && getImageName(panel.image) != name) missingImageNames.set(panel, name);
+	}
+
+	/** The name of the missing image `panel` shows, or null. */
+	public static function getMissingImageName(panel: ImagePanel): Null<String> {
+		return missingImageNames.get(panel);
+	}
+
+	/** Forgets the missing image of `panel`, e.g. when another image is chosen for it. */
+	public static function forgetMissingImage(panel: ImagePanel): Void {
+		missingImageNames.remove(panel);
 	}
 
 	/**
@@ -538,6 +572,11 @@ class CanvasUtils {
 			var keys: Map<Element, String> = CanvasLoader.buildScene(sceneDataEntry, scene.root, radioGroupMap);
 			for (element => key in keys) sceneData.registerElement(element, key, scene);
 			builtScenes.set(scene.key, { root: scene.root, keys: keys });
+
+			for (elemData in sceneDataEntry.elements) {
+				var path: String = CanvasLoader.joinPath(elemData.parent, elemData.key);
+				rememberMissingImage(CanvasLoader.findByPath(scene.root, keys, path), elemData);
+			}
 		}
 
 		// Radio buttons may have created groups the canvas didn't list
@@ -629,6 +668,7 @@ class CanvasUtils {
 
 			var element: Element = CanvasElements.create(elemData, radioGroupMap);
 			if (element == null) continue;
+			rememberMissingImage(element, elemData);
 
 			// Names are unique among siblings: a copied tree's root gets a free name in
 			// the container it's pasted into; the elements inside it keep theirs
@@ -667,6 +707,7 @@ class CanvasUtils {
 		// Clear the scenes array and reset current scene
 		sceneData.scenes.resize(0);
 		sceneData.currentScene = null;
+		missingImageNames.clear();
 
 		Selection.clear();
 	}

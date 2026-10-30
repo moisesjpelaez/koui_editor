@@ -68,19 +68,12 @@ class ImagePanelEditor implements IElementEditor {
 		var newIndex: Int = ui.combo(imageHandle, imageNames, "Image", true, Right);
 		if (imageHandle.changed) {
 			var selectedName: String = imageNames[newIndex];
-			if (selectedName == "(none)") {
-				ElementEvents.propertyChanged.emit(imagePanel, "image", currentImageName, "");
-				imagePanel.image = null;
-				imagePanel.width = 32;
-				imagePanel.height = 32;
-			} else {
-				var img: kha.Image = Koui.getImage(selectedName);
-				if (img != null) {
-					ElementEvents.propertyChanged.emit(imagePanel, "image", currentImageName, selectedName);
-					imagePanel.image = img;
-				}
-			}
-			Koui.updateElementSize(imagePanel);
+			applyImage(imagePanel, selectedName == "(none)" ? "" : selectedName);
+		}
+
+		var missingName: Null<String> = CanvasUtils.getMissingImageName(imagePanel);
+		if (missingName != null) {
+			ui.text('Image "$missingName" is missing; its name is kept when saving', Left);
 		}
 
 		scaleHandle.selected = imagePanel.scale;
@@ -89,5 +82,24 @@ class ImagePanelEditor implements IElementEditor {
 			ElementEvents.propertyChanged.emit(imagePanel, "scale", imagePanel.scale, newScale);
 			imagePanel.scale = newScale;
 		}
+	}
+
+	/** Shows the image named `name` in `imagePanel`, or no image if `name` is "". */
+	public function applyImage(imagePanel: ImagePanel, name: String): Void {
+		var currentImageName: String = CanvasUtils.getImageName(imagePanel.image);
+		if (name == "") {
+			ElementEvents.propertyChanged.emit(imagePanel, "image", currentImageName, "");
+			imagePanel.image = null;
+			imagePanel.width = 32;
+			imagePanel.height = 32;
+		} else {
+			var img: kha.Image = Koui.getImage(name);
+			if (img == null) return;
+			ElementEvents.propertyChanged.emit(imagePanel, "image", currentImageName, name);
+			imagePanel.image = img;
+		}
+		// A chosen image (or none) replaces a missing one
+		CanvasUtils.forgetMissingImage(imagePanel);
+		Koui.updateElementSize(imagePanel);
 	}
 }

@@ -53,9 +53,10 @@ class ButtonEditor implements IElementEditor {
 			}
 		}
 
+		// Only toggle buttons show as pressed; react to a click, not to that difference
 		isPressedHandle.selected = button.isToggle && button.isPressed;
 		var newPressed = ui.check(isPressedHandle, "Is Pressed");
-		if (newPressed != button.isPressed) {
+		if (isPressedHandle.changed && newPressed != button.isPressed) {
 			ElementEvents.propertyChanged.emit(button, "isPressed", button.isPressed, newPressed);
 			button.isPressed = newPressed;
 		}
