@@ -1,6 +1,8 @@
 package arm;
 
 import arm.base.UIBase;
+import arm.data.SceneData;
+import arm.data.Selection;
 import arm.editors.ElementRegistry;
 import arm.events.ElementEvents;
 import arm.panels.TopToolbar;
@@ -8,6 +10,7 @@ import arm.types.Enums.PanelHandle;
 
 import iron.math.Vec2;
 import iron.system.Input;
+import iron.system.Input.Keyboard;
 import iron.system.Input.Mouse;
 
 import koui.Koui;
@@ -24,10 +27,6 @@ import iron.App;
 
 @:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane)
 class DragDropHandler {
-	// Shared references (set by KouiEditor)
-	public var rootPane: AnchorPane;
-	public var selectedElement: Element = null;
-
 	var uiBase: UIBase;
 	var viewport: CanvasViewport;
 	var topToolbar: TopToolbar;
@@ -85,6 +84,9 @@ class DragDropHandler {
 	public function update() {
 		if (viewport.isPanning) return;
 
+		var rootPane: AnchorPane = SceneData.data.getRoot();
+		if (rootPane == null) return;
+
 		// FIXME: elements flicker on mouse start and release
 		var mouse: Mouse = Input.getMouse();
 		var mouseDown: Bool = mouse.down();
@@ -92,26 +94,39 @@ class DragDropHandler {
 
 		if (mouseJustPressed && isInCanvas()) {
 			var element: Element = getElementAtPositionUnclipped(Std.int(mouse.x), Std.int(mouse.y));
+			var keyboard: Keyboard = Input.getKeyboard();
+			var toggle: Bool = keyboard.down("control");
+			var additive: Bool = keyboard.down("shift");
 
 			if (element != null && element != rootPane) {
+				var clickedElement: Element;
 				// Select parent element instead of internal children of composite types
 				var parentEditor = ElementRegistry.getForElement(element.parent);
 				if ((parentEditor != null && parentEditor.isComposite) || (element is Panel && element.parent != rootPane)) {
-					selectedElement = element.parent;
+					clickedElement = element.parent;
 				}
 				// Select parent AnchorPane instead of child AnchorPane (but not if parent is rootPane)
 				else if (element is AnchorPane && element.layout is AnchorPane && element.layout != rootPane) {
-					selectedElement = cast(element.layout, Element);
+					clickedElement = cast(element.layout, Element);
 				}
 				else {
-					selectedElement = element;
+					clickedElement = element;
 				}
-				ElementEvents.elementSelected.emit(selectedElement);
-				if (isDynamicSized(selectedElement)) {
+
+				// Ctrl toggles and Shift adds to the selection; neither starts a drag
+				if (toggle || additive) {
+					toggle ? Selection.toggle(clickedElement) : Selection.add(clickedElement);
+					draggedElement = null;
+					wasMouseDown = mouseDown;
+					return;
+				}
+
+				Selection.select(clickedElement);
+				if (isDynamicSized(clickedElement)) {
 					draggedElement = null;
 					return;
 				}
-				draggedElement = selectedElement;
+				draggedElement = clickedElement;
 
 				// Store original anchor and switch to TopLeft BEFORE calculating offset
 				dragAnchor = draggedElement.getAnchorResolved();
@@ -125,13 +140,13 @@ class DragDropHandler {
 				dragStartX = draggedElement.posX;
 				dragStartY = draggedElement.posY;
 			} else {
-				selectedElement = null;
+				// Clicking empty space clears the selection, unless adding to it
+				if (!toggle && !additive) Selection.clear();
 				draggedElement = null;
-				ElementEvents.elementSelected.emit(null);
 			}
 		} else if (mouseJustPressed && isInHierarchyPanel()) {
 			// Clicked in hierarchy panel — clear canvas drag state only.
-			// The hierarchy panel emits its own elementSelected event.
+			// The hierarchy panel updates the selection itself.
 			draggedElement = null;
 		} else if (mouseDown && draggedElement != null) {
 			// Calculate new position in TopLeft space
@@ -209,6 +224,9 @@ class DragDropHandler {
 	 * This allows selecting elements that are positioned outside the rootPane's visible area.
 	 */
 	function getElementAtPositionUnclipped(x: Int, y: Int): Null<Element> {
+		var rootPane: AnchorPane = SceneData.data.getRoot();
+		if (rootPane == null) return null;
+
 		// Transform screen coordinates to rootPane space (accounting for pan and scale)
 		// rootPane.layoutX/layoutY already include the pan offset and are in screen coordinates
 		var relX: Int = x - rootPane.layoutX;
@@ -248,7 +266,7 @@ class DragDropHandler {
 		return null;
 	}
 
-	public function drawSelectedElement(g2: kha.graphics2.Graphics) {
-		viewport.drawSelectedElement(g2, selectedElement, draggedElement);
+	public function drawSelectedElements(g2: kha.graphics2.Graphics) {
+		viewport.drawSelection(g2, draggedElement);
 	}
 }

@@ -39,22 +39,12 @@ class NameUtils {
 	}
 
 	static function getSiblingNames(element: Element, parent: Element): Array<String> {
-		var currentScene = SceneData.data.currentScene;
-		if (currentScene == null) return [];
-
-		var siblings: Array<Element> = HierarchyUtils.getChildren(parent);
+		var sceneData: SceneData = SceneData.data;
 		var existingNames: Array<String> = [];
 
 		// Collect sibling names (excluding the element itself)
-		for (sibling in siblings) {
-			if (sibling != element) {
-				for (entry in currentScene.elements) {
-					if (entry.element == sibling) {
-						existingNames.push(entry.key);
-						break;
-					}
-				}
-			}
+		for (sibling in sceneData.getChildren(parent)) {
+			if (sibling != element) existingNames.push(sceneData.getElementKey(sibling));
 		}
 
 		return existingNames;

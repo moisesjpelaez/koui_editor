@@ -2,6 +2,7 @@ package arm;
 
 import arm.base.UIBase;
 import arm.data.SceneData;
+import arm.data.Selection;
 import arm.panels.TopToolbar;
 
 import iron.App;
@@ -32,7 +33,6 @@ class CanvasViewport {
 	public var currentScale: Float = 0.8;
 
 	// Shared references (set by KouiEditor)
-	public var rootPane: AnchorPane;
 	public var uiBase: UIBase;
 	public var topToolbar: TopToolbar;
 	public var sceneData: SceneData;
@@ -40,6 +40,9 @@ class CanvasViewport {
 	public function new() {}
 
 	public function canvasControl(isInCanvas: Bool, isInElementsPanel: Bool): Void {
+		var rootPane: AnchorPane = sceneData.getRoot();
+		if (rootPane == null) return;
+
 		var mouse: Mouse = Input.getMouse();
 		var keyboard: Keyboard = Input.getKeyboard();
 
@@ -89,6 +92,9 @@ class CanvasViewport {
 	}
 
 	public function resetCanvasView(): Void {
+		var rootPane: AnchorPane = sceneData.getRoot();
+		if (rootPane == null) return;
+
 		canvasPanX = 0;
 		canvasPanY = 0;
 
@@ -113,6 +119,7 @@ class CanvasViewport {
 	}
 
 	public function drawGrid(g2: Graphics): Void {
+		var rootPane: AnchorPane = sceneData.getRoot();
 		if (!topToolbar.snappingEnabled || rootPane == null) return;
 
 		var cellSize: Float = topToolbar.snapValue * currentScale;
@@ -162,6 +169,7 @@ class CanvasViewport {
 	}
 
 	public function drawRootPane(g2: Graphics): Void {
+		var rootPane: AnchorPane = sceneData.getRoot();
 		if (rootPane != null) {
 			var thickness: Int = 1;
 			g2.color = 0xffe7e7e7;
@@ -178,8 +186,16 @@ class CanvasViewport {
 		}
 	}
 
-	public function drawSelectedElement(g2: Graphics, selectedElement: Element, draggedElement: Element): Void {
-		if (selectedElement != null && selectedElement != rootPane) {
+	/** Outlines every selected element. */
+	public function drawSelection(g2: Graphics, draggedElement: Element): Void {
+		for (element in Selection.elements) {
+			drawSelectedElement(g2, element, draggedElement);
+		}
+	}
+
+	function drawSelectedElement(g2: Graphics, selectedElement: Element, draggedElement: Element): Void {
+		var rootPane: AnchorPane = sceneData.getRoot();
+		if (rootPane != null && selectedElement != null && selectedElement != rootPane) {
 			var thickness: Int = 2;
 			g2.color = 0xff469cff;
 
@@ -188,7 +204,7 @@ class CanvasViewport {
 			var w: Int = selectedElement.drawWidth;
 			var h: Int = selectedElement.drawHeight;
 
-			var finalPos: Vec2 = sumLayout(selectedElement, 0, 0);
+			var finalPos: Vec2 = sumLayout(selectedElement, 0, 0, rootPane);
 			if (selectedElement.layout != rootPane) {
 				x += Std.int(finalPos.x);
 				y += Std.int(finalPos.y);
@@ -201,22 +217,22 @@ class CanvasViewport {
 		}
 	}
 
-	function sumLayout(elem: Element, x: Int, y: Int): Vec2 {
+	function sumLayout(elem: Element, x: Int, y: Int, rootPane: AnchorPane): Vec2 {
 		if (elem.layout != null && elem.layout != rootPane) {
-			return sumLayout(elem.layout, x + elem.layout.drawX, y + elem.layout.drawY);
+			return sumLayout(elem.layout, x + elem.layout.drawX, y + elem.layout.drawY, rootPane);
 		} else {
 			return new Vec2(x, y);
 		}
 	}
 
 	public function drawLayoutElements(g2: Graphics): Void {
-		if (sceneData.currentScene == null) return;
+		var rootPane: AnchorPane = sceneData.getRoot();
+		if (rootPane == null) return;
 
 		var thickness: Int = 1;
 		g2.color = 0xff808080;
 
-		for (entry in sceneData.currentScene.elements) {
-			var elem: Element = entry.element;
+		for (elem in sceneData.getElements()) {
 			if (elem == rootPane) continue;
 
 			if (elem is AnchorPane || elem is RowLayout || elem is ColLayout) {
@@ -225,7 +241,7 @@ class CanvasViewport {
 				var w: Int = elem.drawWidth;
 				var h: Int = elem.drawHeight;
 
-				var finalPos: Vec2 = sumLayout(elem, 0, 0);
+				var finalPos: Vec2 = sumLayout(elem, 0, 0, rootPane);
 				if (elem.layout != rootPane) {
 					x += Std.int(finalPos.x);
 					y += Std.int(finalPos.y);

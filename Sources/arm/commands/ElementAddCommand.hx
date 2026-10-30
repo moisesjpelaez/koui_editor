@@ -1,7 +1,6 @@
 package arm.commands;
 
 import arm.data.SceneData;
-import arm.events.ElementEvents;
 import arm.tools.HierarchyUtils;
 import koui.elements.Element;
 
@@ -35,12 +34,8 @@ class ElementAddCommand implements ICommand {
 
 		// Re-add to SceneData
 		var sceneData = SceneData.data;
-		for (scene in sceneData.scenes) {
-			if (scene.key == _sceneName) {
-				scene.elements.push({key: key, element: element});
-				break;
-			}
-		}
+		var scene = sceneData.getScene(_sceneName);
+		if (scene != null) sceneData.registerElement(element, key, scene);
 	}
 
 	public function undo(): Void {
@@ -49,18 +44,7 @@ class ElementAddCommand implements ICommand {
 
 		// Remove from SceneData
 		var sceneData = SceneData.data;
-		for (scene in sceneData.scenes) {
-			if (scene.key == _sceneName) {
-				for (i in 0...scene.elements.length) {
-					if (scene.elements[i].element == element) {
-						scene.elements.splice(i, 1);
-						break;
-					}
-				}
-				break;
-			}
-		}
-
-		ElementEvents.elementSelected.emit(null);
+		var scene = sceneData.getScene(_sceneName);
+		if (scene != null) sceneData.unregisterElement(element, scene);
 	}
 }

@@ -2,6 +2,7 @@ package arm.data;
 
 import arm.events.ElementEvents;
 import arm.events.SceneEvents;
+import arm.tools.HierarchyUtils;
 import arm.types.Types;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.Element;
@@ -20,39 +21,86 @@ class SceneData {
         // to support undo/redo (commands need to capture state before mutation).
     }
 
-    public function updateElementKey(element: Element, newKey: String): Void {
-        if (currentScene == null) return;
-        for (entry in currentScene.elements) {
-            if (entry.element == element) {
-                entry.key = newKey;
-                return;
-            }
-        }
+    /** The root pane of the current scene, or null if there is no scene. */
+    public function getRoot(): Null<AnchorPane> {
+        return currentScene != null ? currentScene.root : null;
     }
 
-    public function getElementKey(element: Element): String {
-        if (currentScene == null) return null;
-        for (entry in currentScene.elements) {
-            if (entry.element == element) {
-                return entry.key;
-            }
+    public function getScene(sceneKey: String): Null<TSceneEntry> {
+        for (scene in scenes) {
+            if (scene.key == sceneKey) return scene;
         }
         return null;
     }
 
+    public function updateElementKey(element: Element, newKey: String): Void {
+        if (currentScene == null || !currentScene.keys.exists(element)) return;
+        currentScene.keys.set(element, newKey);
+    }
+
+    public function getElementKey(element: Element, ?scene: TSceneEntry): Null<String> {
+        if (scene == null) scene = currentScene;
+        if (scene == null) return null;
+        return scene.keys.get(element);
+    }
+
+    /** Whether `element` is a user element of the scene (not an internal part like a Button's label). */
+    public function isRegistered(element: Element, ?scene: TSceneEntry): Bool {
+        if (scene == null) scene = currentScene;
+        return scene != null && scene.keys.exists(element);
+    }
+
+    public function registerElement(element: Element, key: String, ?scene: TSceneEntry): Void {
+        if (scene == null) scene = currentScene;
+        if (scene == null) return;
+        scene.keys.set(element, key);
+    }
+
+    public function unregisterElement(element: Element, ?scene: TSceneEntry): Void {
+        if (scene == null) scene = currentScene;
+        if (scene == null) return;
+        scene.keys.remove(element);
+    }
+
+    /** The user elements directly inside `parent`, in the order they are drawn. */
+    public function getChildren(parent: Element, ?scene: TSceneEntry): Array<Element> {
+        if (scene == null) scene = currentScene;
+        if (scene == null) return [];
+        return [for (child in HierarchyUtils.getChildren(parent)) if (scene.keys.exists(child)) child];
+    }
+
+    /** All user elements of the scene, parents before their children, in the order they are drawn. */
+    public function getElements(?scene: TSceneEntry): Array<Element> {
+        if (scene == null) scene = currentScene;
+        var result: Array<Element> = [];
+        if (scene != null) collectElements(scene.root, scene, result);
+        return result;
+    }
+
+    function collectElements(parent: Element, scene: TSceneEntry, out: Array<Element>): Void {
+        for (child in getChildren(parent, scene)) {
+            out.push(child);
+            collectElements(child, scene, out);
+        }
+    }
+
+    /** Whether `element` is a user element attached to the current scene's tree. */
+    public function isInCurrentScene(element: Element): Bool {
+        if (currentScene == null || !currentScene.keys.exists(element)) return false;
+        var current: Element = HierarchyUtils.getParentElement(element);
+        while (current != null) {
+            if (current == currentScene.root) return true;
+            current = HierarchyUtils.getParentElement(current);
+        }
+        return false;
+    }
+
     public function onElementAdded(entry: TElementEntry): Void {
-        if (currentScene == null) return;
-        currentScene.elements.push({ key: entry.key, element: entry.element });
+        registerElement(entry.element, entry.key);
     }
 
     public function onElementRemoved(element: Element): Void {
-        if (currentScene == null) return;
-        for (i in 0...currentScene.elements.length) {
-            if (currentScene.elements[i].element == element) {
-                currentScene.elements.splice(i, 1);
-                break;
-            }
-        }
+        unregisterElement(element);
     }
 
     function onSceneChanged(sceneKey: String): Void {

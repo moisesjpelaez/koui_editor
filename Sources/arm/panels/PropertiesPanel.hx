@@ -2,6 +2,7 @@ package arm.panels;
 
 import arm.data.CanvasSettings;
 import arm.data.SceneData;
+import arm.data.Selection;
 import arm.events.SceneEvents;
 import arm.events.ElementEvents;
 import arm.editors.ElementRegistry;
@@ -105,7 +106,7 @@ class PropertiesPanel {
         instance = this;
 
         ElementEvents.elementAdded.connect(onElementAdded);
-        ElementEvents.elementSelected.connect(onElementSelected);
+        ElementEvents.selectionChanged.connect(onSelectionChanged);
         ElementEvents.elementRemoved.connect(onElementRemoved);
         SceneEvents.canvasLoaded.connect(onCanvasLoaded);
     }
@@ -293,9 +294,9 @@ class PropertiesPanel {
         var currentScene = sceneData.currentScene;
         if (currentScene == null) return entries;
 
-        for (entry in currentScene.elements) {
-            if (Std.isOfType(entry.element, RadioButton)) {
-                entries.push({ key: entry.key, button: cast entry.element });
+        for (element in sceneData.getElements()) {
+            if (Std.isOfType(element, RadioButton)) {
+                entries.push({ key: sceneData.getElementKey(element), button: cast element });
             }
         }
 
@@ -440,15 +441,12 @@ class PropertiesPanel {
         var ui: Zui = uiBase.ui;
 
         // Get element name from SceneData
-        var elemName = "";
-        var currentScene = SceneData.data.currentScene;
-        if (currentScene != null) {
-            for (entry in currentScene.elements) {
-                if (entry.element == selectedElement) {
-                    elemName = entry.key;
-                    break;
-                }
-            }
+        var elemName: String = sceneData.getElementKey(selectedElement);
+        if (elemName == null) elemName = "";
+
+        // Editing several elements at once comes with multi-editing; until then, show the primary one
+        if (Selection.elements.length > 1) {
+            ui.text('${Selection.elements.length} elements selected, showing "$elemName"', Left);
         }
 
 		var elementType = CanvasUtils.getElementType(selectedElement);
@@ -626,12 +624,11 @@ class PropertiesPanel {
 
             var focusableNames: Array<String> = ["(none)"];
             var elementMap: Map<String, Element> = new Map();
-            if (currentScene != null) {
-                for (entry in currentScene.elements) {
-                    if (entry.element != selectedElement && entry.element.canFocus) {
-                        focusableNames.push(entry.key);
-                        elementMap.set(entry.key, entry.element);
-                    }
+            for (element in sceneData.getElements()) {
+                if (element != selectedElement && element.canFocus) {
+                    var key: String = sceneData.getElementKey(element);
+                    focusableNames.push(key);
+                    elementMap.set(key, element);
                 }
             }
 
@@ -738,7 +735,8 @@ class PropertiesPanel {
         }
     }
 
-    public function onElementSelected(element: Element): Void {
+    function onSelectionChanged(): Void {
+        var element: Element = Selection.primary;
         selectedElement = element;
 
         // Update all handles with the new element's values
@@ -748,19 +746,8 @@ class PropertiesPanel {
                 elementSizes.set(element, new Vec2(element.width, element.height));
             }
 
-            // Find element name
-            var elemName: String = "";
-            var currentScene = SceneData.data.currentScene;
-            if (currentScene != null) {
-                for (entry in currentScene.elements) {
-                    if (entry.element == element) {
-                        elemName = entry.key;
-                        break;
-                    }
-                }
-            }
-
-            nameHandle.text = elemName;
+            var elemName: String = sceneData.getElementKey(element);
+            nameHandle.text = elemName != null ? elemName : "";
             tidHandle.text = element.getTID();
             posXHandle.text = Std.string(element.posX);
             posYHandle.text = Std.string(element.posY);
@@ -771,18 +758,11 @@ class PropertiesPanel {
             anchorHandle.position = element.anchor;
 
             if (element.canFocus) {
+                // Same order as the focus combos in drawProperties()
+                var focusable: Array<Element> = [for (e in sceneData.getElements()) if (e != element && e.canFocus) e];
                 var getIndex = function(targetElem: Element): Int {
                     if (targetElem == null) return 0;
-                    var idx = 1;
-                    if (currentScene != null) {
-                        for (entry in currentScene.elements) {
-                            if (entry.element != element && entry.element.canFocus) {
-                                if (entry.element == targetElem) return idx;
-                                idx++;
-                            }
-                        }
-                    }
-                    return 0;
+                    return focusable.indexOf(targetElem) + 1;
                 };
 
                 focusUpHandle.position = getIndex(element.focusUp);

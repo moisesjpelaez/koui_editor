@@ -2,6 +2,7 @@ package arm;
 
 import arm.data.SceneData;
 import arm.data.EditorSettings;
+import arm.data.Selection;
 import arm.events.ElementEvents;
 import arm.events.SceneEvents;
 import arm.base.Base;
@@ -56,13 +57,10 @@ import arm.DragDropHandler;
 class KouiEditor extends iron.Trait {
 	var uiBase: UIBase;
 
-	var rootPane: AnchorPane;
 	var sizeInit: Bool = false;
 
 	// Created elements
 	var sceneData: SceneData = SceneData.data;
-
-	var selectedElement: Element = null;
 
 	// Viewport controller
 	var viewport: CanvasViewport = new CanvasViewport();
@@ -150,7 +148,7 @@ class KouiEditor extends iron.Trait {
 			App.onResize = onResized;
 
 			ElementEvents.elementAdded.connect(onElementAdded);
-			ElementEvents.elementSelected.connect(onElementSelected);
+			ElementEvents.selectionChanged.connect(onSelectionChanged);
 			ElementEvents.elementDropped.connect(onElementDropped);
 			ElementEvents.elementRemoved.connect(onElementRemoved);
 			ElementEvents.propertyChanged.connect(onPropertyChangedForUndo);
@@ -177,13 +175,11 @@ class KouiEditor extends iron.Trait {
 		var s: TSceneEntry = {
 		    key: sceneName,
 		    root: scene,
-		    elements: [],
+		    keys: new Map(),
 		    active: true
 		};
 		sceneData.scenes.push(s);
 		sceneData.currentScene = s;
-		rootPane = scene;
-		viewport.rootPane = rootPane;
 		hierarchyPanel.onElementAdded({ key: sceneName, element: scene });
 	}
 
@@ -200,41 +196,29 @@ class KouiEditor extends iron.Trait {
 		var keyboard: Keyboard = Input.getKeyboard();
 		var isTyping: Bool = uiBase.ui.isTyping;
 
-		if (!isTyping && keyboard.started("delete") && selectedElement != null && selectedElement != rootPane) {
-			ElementEvents.elementRemoved.emit(selectedElement);
+		if (!isTyping && keyboard.started("delete")) {
+			deleteSelection();
 		}
 
 		// Copy (Ctrl+C)
-		if (!isTyping && keyboard.down("control") && keyboard.started("c") && selectedElement != null && selectedElement != rootPane) {
-			Clipboard.clipboardData = CanvasUtils.serializeElementTree(selectedElement);
-			Clipboard.isCut = false;
+		if (!isTyping && keyboard.down("control") && keyboard.started("c")) {
+			copySelection(false);
 		}
 
 		// Cut (Ctrl+X)
-		if (!isTyping && keyboard.down("control") && keyboard.started("x") && selectedElement != null && selectedElement != rootPane) {
-			Clipboard.clipboardData = CanvasUtils.serializeElementTree(selectedElement);
-			Clipboard.isCut = true;
-			ElementEvents.elementRemoved.emit(selectedElement);
+		if (!isTyping && keyboard.down("control") && keyboard.started("x")) {
+			copySelection(true);
 		}
 
 		// Paste (Ctrl+V)
-		if (!isTyping && keyboard.down("control") && keyboard.started("v") && Clipboard.clipboardData.length > 0) {
-			CanvasUtils.pasteElements(Clipboard.clipboardData, selectedElement);
-			if (Clipboard.isCut) {
-				Clipboard.clipboardData = [];
-				Clipboard.isCut = false;
-			}
-			uiBase.hwnds[PanelHierarchy].redraws = 2;
-			uiBase.hwnds[PanelProperties].redraws = 2;
+		if (!isTyping && keyboard.down("control") && keyboard.started("v")) {
+			paste();
 		}
 
 		// Undo (Ctrl+Z)
 		if (!isTyping && keyboard.down("control") && !keyboard.down("shift") && keyboard.started("z")) {
 			if (commandManager.undo()) {
-				rootPane = SceneManager.activeScene;
-				viewport.rootPane = rootPane;
 				hierarchyPanel.updateTabPosition();
-				ElementEvents.elementSelected.emit(selectedElement);
 				uiBase.hwnds[PanelHierarchy].redraws = 2;
 				uiBase.hwnds[PanelProperties].redraws = 2;
 			}
@@ -243,14 +227,46 @@ class KouiEditor extends iron.Trait {
 		// Redo (Ctrl+Shift+Z or Ctrl+Y)
 		if (!isTyping && keyboard.down("control") && (keyboard.down("shift") && keyboard.started("z") || keyboard.started("y"))) {
 			if (commandManager.redo()) {
-				rootPane = SceneManager.activeScene;
-				viewport.rootPane = rootPane;
 				hierarchyPanel.updateTabPosition();
-				ElementEvents.elementSelected.emit(selectedElement);
 				uiBase.hwnds[PanelHierarchy].redraws = 2;
 				uiBase.hwnds[PanelProperties].redraws = 2;
 			}
 		}
+	}
+
+	/** Deletes the selected elements, with everything inside them. */
+	public function deleteSelection(): Void {
+		for (element in Selection.getTopLevel()) {
+			ElementEvents.elementRemoved.emit(element);
+		}
+	}
+
+	/** Copies the selected elements to the clipboard, and removes them if `cut` is true. */
+	public function copySelection(cut: Bool): Void {
+		var topLevel: Array<Element> = Selection.getTopLevel();
+		if (topLevel.length == 0) return;
+
+		var data: Array<TElementData> = [];
+		for (element in topLevel) {
+			for (elementData in CanvasUtils.serializeElementTree(element)) data.push(elementData);
+		}
+		Clipboard.clipboardData = data;
+		Clipboard.isCut = cut;
+
+		if (cut) deleteSelection();
+	}
+
+	/** Pastes the clipboard into the primary selected container, or into the scene. */
+	public function paste(): Void {
+		if (Clipboard.clipboardData.length == 0) return;
+
+		CanvasUtils.pasteElements(Clipboard.clipboardData, Selection.primary);
+		if (Clipboard.isCut) {
+			Clipboard.clipboardData = [];
+			Clipboard.isCut = false;
+		}
+		uiBase.hwnds[PanelHierarchy].redraws = 2;
+		uiBase.hwnds[PanelProperties].redraws = 2;
 	}
 
 	function drawRightPanels() {
@@ -267,15 +283,13 @@ class KouiEditor extends iron.Trait {
 		if (uiBase == null) return;
 		g2.end();
 
-		dragDrop.rootPane = rootPane;
 		dragDrop.update();
-		selectedElement = dragDrop.selectedElement;
 		Koui.render(g2);
 		g2.begin(false);
 		viewport.drawGrid(g2);
 		viewport.drawRootPane(g2);
 		viewport.drawLayoutElements(g2);
-		dragDrop.drawSelectedElement(g2);
+		dragDrop.drawSelectedElements(g2);
 		g2.end();
 
 		uiBase.ui.begin(g2);
@@ -331,10 +345,7 @@ class KouiEditor extends iron.Trait {
 		commandManager.record(new PropertyChangeCommand(element, props, olds, news));
 	}
 
-	function onElementSelected(element: Element): Void {
-		selectedElement = element;
-		dragDrop.selectedElement = element;
-
+	function onSelectionChanged(): Void {
 		uiBase.hwnds[PanelHierarchy].redraws = 2;
 		uiBase.hwnds[PanelProperties].redraws = 2;
 	}
@@ -342,6 +353,8 @@ class KouiEditor extends iron.Trait {
 	function onElementDropped(element: Element, target: Element, zone: DropZone): Void {
 		if (element == null || target == null) return;
 		if (element == target) return;
+
+		var rootPane: AnchorPane = sceneData.getRoot();
 
 		// Determine new parent before mutation
 		var newParent: Element = null;
@@ -372,16 +385,8 @@ class KouiEditor extends iron.Trait {
 		}
 
 		// Get current name and ensure it's unique in new parent
-		var currentName: String = "";
-		var currentScene = SceneData.data.currentScene;
-		if (currentScene != null) {
-			for (entry in currentScene.elements) {
-				if (entry.element == element) {
-					currentName = entry.key;
-					break;
-				}
-			}
-		}
+		var currentName: String = sceneData.getElementKey(element);
+		if (currentName == null) currentName = "";
 		var uniqueName: String = NameUtils.ensureUniqueName(currentName, element, newParent);
 
 		// Perform the mutation
@@ -405,6 +410,9 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function onElementAdded(entry: TElementEntry): Void {
+		var rootPane: AnchorPane = sceneData.getRoot();
+		if (rootPane == null) return;
+
 		rootPane.add(entry.element, Anchor.TopLeft);
 
 		// Generate unique name based on parent's children
@@ -412,7 +420,7 @@ class KouiEditor extends iron.Trait {
 		entry.key = uniqueName;
 		sceneData.updateElementKey(entry.element, uniqueName);
 
-		ElementEvents.elementSelected.emit(entry.element);
+		Selection.select(entry.element);
 
 		// Record for undo (SceneData.onElementAdded already pushed the entry via event)
 		if (!commandManager.isUndoRedoing) {
@@ -435,10 +443,7 @@ class KouiEditor extends iron.Trait {
 		// Detach from parent (children stay attached to element)
 		HierarchyUtils.detachFromCurrentParent(element);
 
-		if (selectedElement == element) {
-			selectedElement = null;
-			ElementEvents.elementSelected.emit(null);
-		}
+		Selection.refresh();
 
 		// Record for undo
 		var key = allEntries.length > 0 ? allEntries[0].key : "";
@@ -448,23 +453,13 @@ class KouiEditor extends iron.Trait {
 	/** Recursively collect TElementEntry records for an element and all its descendants. */
 	function collectDescendantEntries(element: Element): Array<TElementEntry> {
 		var result: Array<TElementEntry> = [];
-		var currentScene = sceneData.currentScene;
-		if (currentScene == null) return result;
+		var key: Null<String> = sceneData.getElementKey(element);
+		if (key == null) return result;
 
-		// Find this element's entry
-		for (entry in currentScene.elements) {
-			if (entry.element == element) {
-				result.push({key: entry.key, element: entry.element});
-				break;
-			}
-		}
-
-		// Recursively collect children's entries
-		var children = HierarchyUtils.getChildren(element);
-		for (child in children) {
-			var childEntries = collectDescendantEntries(child);
-			for (ce in childEntries) {
-				result.push(ce);
+		result.push({key: key, element: element});
+		for (child in sceneData.getChildren(element)) {
+			for (childEntry in collectDescendantEntries(child)) {
+				result.push(childEntry);
 			}
 		}
 
@@ -476,23 +471,20 @@ class KouiEditor extends iron.Trait {
 
 		SceneManager.addScene(sceneName, (scene) -> setupRootScene(scene, sceneName));
 		SceneManager.setScene(sceneName);
-		selectedElement = null;
-		ElementEvents.elementSelected.emit(null);
+		Selection.clear();
 		hierarchyPanel.updateTabPosition();
 
 		// Find the just-created scene entry and record for undo
-		for (scene in sceneData.scenes) {
-			if (scene.key == sceneName) {
-				commandManager.record(new SceneAddCommand(sceneName, scene));
-				break;
-			}
+		var scene: TSceneEntry = sceneData.getScene(sceneName);
+		if (scene != null) {
+			commandManager.record(new SceneAddCommand(sceneName, scene));
 		}
 	}
 
 	function onSceneChanged(sceneName: String): Void {
 		SceneManager.setScene(sceneName);
-		rootPane = SceneManager.activeScene;
-		viewport.rootPane = rootPane;
+		// The selection belongs to the scene that was shown before
+		Selection.clear();
 	}
 
 	function onSceneNameChanged(oldKey: String, newKey: String): Void {
@@ -535,8 +527,7 @@ class KouiEditor extends iron.Trait {
 			SceneEvents.sceneChanged.emit(sceneData.scenes[idx].key);
 		}
 
-		selectedElement = null;
-		ElementEvents.elementSelected.emit(null);
+		Selection.clear();
 		hierarchyPanel.updateTabPosition();
 
 		// Record for undo

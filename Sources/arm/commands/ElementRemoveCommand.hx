@@ -1,7 +1,6 @@
 package arm.commands;
 
 import arm.data.SceneData;
-import arm.events.ElementEvents;
 import arm.tools.HierarchyUtils;
 import arm.types.Types;
 import koui.elements.Element;
@@ -42,21 +41,10 @@ class ElementRemoveCommand implements ICommand {
 
 		// Remove all entries from SceneData
 		var sceneData = SceneData.data;
-		for (scene in sceneData.scenes) {
-			if (scene.key == _sceneName) {
-				for (entry in childEntries) {
-					for (i in 0...scene.elements.length) {
-						if (scene.elements[i].element == entry.element) {
-							scene.elements.splice(i, 1);
-							break;
-						}
-					}
-				}
-				break;
-			}
+		var scene = sceneData.getScene(_sceneName);
+		if (scene != null) {
+			for (entry in childEntries) sceneData.unregisterElement(entry.element, scene);
 		}
-
-		ElementEvents.elementSelected.emit(null);
 	}
 
 	public function undo(): Void {
@@ -65,13 +53,9 @@ class ElementRemoveCommand implements ICommand {
 
 		// Re-add all entries to SceneData
 		var sceneData = SceneData.data;
-		for (scene in sceneData.scenes) {
-			if (scene.key == _sceneName) {
-				for (entry in childEntries) {
-					scene.elements.push({key: entry.key, element: entry.element});
-				}
-				break;
-			}
+		var scene = sceneData.getScene(_sceneName);
+		if (scene != null) {
+			for (entry in childEntries) sceneData.registerElement(entry.element, entry.key, scene);
 		}
 	}
 }

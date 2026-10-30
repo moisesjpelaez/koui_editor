@@ -1,6 +1,7 @@
 package arm.panels;
 
 import arm.data.SceneData;
+import arm.data.Selection;
 import arm.events.ElementEvents;
 import arm.events.SceneEvents;
 import arm.base.Base;
@@ -39,9 +40,6 @@ class HierarchyPanel {
 	var expanded: ObjectMap<Element, Bool> = new ObjectMap();
 
 	// Drag-drop state - use Element references instead of indices
-    var selectedElement: Element = null;
-	var selectedElements: Array<Element> = [];
-	var shiftAnchorElement: Element = null;
 	var draggedItem: TElementEntry = null;
 	var mouseDownOnItem: Bool = false;
 	var clickedEmptySpace: Bool = false;
@@ -57,7 +55,7 @@ class HierarchyPanel {
 		sceneTabHandle = new Handle();
 
 		ElementEvents.elementAdded.connect(onElementAdded);
-		ElementEvents.elementSelected.connect(onElementSelected);
+		ElementEvents.selectionChanged.connect(onSelectionChanged);
 
 		SceneEvents.sceneAdded.connect(onSceneAdded);
 		SceneEvents.sceneChanged.connect(onSceneChanged);
@@ -106,9 +104,7 @@ class HierarchyPanel {
 			}
 			if (clickedEmptySpace && uiBase.ui.inputReleased && !isDragging && !Base.isResizing) {
 				clickedEmptySpace = false;
-				selectedElement = null;
-				selectedElements = [];
-				ElementEvents.elementSelected.emit(null);
+				Selection.clear();
 				uiBase.hwnds[PanelHierarchy].redraws = 2;
 				uiBase.hwnds[PanelProperties].redraws = 2;
 			}
@@ -145,20 +141,8 @@ class HierarchyPanel {
 		if (entry == null) return;
 
 		var name: String = entry.key;
-		// Only show children that are user-facing containers (not internal elements like Button's _label)
-		var allChildren: Array<Element> = HierarchyUtils.getChildren(entry.element);
-		var children: Array<Element> = [];
-		for (child in allChildren) {
-			// Include containers and elements that are in our elements list
-			var currentScene = SceneData.data.currentScene;
-			if (currentScene == null) continue;
-			for (e in currentScene.elements) {
-				if (e.element == child) {
-					children.push(child);
-					break;
-				}
-			}
-		}
+		// Only user elements, not internal parts like a Button's label
+		var children: Array<Element> = sceneData.getChildren(entry.element);
 		var hasChildren: Bool = children.length > 0;
 		var isExpanded: Bool = expanded.exists(entry.element) ? expanded.get(entry.element) : true;
 
@@ -246,22 +230,14 @@ class HierarchyPanel {
 
 		// Recursively draw children
 		if (hasChildren && isExpanded) {
-			// Add vertical spacing before children
 			for (child in children) {
-				var currentScene = SceneData.data.currentScene;
-				if (currentScene == null) continue;
-                for (entry in currentScene.elements) {
-                    if (entry.element == child) {
-                        drawItem(uiBase, entry, depth + 1);
-                        break;
-                    }
-                }
+				drawItem(uiBase, { key: sceneData.getElementKey(child), element: child }, depth + 1);
 			}
 		}
 	}
 
     function drawItemButton(ui: Zui, name: String, element: Element) {
-		var isSelected: Bool = selectedElements.indexOf(element) >= 0;
+		var isSelected: Bool = Selection.contains(element);
 
 		// Save theme colors
 		var savedCol: Int = ui.t.BUTTON_COL;
@@ -304,32 +280,21 @@ class HierarchyPanel {
 			var shiftHeld: Bool = Input.getKeyboard().down("shift");
 			var ctrlHeld: Bool = Input.getKeyboard().down("control");
 			if (shiftHeld) {
-				var anchor: Element = shiftAnchorElement;
-				if (anchor == null) anchor = selectedElement;
+				var anchor: Element = Selection.rangeAnchor;
+				if (anchor == null) anchor = Selection.primary;
 				if (anchor == null) anchor = entry.element;
 
 				var rangeSelection: Array<Element> = getShiftRangeSelection(anchor, entry.element);
 				if (rangeSelection.length == 0) rangeSelection = [entry.element];
 
-				selectedElements = mergeSelection(rangeSelection);
-				selectedElement = entry.element;
-				if (shiftAnchorElement == null) shiftAnchorElement = anchor;
+				Selection.setAll(mergeSelection(rangeSelection), entry.element);
+				if (Selection.rangeAnchor == null) Selection.rangeAnchor = anchor;
 			} else if (ctrlHeld) {
-				var idx: Int = selectedElements.indexOf(entry.element);
-				if (idx >= 0) {
-					selectedElements.splice(idx, 1);
-					selectedElement = selectedElements.length > 0 ? selectedElements[selectedElements.length - 1] : null;
-				} else {
-					selectedElements.push(entry.element);
-					selectedElement = entry.element;
-				}
-				shiftAnchorElement = entry.element;
+				Selection.toggle(entry.element);
+				Selection.rangeAnchor = entry.element;
 			} else {
-				selectedElement = entry.element;
-				selectedElements = [entry.element];
-				shiftAnchorElement = entry.element;
+				Selection.select(entry.element);
 			}
-			ElementEvents.elementSelected.emit(selectedElement);
 
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 			uiBase.hwnds[PanelProperties].redraws = 2;
@@ -358,7 +323,7 @@ class HierarchyPanel {
 	}
 
 	function mergeSelection(rangeSelection: Array<Element>): Array<Element> {
-		var merged: Array<Element> = selectedElements.copy();
+		var merged: Array<Element> = Selection.elements.copy();
 		for (element in rangeSelection) {
 			if (merged.indexOf(element) < 0) merged.push(element);
 		}
@@ -431,20 +396,8 @@ class HierarchyPanel {
 	}
 
 	function getVisibleHierarchyChildren(parent: Element): Array<Element> {
-		var currentScene = sceneData.currentScene;
-		if (currentScene == null || parent == null) return [];
-
-		var children: Array<Element> = [];
-		var allChildren: Array<Element> = HierarchyUtils.getChildren(parent);
-		for (child in allChildren) {
-			for (entry in currentScene.elements) {
-				if (entry.element == child) {
-					children.push(child);
-					break;
-				}
-			}
-		}
-		return children;
+		if (parent == null) return [];
+		return sceneData.getChildren(parent);
 	}
 
     function drawDragGhost(uiBase: UIBase) {
@@ -465,7 +418,7 @@ class HierarchyPanel {
 
 		uiBase.ui.g.color = 0xFFFFFFFF;
 		uiBase.ui.g.font = uiBase.ui.ops.font;
-		var dragCount: Int = (selectedElements.length > 1 && selectedElements.indexOf(draggedItem.element) >= 0) ? selectedElements.length : 1;
+		var dragCount: Int = (Selection.elements.length > 1 && Selection.contains(draggedItem.element)) ? Selection.elements.length : 1;
 		var dragLabel: String = dragCount > 1 ? '${draggedItem.key} (+${dragCount - 1})' : draggedItem.key;
 		uiBase.ui.g.drawString(dragLabel, ghostX + 8, ghostY + 4);
 
@@ -483,20 +436,13 @@ class HierarchyPanel {
 		// Select the dragged element when the drag ends
 		if (draggedItem != null) {
 			var ctrlHeld: Bool = Input.getKeyboard().down("control");
-			var wasMultiSelected: Bool = selectedElements.length > 1 && selectedElements.indexOf(draggedItem.element) >= 0;
-			if (ctrlHeld) {
-				if (selectedElements.indexOf(draggedItem.element) < 0) {
-					selectedElements.push(draggedItem.element);
-				}
-				selectedElement = draggedItem.element;
-			} else if (wasMultiSelected) {
-				// Keep the full multi-selection after dropping multiple selected elements.
-				selectedElement = draggedItem.element;
+			var wasMultiSelected: Bool = Selection.elements.length > 1 && Selection.contains(draggedItem.element);
+			if (ctrlHeld || wasMultiSelected) {
+				// Keep the multi-selection, with the dragged element as the primary one
+				Selection.add(draggedItem.element);
 			} else {
-				selectedElement = draggedItem.element;
-				selectedElements = [draggedItem.element];
+				Selection.select(draggedItem.element);
 			}
-			ElementEvents.elementSelected.emit(selectedElement);
 		}
 
 		isDragging = false;
@@ -558,23 +504,16 @@ class HierarchyPanel {
 		if (draggedItem == null || dropTargetElement == null || dropZone == None) return;
 
 		// Determine which elements to drop
-		var isMulti: Bool = selectedElements.length > 1 && selectedElements.indexOf(draggedItem.element) >= 0;
-		var elemsToDrop: Array<Element> = isMulti ? selectedElements.copy() : [draggedItem.element];
+		var isMulti: Bool = Selection.elements.length > 1 && Selection.contains(draggedItem.element);
+		var elemsToDrop: Array<Element> = isMulti ? Selection.elements.copy() : [draggedItem.element];
 
 		// Filter out the target itself and any ancestor of the target
 		elemsToDrop = elemsToDrop.filter(e -> e != dropTargetElement && !HierarchyUtils.isDescendant(dropTargetElement, e));
 		if (elemsToDrop.length == 0) return;
 
-		// Sort by scene order so relative order is preserved
-		var sceneElements = sceneData.currentScene.elements;
-		elemsToDrop.sort(function(a, b) {
-			var ia = -1; var ib = -1;
-			for (i in 0...sceneElements.length) {
-				if (sceneElements[i].element == a) ia = i;
-				if (sceneElements[i].element == b) ib = i;
-			}
-			return ia - ib;
-		});
+		// Sort by hierarchy order so relative order is preserved
+		var sceneElements: Array<Element> = sceneData.getElements();
+		elemsToDrop.sort((a, b) -> sceneElements.indexOf(a) - sceneElements.indexOf(b));
 
 		// For BeforeSibling: normal order → each inserts before target, pushing earlier ones ahead
 		// For AfterSibling:  reverse order → each inserts after target, pulling earlier ones forward
@@ -604,22 +543,12 @@ class HierarchyPanel {
         }
     }
 
-    public function onElementSelected(element: Element): Void {
-        selectedElement = element;
-		if (element == null) {
-			selectedElements = [];
-			shiftAnchorElement = null;
-		} else if (selectedElements.indexOf(element) < 0) {
-			// External selection (e.g. canvas click) — reset to single
-			selectedElements = [element];
-			shiftAnchorElement = element;
-		}
-		if (selectedElement == null) draggedItem = null;
-    }
+	function onSelectionChanged(): Void {
+		if (Selection.isEmpty()) draggedItem = null;
+	}
 
     public function onElementAdded(entry: TElementEntry): Void {
-		if (entry.element == sceneData.currentScene.root) return;
-        onElementSelected(entry.element);
+		if (sceneData.currentScene == null || entry.element == sceneData.currentScene.root) return;
         registerChildren(entry.element);
     }
 

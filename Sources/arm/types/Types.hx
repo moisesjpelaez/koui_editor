@@ -62,7 +62,8 @@ typedef TElementData = {
 typedef TSceneEntry = {
 	var key: String;
 	var root: AnchorPane;
-	var elements: Array<TElementEntry>;
+	/** The name of every user element in this scene. Their order comes from the Koui tree. */
+	var keys: Map<Element, String>;
 	var active: Bool;
 }
 

@@ -1,6 +1,7 @@
 package arm.commands;
 
 import arm.data.SceneData;
+import arm.data.Selection;
 import arm.events.SceneEvents;
 
 class CommandManager {
@@ -39,6 +40,8 @@ class CommandManager {
 		cmd.undo();
 		redoStack.push(cmd);
 		isUndoRedoing = false;
+		// Drop elements the undo removed; panels re-read the changed values
+		Selection.refresh();
 		return true;
 	}
 
@@ -50,6 +53,7 @@ class CommandManager {
 		cmd.execute();
 		undoStack.push(cmd);
 		isUndoRedoing = false;
+		Selection.refresh();
 		return true;
 	}
 

@@ -2,6 +2,7 @@ package arm.tools;
 
 import arm.data.CanvasSettings;
 import arm.data.SceneData;
+import arm.data.Selection;
 import arm.events.SceneEvents;
 import arm.events.ElementEvents;
 import arm.tools.ElementUtils;
@@ -406,14 +407,8 @@ class CanvasUtils {
 	static function serializeScene(scene: TSceneEntry): TSceneData {
 		var elementsData: Array<TElementData> = [];
 
-		// Build a map of element -> key for parent references
-		var elementKeyMap: Map<Element, String> = new Map();
-		for (entry in scene.elements) {
-			elementKeyMap.set(entry.element, entry.key);
-		}
-
 		// Serialize elements in hierarchy order (depth-first traversal)
-		serializeElementsRecursive(scene.root, scene.elements, elementKeyMap, elementsData);
+		serializeElementsRecursive(scene.root, scene.keys, elementsData);
 
 		return {
 			key: scene.key,
@@ -429,9 +424,8 @@ class CanvasUtils {
 		var findElementKey = function(element: Element): Null<String> {
 			if (element == null) return null;
 			for (scene in sceneData.scenes) {
-				for (entry in scene.elements) {
-					if (entry.element == element) return entry.key;
-				}
+				var key: Null<String> = scene.keys.get(element);
+				if (key != null) return key;
 			}
 			return null;
 		};
@@ -445,7 +439,7 @@ class CanvasUtils {
 	/**
 	 * Recursively serializes elements in hierarchy order.
 	 */
-	static function serializeElementsRecursive(parent: Element, sceneElements: Array<{key: String, element: Element}>, elementKeyMap: Map<Element, String>, output: Array<TElementData>): Void {
+	static function serializeElementsRecursive(parent: Element, elementKeyMap: Map<Element, String>, output: Array<TElementData>): Void {
 		// Get children of this parent
 		var children: Array<Element> = HierarchyUtils.getChildren(parent);
 
@@ -455,23 +449,15 @@ class CanvasUtils {
 				continue;
 			}
 
-			// Find the entry for this child
-			var entry: {key: String, element: Element} = null;
-			for (e in sceneElements) {
-				if (e.element == child) {
-					entry = e;
-					break;
-				}
-			}
-
-			if (entry != null) {
-				var elementData: TElementData = serializeElement(entry, elementKeyMap);
+			var key: Null<String> = elementKeyMap.get(child);
+			if (key != null) {
+				var elementData: TElementData = serializeElement({key: key, element: child}, elementKeyMap);
 				if (elementData != null) {
 					output.push(elementData);
 				}
 
 				// Recursively serialize children of this element
-				serializeElementsRecursive(child, sceneElements, elementKeyMap, output);
+				serializeElementsRecursive(child, elementKeyMap, output);
 			}
 		}
 	}
@@ -608,7 +594,7 @@ class CanvasUtils {
 			SceneEvents.sceneChanged.emit(activeSceneKey);
 		}
 
-		ElementEvents.elementSelected.emit(null);
+		Selection.clear();
 	}
 
 	/**
@@ -644,7 +630,7 @@ class CanvasUtils {
 			if (element == null) continue;
 
 			// Register element in scene data with the loaded key
-			scene.elements.push({ key: elemData.key, element: element });
+			sceneData.registerElement(element, elemData.key, scene);
 
 			// Find the parent element
 			var parent: Element = null;
@@ -707,24 +693,12 @@ class CanvasUtils {
 		var scene = sceneData.currentScene;
 		if (scene == null) return result;
 
-		// Build element->key map from current scene
-		var elementKeyMap: Map<Element, String> = new Map();
-		for (entry in scene.elements) {
-			elementKeyMap.set(entry.element, entry.key);
-		}
-
-		// Find the entry for the root element
-		var rootEntry: {key: String, element: Element} = null;
-		for (entry in scene.elements) {
-			if (entry.element == element) {
-				rootEntry = entry;
-				break;
-			}
-		}
-		if (rootEntry == null) return result;
+		var elementKeyMap: Map<Element, String> = scene.keys;
+		var rootKey: Null<String> = elementKeyMap.get(element);
+		if (rootKey == null) return result;
 
 		// Serialize the root element with parentKey = null
-		var rootData: TElementData = serializeElement(rootEntry, elementKeyMap);
+		var rootData: TElementData = serializeElement({key: rootKey, element: element}, elementKeyMap);
 		if (rootData == null) return result;
 		rootData.parentKey = null; // Force root to have no parent in clipboard
 		rootData.focusUp = null;
@@ -734,7 +708,7 @@ class CanvasUtils {
 		result.push(rootData);
 
 		// Recursively serialize children
-		serializeChildrenRecursive(element, scene.elements, elementKeyMap, result);
+		serializeChildrenRecursive(element, elementKeyMap, result);
 
 		return result;
 	}
@@ -742,21 +716,15 @@ class CanvasUtils {
 	/**
 	 * Helper: recursively serializes children of a parent element.
 	 */
-	static function serializeChildrenRecursive(parent: Element, sceneElements: Array<{key: String, element: Element}>, elementKeyMap: Map<Element, String>, output: Array<TElementData>): Void {
+	static function serializeChildrenRecursive(parent: Element, elementKeyMap: Map<Element, String>, output: Array<TElementData>): Void {
 		var children: Array<Element> = HierarchyUtils.getChildren(parent);
 		for (child in children) {
 			if (HierarchyUtils.shouldSkipInternalChild(parent, child)) continue;
 
-			var entry: {key: String, element: Element} = null;
-			for (e in sceneElements) {
-				if (e.element == child) {
-					entry = e;
-					break;
-				}
-			}
-			if (entry == null) continue;
+			var key: Null<String> = elementKeyMap.get(child);
+			if (key == null) continue;
 
-			var elemData: TElementData = serializeElement(entry, elementKeyMap);
+			var elemData: TElementData = serializeElement({key: key, element: child}, elementKeyMap);
 			if (elemData == null) continue;
 			// Clear focus nav links — they reference elements by key that won't exist after paste
 			elemData.focusUp = null;
@@ -765,7 +733,7 @@ class CanvasUtils {
 			elemData.focusRight = null;
 			output.push(elemData);
 
-			serializeChildrenRecursive(child, sceneElements, elementKeyMap, output);
+			serializeChildrenRecursive(child, elementKeyMap, output);
 		}
 	}
 
@@ -785,14 +753,18 @@ class CanvasUtils {
 		}
 
 		// Collect ALL existing keys in the scene for global uniqueness
-		var allSceneKeys: Array<String> = [for (entry in scene.elements) entry.key];
+		var allSceneKeys: Array<String> = [for (key in scene.keys) key];
 
 		// Map from original clipboard key -> new element (for restoring parent-child)
 		var keyToElement: Map<String, Element> = new Map();
 		// Map from original clipboard key -> final unique key (for parentKey remapping)
 		var keyToNewKey: Map<String, String> = new Map();
+		var pastedRoots: Array<Element> = [];
 
 		for (elemData in clipboardData) {
+			// The clipboard can hold several copied trees; names only need to be unique within each
+			if (elemData.parentKey == null) keyToElement = new Map();
+
 			var element: Element = createElementFromData(elemData);
 			if (element == null) continue;
 
@@ -824,14 +796,16 @@ class CanvasUtils {
 				} else {
 					HierarchyUtils.moveAsChild(element, pasteParent);
 				}
-				scene.elements.push({key: proposedKey, element: element});
-				ElementEvents.elementSelected.emit(element);
+				sceneData.registerElement(element, proposedKey, scene);
+				pastedRoots.push(element);
 			} else {
 				// Child element — add to its parent
 				HierarchyUtils.moveAsChild(element, parent);
-				scene.elements.push({key: proposedKey, element: element});
+				sceneData.registerElement(element, proposedKey, scene);
 			}
 		}
+
+		Selection.setAll(pastedRoots);
 	}
 
 	/**
@@ -842,7 +816,7 @@ class CanvasUtils {
 		var scenesToRemove: Array<TSceneEntry> = sceneData.scenes.copy();
 		for (scene in scenesToRemove) {
 			// Clear element bookkeeping
-			scene.elements.resize(0);
+			scene.keys.clear();
 
 			// Emit scene removed - KouiEditor.onSceneRemoved will call SceneManager.removeScene
 			SceneEvents.sceneRemoved.emit(scene.key);
@@ -852,6 +826,6 @@ class CanvasUtils {
 		sceneData.scenes.resize(0);
 		sceneData.currentScene = null;
 
-		ElementEvents.elementSelected.emit(null);
+		Selection.clear();
 	}
 }
