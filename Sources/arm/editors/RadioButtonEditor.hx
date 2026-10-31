@@ -1,5 +1,6 @@
 package arm.editors;
 
+import arm.data.RadioGroups;
 import arm.data.SceneData;
 import arm.canvas.CanvasElements;
 import arm.panels.PropertyFields;
@@ -39,13 +40,7 @@ class RadioButtonEditor extends ElementEditor {
 		var groups: Array<RadioGroup> = SceneData.data.radioGroups;
 		var groupNames: Array<String> = [for (group in groups) group.id];
 		PropertyFields.combo(ui, groupHandle, "Radio Group", groupNames, elements, e -> groups.indexOf((cast e: RadioButton).group), (e, index) -> {
-			var radioButton: RadioButton = cast e;
-			var newGroup: RadioGroup = groups[index];
-			if (radioButton.group == newGroup) return;
-			// Move button to new group
-			if (radioButton.group != null) radioButton.group.remove(radioButton);
-			radioButton.group = newGroup;
-			newGroup.add(radioButton);
+			RadioGroups.moveButton(cast e, groups[index]);
 		});
 	}
 }

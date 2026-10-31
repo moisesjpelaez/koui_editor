@@ -1,5 +1,6 @@
 package arm.data;
 
+import arm.canvas.CanvasLoader;
 import arm.events.ElementEvents;
 import arm.events.SceneEvents;
 import arm.tools.HierarchyUtils;
@@ -14,7 +15,8 @@ class SceneData {
 	public static inline var FIRST_SCENE: String = "Scene_1";
 	public var scenes: Array<TSceneEntry> = [];
 	public var currentScene: TSceneEntry;
-	public var radioGroups: Array<RadioGroup> = [];
+	/** Canvas-wide, never empty: see `RadioGroups`. */
+	public var radioGroups: Array<RadioGroup> = [new RadioGroup("RadioGroup")];
 
 	public function new() {
 		ElementEvents.elementAdded.connect(onElementAdded);
@@ -93,6 +95,16 @@ class SceneData {
 			current = HierarchyUtils.getParentElement(current);
 		}
 		return false;
+	}
+
+	/** The element's path in the current scene, "scene: path" in another one, or null if it's in no scene. */
+	public function getLabel(element: Element): Null<String> {
+		for (scene in scenes) {
+			if (!scene.keys.exists(element)) continue;
+			var path: String = CanvasLoader.getPath(element, scene.root, scene.keys);
+			return scene == currentScene ? path : scene.key + ": " + path;
+		}
+		return null;
 	}
 
 	public function onElementAdded(entry: TElementEntry): Void {

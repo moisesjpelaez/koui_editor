@@ -4,6 +4,7 @@ import arm.base.UIBase;
 import arm.data.SceneData;
 import arm.data.Selection;
 import arm.panels.TopToolbar;
+import arm.types.Enums.Cursor;
 
 import iron.App;
 import iron.Scene;
@@ -67,11 +68,11 @@ class CanvasViewport {
 			panStartX = mouse.x;
 			panStartY = mouse.y;
 
-			Krom.setMouseCursor(9);
+			uiBase.setCursor(Cursor.Move);
 		}
 		else if (!mouse.down("middle") && isPanning) {
 			isPanning = false;
-			Krom.setMouseCursor(0);
+			uiBase.setCursor(Cursor.Default);
 		}
 
 		if (isInCanvas && !isPanning && mouse.wheelDelta != 0) {

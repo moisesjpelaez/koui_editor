@@ -8,7 +8,7 @@ import arm.CanvasViewport.TScreenRect;
 import arm.panels.ElementsPanel;
 import arm.panels.TopToolbar;
 import arm.tools.HierarchyUtils;
-import arm.types.Enums.PanelHandle;
+import arm.types.Enums;
 
 import iron.system.Input;
 import iron.system.Input.Keyboard;
@@ -42,8 +42,9 @@ typedef THandle = {
 	var y: Int;
 }
 
-@:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane, arm.base.UIBase)
-class DragDropHandler {
+/** All mouse input on the canvas: selecting, the selection box, moving and resizing, with their overlays. */
+@:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane)
+class CanvasInput {
 	var uiBase: UIBase;
 	var viewport: CanvasViewport;
 	var topToolbar: TopToolbar;
@@ -78,7 +79,6 @@ class DragDropHandler {
 	var dragRootRect: TScreenRect;
 	/** Pressed on an already selected element: if the mouse doesn't move, only this one gets selected on release. */
 	var clickedInSelection: Null<Element> = null;
-	var wasMouseDown: Bool = false;
 
 	// Selection box: pressing on empty space and dragging past MOVE_THRESHOLD pixels
 	var boxPending: Bool = false;
@@ -117,104 +117,120 @@ class DragDropHandler {
 		return isDynamicWidth || isDynamicHeight;
 	}
 
+	/**
+	 * Handles the mouse on the canvas, once per frame in the editor's update:
+	 * Iron's "pressed" and "released" are only set there. A press selects and
+	 * starts a drag, a resize or a selection box; holding moves them along;
+	 * releasing ends them and records the undo step.
+	 */
 	public function update() {
-		if (viewport.isPanning) return;
-
-		var rootPane: AnchorPane = SceneData.data.getRoot();
-		if (rootPane == null) return;
+		if (SceneData.data.getRoot() == null) return;
 
 		var mouse: Mouse = Input.getMouse();
-		var mouseDown: Bool = mouse.down();
-		var mouseJustPressed: Bool = mouseDown && !wasMouseDown;
+		// A press and release in the same frame is a click: both run. A release
+		// while panning still ends what the press started, and so does a button
+		// that's up without a release (Iron's Mouse.reset() clears it).
+		if (!viewport.isPanning) {
+			if (mouse.started() && isInCanvas()) onPress(mouse);
+			else if (mouse.down()) onDrag(mouse);
+		}
+		if (mouse.released() || (!mouse.down() && isActive())) onRelease();
+		if (viewport.isPanning) return;
 
-		if (mouseJustPressed && isInCanvas() && startResize(mouse)) {
-			// Grabbed a handle of the primary element: resize, even over another element
-		} else if (mouseJustPressed && isInCanvas()) {
-			var clickedElement: Element = viewport.getElementAt(Std.int(mouse.x), Std.int(mouse.y));
-			var keyboard: Keyboard = Input.getKeyboard();
-			var toggle: Bool = keyboard.down("control");
-			var additive: Bool = keyboard.down("shift");
+		// A resize cursor over a handle and while resizing
+		var hovered: Null<THandle> = resizeHandle != null ? resizeHandle : (!mouse.down() && isInCanvas() ? getHandleAt(mouse.x, mouse.y) : null);
+		if (hovered != null) uiBase.setCursor(hovered.x == 0 ? ResizeVertical : hovered.y == 0 ? ResizeHorizontal : hovered.x == hovered.y ? ResizeDiagonalDown : ResizeDiagonalUp);
+	}
 
-			if (clickedElement != null) {
-				// Ctrl toggles and Shift adds to the selection; neither starts a drag
-				if (toggle || additive) {
-					toggle ? Selection.toggle(clickedElement) : Selection.add(clickedElement);
-					draggedElements = [];
-					wasMouseDown = mouseDown;
-					return;
-				}
+	/** Grabs a handle of the primary element, or selects the element under the mouse and starts dragging it, or starts a selection box. */
+	function onPress(mouse: Mouse): Void {
+		// A handle of the primary element: resize, even over another element
+		if (startResize(mouse)) return;
 
-				// Pressing a selected element keeps the selection, so all of it can be dragged;
-				// pressing another element selects only that one
-				clickedInSelection = Selection.contains(clickedElement) && Selection.elements.length > 1 ? clickedElement : null;
-				if (clickedInSelection == null) Selection.select(clickedElement);
-				startDrag(clickedElement, mouse);
-			} else {
-				// Clicking empty space clears the selection, unless adding to it
-				if (!toggle && !additive) Selection.clear();
-				draggedElements = [];
+		var clickedElement: Element = viewport.getElementAt(Std.int(mouse.x), Std.int(mouse.y));
+		var keyboard: Keyboard = Input.getKeyboard();
+		var toggle: Bool = keyboard.down("control");
+		var additive: Bool = keyboard.down("shift");
 
-				// Dragging from here draws a selection box
-				boxPending = true;
-				boxActive = false;
-				boxStartX = boxEndX = mouse.x;
-				boxStartY = boxEndY = mouse.y;
-				boxToggles = toggle;
-				boxAdds = additive;
+		if (clickedElement != null) {
+			// Ctrl toggles and Shift adds to the selection; neither starts a drag
+			if (toggle || additive) {
+				toggle ? Selection.toggle(clickedElement) : Selection.add(clickedElement);
+				return;
 			}
-		} else if (mouseDown && resizeHandle != null) {
-			if (!dragStarted && (Math.abs(mouse.x - dragMouseX) > MOVE_THRESHOLD || Math.abs(mouse.y - dragMouseY) > MOVE_THRESHOLD)) {
-				dragStarted = true;
-			}
+
+			// Pressing a selected element keeps the selection, so all of it can be dragged;
+			// pressing another element selects only that one
+			clickedInSelection = Selection.contains(clickedElement) && Selection.elements.length > 1 ? clickedElement : null;
+			if (clickedInSelection == null) Selection.select(clickedElement);
+			startDrag(clickedElement, mouse);
+		} else {
+			// Clicking empty space clears the selection, unless adding to it
+			if (!toggle && !additive) Selection.clear();
+
+			// Dragging from here draws a selection box
+			boxPending = true;
+			boxStartX = boxEndX = mouse.x;
+			boxStartY = boxEndY = mouse.y;
+			boxToggles = toggle;
+			boxAdds = additive;
+		}
+	}
+
+	/** While the button is held: the resize, the selection box or the drag follows the mouse once it moved past MOVE_THRESHOLD. */
+	function onDrag(mouse: Mouse): Void {
+		if (resizeHandle != null) {
+			if (!dragStarted) dragStarted = movedPastThreshold(mouse);
 			if (dragStarted) resizeElements(mouse);
-		} else if (mouseDown && boxPending) {
+		} else if (boxPending) {
 			boxEndX = mouse.x;
 			boxEndY = mouse.y;
 			if (Math.abs(boxEndX - boxStartX) > MOVE_THRESHOLD || Math.abs(boxEndY - boxStartY) > MOVE_THRESHOLD) boxActive = true;
-		} else if (mouseDown && draggedElements.length > 0) {
-			if (!dragStarted && (Math.abs(mouse.x - dragMouseX) > MOVE_THRESHOLD || Math.abs(mouse.y - dragMouseY) > MOVE_THRESHOLD)) {
-				dragStarted = true;
-			}
+		} else if (draggedElements.length > 0) {
+			if (!dragStarted) dragStarted = movedPastThreshold(mouse);
 			if (dragStarted) moveDraggedElements(mouse);
-		} else {
-			if (boxActive) selectInBox();
-			boxPending = boxActive = false;
-
-			if (draggedElements.length > 0) {
-				var moved: Bool = false;
-				for (dragged in draggedElements) {
-					if (dragged.element.posX != dragged.startX || dragged.element.posY != dragged.startY) moved = true;
-				}
-				if (moved) History.edited("Move");
-				uiBase.redrawPanels();
-			}
-			if (resizeHandle != null) {
-				var resized: Bool = false;
-				for (r in resizedElements) {
-					var e: Element = r.element;
-					if (e.posX != r.startX || e.posY != r.startY || e.width != r.startW || e.height != r.startH) resized = true;
-				}
-				if (resized) History.edited("Resize");
-				uiBase.hwnds[PanelProperties].redraws = 2;
-				resizeHandle = null;
-				resizedElements = [];
-			}
-			// A click without dragging on a selected element selects only that one
-			if (clickedInSelection != null && !dragStarted) Selection.select(clickedInSelection);
-			clickedInSelection = null;
-			draggedElements = [];
-			dragStarted = false;
-			topToolbar.snapInverted = false;
 		}
+	}
 
-		// A resize cursor over a handle and while resizing
-		var hovered: Null<THandle> = resizeHandle != null ? resizeHandle : (!mouseDown && isInCanvas() ? getHandleAt(mouse.x, mouse.y) : null);
-		if (hovered != null) {
-			Krom.setMouseCursor(hovered.x == 0 ? 4 : hovered.y == 0 ? 3 : hovered.x == hovered.y ? 6 : 5);
-			uiBase.cursorSet = true;
+	/** Ends what the press started: selects the elements in the box, or records the move or resize as one undo step. */
+	function onRelease(): Void {
+		if (boxActive) selectInBox();
+		boxPending = boxActive = false;
+
+		if (draggedElements.length > 0) {
+			var moved: Bool = false;
+			for (dragged in draggedElements) {
+				if (dragged.element.posX != dragged.startX || dragged.element.posY != dragged.startY) moved = true;
+			}
+			if (moved) History.edited("Move");
+			uiBase.redrawPanels();
 		}
+		if (resizeHandle != null) {
+			var resized: Bool = false;
+			for (r in resizedElements) {
+				var e: Element = r.element;
+				if (e.posX != r.startX || e.posY != r.startY || e.width != r.startW || e.height != r.startH) resized = true;
+			}
+			if (resized) History.edited("Resize");
+			uiBase.hwnds[PanelProperties].redraws = 2;
+			resizeHandle = null;
+			resizedElements = [];
+		}
+		// A click without dragging on a selected element selects only that one
+		if (clickedInSelection != null && !dragStarted) Selection.select(clickedInSelection);
+		clickedInSelection = null;
+		draggedElements = [];
+		dragStarted = false;
+		topToolbar.snapInverted = false;
+	}
 
-		wasMouseDown = mouseDown;
+	/** Whether a press started something that a release has to end. */
+	function isActive(): Bool {
+		return resizeHandle != null || boxPending || draggedElements.length > 0 || clickedInSelection != null;
+	}
+
+	function movedPastThreshold(mouse: Mouse): Bool {
+		return Math.abs(mouse.x - dragMouseX) > MOVE_THRESHOLD || Math.abs(mouse.y - dragMouseY) > MOVE_THRESHOLD;
 	}
 
 	/**

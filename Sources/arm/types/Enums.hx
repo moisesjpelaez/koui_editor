@@ -20,6 +20,18 @@ enum abstract PanelHandle(Int) from Int to Int {
 	var PanelBottom: Int = 2;
 }
 
+/** The mouse cursors the editor uses, as Krom numbers them. */
+enum abstract Cursor(Int) from Int to Int {
+	var Default: Int = 0;
+	var ResizeHorizontal: Int = 3;
+	var ResizeVertical: Int = 4;
+	/** From bottom-left to top-right. */
+	var ResizeDiagonalUp: Int = 5;
+	/** From top-left to bottom-right. */
+	var ResizeDiagonalDown: Int = 6;
+	var Move: Int = 9;
+}
+
 enum abstract DropZone(Int) from Int to Int {
 	var None: Int = 0;
 	var BeforeSibling: Int = 1;

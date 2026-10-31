@@ -35,6 +35,14 @@ class ElementEditor {
 		return makeDefault(radioGroups != null ? radioGroups : []);
 	}
 
+	/** The size of a new element from the palette, for "Reset Size": measured on one made and freed for it. */
+	public function defaultSize(): { width: Int, height: Int } {
+		var element: Element = makeDefault([]);
+		var size = { width: element.width, height: element.height };
+		element.destroy();
+		return size;
+	}
+
 	/** Draws the type's fields for `elements`, all of this type; a field edits every one of them (see `PropertyFields`). */
 	public function drawProperties(ui: Zui, elements: Array<Element>): Void {}
 }

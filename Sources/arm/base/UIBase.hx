@@ -98,7 +98,7 @@ class UIBase {
 			if (borderHandle != null) {
 				borderHandle = null;
 				Base.isResizing = false;
-				Krom.setMouseCursor(0); // Reset cursor
+				Krom.setMouseCursor(Cursor.Default);
 			}
 		}
 
@@ -108,9 +108,15 @@ class UIBase {
 			if (cursorSet) {
 				cursorSet = false;
 			} else if (borderHandle == null) {
-				Krom.setMouseCursor(0); // Default cursor
+				Krom.setMouseCursor(Cursor.Default);
 			}
 		}
+	}
+
+	/** Shows `cursor` until the mouse moves without anything setting it again. */
+	public function setCursor(cursor: Cursor): Void {
+		Krom.setMouseCursor(cursor);
+		cursorSet = true;
 	}
 
 	/** Redraws the Hierarchy and Properties panels, after the canvas or the selection changed. */
@@ -132,13 +138,7 @@ class UIBase {
 		// Center panel: respond to top border only
 		if (handle == hwnds[PanelBottom] && side != SideTop) return;
 
-		// Set cursor based on resize direction
-		if (side == SideLeft || side == SideRight) {
-			Krom.setMouseCursor(3); // Horizontal resize cursor
-		} else {
-			Krom.setMouseCursor(4); // Vertical resize cursor
-		}
-		cursorSet = true;
+		setCursor(side == SideLeft || side == SideRight ? ResizeHorizontal : ResizeVertical);
 
 		// Start resizing on mouse down
 		if (ui.inputStarted) {

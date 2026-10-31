@@ -46,8 +46,8 @@ class KouiEditor extends iron.Trait {
 	// Viewport controller
 	var viewport: CanvasViewport = new CanvasViewport();
 
-	// Drag and drop
-	var dragDrop: DragDropHandler;
+	// Mouse input on the canvas
+	var canvasInput: CanvasInput;
 
 	// Panels
 	var topToolbar: TopToolbar = new TopToolbar();
@@ -84,7 +84,7 @@ class KouiEditor extends iron.Trait {
 			viewport.uiBase = uiBase;
 			viewport.sceneData = sceneData;
 			viewport.topToolbar = topToolbar;
-			dragDrop = new DragDropHandler(uiBase, viewport, topToolbar, elementsPanel);
+			canvasInput = new CanvasInput(uiBase, viewport, topToolbar, elementsPanel);
 
 			Koui.init(function() {
 				Koui.setPadding(100, 100, 75, 75);
@@ -161,7 +161,8 @@ class KouiEditor extends iron.Trait {
 		if (!mouseHeld) History.commitPending();
 
 		uiBase.update();
-		viewport.canvasControl(dragDrop.isInCanvas());
+		viewport.canvasControl(canvasInput.isInCanvas());
+		canvasInput.update();
 
 		var keyboard: Keyboard = Input.getKeyboard();
 		var isTyping: Bool = uiBase.ui.isTyping;
@@ -301,13 +302,12 @@ class KouiEditor extends iron.Trait {
 		if (uiBase == null) return;
 		g2.end();
 
-		dragDrop.update();
 		Koui.render(g2);
 		g2.begin(false);
 		viewport.drawGrid(g2);
 		viewport.drawRootPane(g2);
 		viewport.drawLayoutElements(g2);
-		dragDrop.drawSelectedElements(g2);
+		canvasInput.drawSelectedElements(g2);
 		g2.end();
 
 		uiBase.ui.begin(g2);
