@@ -85,7 +85,7 @@ class UIBase {
 				} else {
 					// Sidebar panels
 					if (Config.raw.layout[LayoutSidebarH0] + my > MIN_PANEL_SIZE &&
-					    Config.raw.layout[LayoutSidebarH1] - my > MIN_PANEL_SIZE) {
+						Config.raw.layout[LayoutSidebarH1] - my > MIN_PANEL_SIZE) {
 						Config.raw.layout[LayoutSidebarH0] += my;
 						Config.raw.layout[LayoutSidebarH1] -= my;
 					}

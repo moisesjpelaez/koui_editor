@@ -15,7 +15,7 @@ import zui.Zui.Handle;
 @:access(zui.Zui)
 class TopToolbar {
 
-    public var snappingEnabled: Bool = false;
+	public var snappingEnabled: Bool = false;
 	public var snapValue: Float = 8.0;
 	public var snapMaxValue: Float = 288.0;
 	/** Set while a drag is going on with Ctrl held: snapping is inverted. */
@@ -160,7 +160,7 @@ class TopToolbar {
 	}
 
 	public function setIcons(iconsImage: Image): Void {
-        icons = iconsImage;
-    }
+		icons = iconsImage;
+	}
 
 }

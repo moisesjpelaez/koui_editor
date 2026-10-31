@@ -86,10 +86,10 @@ class HierarchyPanel {
 			drawSceneSelector(uiBase);
 			uiBase.ui.separator();
 
-            // Draw root element (only if currentScene exists)
-            if (sceneData.currentScene != null) {
-                drawItem(uiBase, { key: sceneData.currentScene.key, element: sceneData.currentScene.root }, 0);
-            }
+			// Draw root element (only if currentScene exists)
+			if (sceneData.currentScene != null) {
+				drawItem(uiBase, { key: sceneData.currentScene.key, element: sceneData.currentScene.root }, 0);
+			}
 
 			// Click on empty space (no item captured the mouse-down) → deselect on release
 			// Only track clicks that originated inside the hierarchy panel
@@ -228,7 +228,7 @@ class HierarchyPanel {
 		}
 	}
 
-    function drawItemButton(ui: Zui, name: String, element: Element) {
+	function drawItemButton(ui: Zui, name: String, element: Element) {
 		var isSelected: Bool = Selection.contains(element);
 
 		// Save theme colors
@@ -291,7 +291,7 @@ class HierarchyPanel {
 			var dx: Float = uiBase.ui.inputX - dragStartX;
 			var dy: Float = uiBase.ui.inputY - dragStartY;
 
-            if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
+			if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
 				isDragging = true;
 				uiBase.redrawPanels();
 			}
@@ -380,7 +380,7 @@ class HierarchyPanel {
 		}
 	}
 
-    function drawDragGhost(uiBase: UIBase) {
+	function drawDragGhost(uiBase: UIBase) {
 		if (!isDragging || draggedItem == null) return;
 
 		var winX: Float = uiBase.ui._windowX;
@@ -512,9 +512,9 @@ class HierarchyPanel {
 		if (Selection.isEmpty()) draggedItem = null;
 	}
 
-    public function setIcons(iconsImage: Image): Void {
-        icons = iconsImage;
-    }
+	public function setIcons(iconsImage: Image): Void {
+		icons = iconsImage;
+	}
 
 	function onSceneAdded(sceneName: String): Void {
 		updateTabPosition();

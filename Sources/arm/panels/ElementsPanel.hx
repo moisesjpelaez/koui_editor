@@ -16,9 +16,9 @@ class ElementsPanel {
 	/** Height of what the panel drew; below it the canvas shows through. */
 	var contentHeight: Int = 0;
 
-    public function new() {
+	public function new() {
 
-    }
+	}
 
 	/** The part of the panel drawn over the canvas, in screen pixels. */
 	public function getRect(uiBase: UIBase): TScreenRect {
@@ -37,7 +37,7 @@ class ElementsPanel {
 		};
 	}
 
-    public function draw(uiBase: UIBase): Void {
+	public function draw(uiBase: UIBase): Void {
 		uiBase.ui.t.FILL_WINDOW_BG = false;
 		var rect: TScreenRect = getWindowRect(uiBase);
 

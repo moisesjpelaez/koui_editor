@@ -67,7 +67,9 @@ class KouiEditor extends iron.Trait {
 	var propertiesPanel: PropertiesPanel = new PropertiesPanel();
 	var elementsPanel: ElementsPanel = new ElementsPanel();
 
-	var canvasLoaded: Bool = false; // HACK: ensure canvas is loaded after Koui init
+	/** Koui's init (theme, first scene) has finished; it may finish after the first updates. */
+	var kouiReady: Bool = false;
+	var canvasLoaded: Bool = false;
 	var canvasWidth: Int = 1024;
 	var canvasHeight: Int = 576;
 
@@ -128,6 +130,7 @@ class KouiEditor extends iron.Trait {
 
 				// Set snap max value based on canvas size
 				topToolbar.snapMaxValue = Math.min(canvasWidth, canvasHeight) * 0.5;
+				kouiReady = true;
 			});
 
 			App.onResize = onResized;
@@ -157,17 +160,17 @@ class KouiEditor extends iron.Trait {
 		scene.anchor = Anchor.MiddleCenter;
 		scene.invalidateElem();
 		var s: TSceneEntry = {
-		    key: sceneName,
-		    root: scene,
-		    keys: new Map()
+			key: sceneName,
+			root: scene,
+			keys: new Map()
 		};
 		sceneData.scenes.push(s);
 		sceneData.currentScene = s;
 	}
 
 	function update() {
-		if (uiBase == null) return;
-		if (!canvasLoaded) { // HACK: ensure canvas is loaded after Koui init
+		if (uiBase == null || !kouiReady) return;
+		if (!canvasLoaded) { // The canvas loads into the scene Koui's init made
 			CanvasUtils.loadCanvas();
 			History.reset();
 			canvasLoaded = true;
@@ -175,17 +178,19 @@ class KouiEditor extends iron.Trait {
 
 		// Record last frame's edits, unless a drag is still going on
 		var mouse: Mouse = Input.getMouse();
-		if (!mouse.down("left") && !mouse.down("right") && !mouse.down("middle")) {
-			History.commitPending();
-		}
+		var mouseHeld: Bool = mouse.down("left") || mouse.down("right") || mouse.down("middle");
+		if (!mouseHeld) History.commitPending();
 
 		uiBase.update();
 		viewport.canvasControl(dragDrop.isInCanvas());
 
 		var keyboard: Keyboard = Input.getKeyboard();
 		var isTyping: Bool = uiBase.ui.isTyping;
+		// Shortcuts that replace or remove elements wait until no mouse button is held:
+		// a drag or resize going on would keep changing elements that are gone
+		var canEdit: Bool = !isTyping && !mouseHeld;
 
-		if (!isTyping && keyboard.started("delete")) {
+		if (canEdit && keyboard.started("delete")) {
 			deleteSelection();
 		}
 
@@ -195,17 +200,17 @@ class KouiEditor extends iron.Trait {
 		}
 
 		// Cut (Ctrl+X)
-		if (!isTyping && keyboard.down("control") && keyboard.started("x")) {
+		if (canEdit && keyboard.down("control") && keyboard.started("x")) {
 			copySelection(true);
 		}
 
 		// Paste (Ctrl+V)
-		if (!isTyping && keyboard.down("control") && keyboard.started("v")) {
+		if (canEdit && keyboard.down("control") && keyboard.started("v")) {
 			paste();
 		}
 
 		// Undo (Ctrl+Z)
-		if (!isTyping && keyboard.down("control") && !keyboard.down("shift") && keyboard.started("z")) {
+		if (canEdit && keyboard.down("control") && !keyboard.down("shift") && keyboard.started("z")) {
 			if (History.undo()) {
 				hierarchyPanel.updateTabPosition();
 				uiBase.redrawPanels();
@@ -213,7 +218,7 @@ class KouiEditor extends iron.Trait {
 		}
 
 		// Redo (Ctrl+Shift+Z or Ctrl+Y)
-		if (!isTyping && keyboard.down("control") && (keyboard.down("shift") && keyboard.started("z") || keyboard.started("y"))) {
+		if (canEdit && keyboard.down("control") && (keyboard.down("shift") && keyboard.started("z") || keyboard.started("y"))) {
 			if (History.redo()) {
 				hierarchyPanel.updateTabPosition();
 				uiBase.redrawPanels();
@@ -221,7 +226,7 @@ class KouiEditor extends iron.Trait {
 		}
 
 		// Duplicate (Ctrl+D)
-		if (!isTyping && keyboard.down("control") && keyboard.started("d")) {
+		if (canEdit && keyboard.down("control") && keyboard.started("d")) {
 			duplicateSelection();
 		}
 
@@ -229,13 +234,13 @@ class KouiEditor extends iron.Trait {
 		if (!isTyping && keyboard.down("control") && keyboard.started("s")) {
 			CanvasUtils.saveCanvas();
 		}
-		if (!isTyping && keyboard.down("control") && keyboard.started("o")) {
+		if (canEdit && keyboard.down("control") && keyboard.started("o")) {
 			CanvasUtils.loadCanvas();
 		}
-		if (!isTyping && keyboard.down("control") && keyboard.started("n")) {
+		if (canEdit && keyboard.down("control") && keyboard.started("n")) {
 			CanvasUtils.clearToEmptyScene();
 		}
-		if (!isTyping && keyboard.down("control") && keyboard.started("r")) {
+		if (canEdit && keyboard.down("control") && keyboard.started("r")) {
 			CanvasUtils.refreshTheme();
 		}
 

@@ -139,6 +139,12 @@ class PropertyFields {
 		apply('Change $label', elements, set, picked);
 	}
 
+	/** Sets the value of a range element (Slider, Progressbar), kept inside its own range. */
+	public static function setRangeValue(element: Element, value: Float): Void {
+		var range: I_Range<FastFloat> = cast element;
+		range.value = Math.max(range.minValue, Math.min(range.maxValue, value));
+	}
+
 	/**
 	 * Min Value, Max Value, Precision and Value of range elements (Slider,
 	 * Progressbar). A new range or precision keeps each value inside it.
@@ -162,6 +168,6 @@ class PropertyFields {
 		});
 
 		var first: I_Range<FastFloat> = range(elements[0]);
-		slider(ui, handles.value, "Value", first.minValue, first.maxValue, getPrecision(elements[0]), elements, e -> range(e).value, (e, value) -> range(e).value = value);
+		slider(ui, handles.value, "Value", first.minValue, first.maxValue, getPrecision(elements[0]), elements, e -> range(e).value, setRangeValue);
 	}
 }
