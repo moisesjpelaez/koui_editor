@@ -1,7 +1,7 @@
 package arm.editors;
 
 import arm.editors.IElementEditor;
-import arm.events.ElementEvents;
+import arm.panels.PropertyFields;
 import koui.elements.Checkbox;
 import koui.elements.Element;
 import koui.elements.Panel;
@@ -37,31 +37,16 @@ class CheckboxEditor implements IElementEditor {
 		isCheckedHandle = new Handle();
 	}
 
-	public function syncHandles(element: Element): Void {}
-
-	public function drawProperties(ui: Zui, element: Element): Void {
+	public function drawProperties(ui: Zui, elements: Array<Element>): Void {
 		ui.text("Checkbox Properties", Center);
 		ui.separator();
 
-		var checkbox: Checkbox = cast element;
-
-		textHandle.text = checkbox.text;
-		var newText: String = ui.textInput(textHandle, "Text", Right);
-		if (textHandle.changed) {
-			if (newText != null && newText != "") {
-				ElementEvents.propertyChanged.emit(checkbox, "text", checkbox.text, newText);
-				checkbox.text = newText;
-			}
-		}
-
-		isCheckedHandle.selected = checkbox.isChecked;
-		var newChecked = ui.check(isCheckedHandle, "Is Checked");
-		if (newChecked != checkbox.isChecked) {
-			ElementEvents.propertyChanged.emit(checkbox, "isChecked", checkbox.isChecked, newChecked);
-			checkbox.isChecked = newChecked;
+		PropertyFields.text(ui, textHandle, "Text", elements, e -> (cast e: Checkbox).text, (e, text) -> (cast e: Checkbox).text = text);
+		PropertyFields.check(ui, isCheckedHandle, "Is Checked", elements, e -> (cast e: Checkbox).isChecked, (e, checked) -> {
+			var checkbox: Checkbox = cast e;
+			checkbox.isChecked = checked;
 			var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
-			if (checkSquare != null)
-				checkSquare.setContextElement(newChecked ? "checked" : "");
-		}
+			if (checkSquare != null) checkSquare.setContextElement(checked ? "checked" : "");
+		});
 	}
 }

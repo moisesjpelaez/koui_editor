@@ -8,6 +8,7 @@ import arm.data.Selection;
 import arm.events.SceneEvents;
 import arm.events.ElementEvents;
 import arm.editors.ElementRegistry;
+import arm.editors.IElementEditor;
 import arm.types.Enums;
 import arm.types.Types;
 import arm.base.UIBase;
@@ -45,8 +46,6 @@ class PropertiesPanel {
     var scaleOnResizeHandle: Handle;
     var scaleOnResizeGroup: Handle;
     var editorUiScaleHandle: Handle;
-    // Properties
-    var selectedElement: Element = null;
 
     // Element handles
     var nameHandle: Handle;
@@ -121,7 +120,7 @@ class PropertiesPanel {
 
         if (uiBase.ui.window(uiBase.hwnds[PanelProperties], params.tabx, params.h0, params.w, params.h1)) {
             if (uiBase.ui.tab(tabHandle, "Properties")) {
-                if (selectedElement != null) {
+                if (!Selection.isEmpty()) {
                     drawProperties(uiBase);
                 } else {
                     uiBase.ui.text("No element selected");
@@ -450,222 +449,147 @@ class PropertiesPanel {
 
     function drawProperties(uiBase: UIBase): Void {
         var ui: Zui = uiBase.ui;
+        var elements: Array<Element> = Selection.elements;
+        var single: Bool = elements.length == 1;
 
-        // Get element name from SceneData
-        var elemName: String = sceneData.getElementKey(selectedElement);
-        if (elemName == null) elemName = "";
-
-        // Editing several elements at once comes with multi-editing; until then, show the primary one
-        if (Selection.elements.length > 1) {
-            ui.text('${Selection.elements.length} elements selected, showing "$elemName"', Left);
-        }
-
-		var elementType = CanvasUtils.getElementType(selectedElement);
-		ui.text(elementType, Right);
-        // Check if element is dynamically sized based on theme's minWidth/minHeight
-        var isDynamicWidth: Bool = selectedElement.style != null && selectedElement.style.size.minWidth != 0;
-        var isDynamicHeight: Bool = selectedElement.style != null && selectedElement.style.size.minHeight != 0;
-        var isDynamicallySized: Bool = isDynamicWidth || isDynamicHeight;
-
-        drawElementProperties(uiBase);
+        // The type-specific section only shows when all selected elements share a type
+        var editor: IElementEditor = PropertyFields.shared(elements, e -> ElementRegistry.getForElement(e));
+        if (!single) ui.text('${elements.length} elements selected', Left);
+        ui.text(editor != null ? editor.typeName : "Mixed types", Right);
+        if (editor != null) editor.drawProperties(ui, elements);
 
         ui.text("Element Properties", Center);
         ui.separator();
-        // Key (Name) - editable text input
+
+        if (single) drawKeyField(uiBase, elements[0]);
+
+        // TID: a theme ID the theme doesn't have is rejected
+        PropertyFields.value(ui, tidHandle, "TID", elements, e -> e.getTID(), setTID, s -> s, s -> {
+            if (s != "" && Style.getStyle(s) != null) return s;
+            trace('Error: TID "${s}" not found in theme.');
+            return null;
+        });
+        ui._y += 4;
+
+        // Elements sized by their theme keep the theme's anchor, position and size
+        var placeable: Array<Element> = elements.filter(e -> !isDynamicallySized(e));
+        if (placeable.length == 0) {
+            for (label in ["Anchor", "Position", "Size"]) {
+                ui.row([1/4, 3/4]);
+                ui.text(label, Left);
+                ui.text("Dynamically Sized", Left);
+            }
+        } else {
+            if (placeable.length < elements.length) {
+                ui.text('${elements.length - placeable.length} theme-sized element(s) keep their layout', Left);
+            }
+
+            ui.text("Anchor", Left);
+            drawAnchorGrid(ui, placeable);
+
+            // Position - label, X/Y inputs and reset button in one row
+            ui.row([1/4, 5/16, 5/16, 1/8]);
+            ui.text("Position", Left);
+            PropertyFields.int(ui, posXHandle, "X", placeable, e -> e.posX, (e, x) -> e.posX = x);
+            PropertyFields.int(ui, posYHandle, "Y", placeable, e -> e.posY, (e, y) -> e.posY = y);
+            if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Position", false, false, 0.7)) {
+                PropertyFields.apply("Reset position", placeable, (e, _) -> e.setPosition(0, 0), 0);
+            }
+            ui._y += 4;
+
+            // Size - label, W/H inputs and reset button in one row
+            ui.row([1/4, 5/16, 5/16, 1/8]);
+            ui.text("Size", Left);
+            PropertyFields.int(ui, widthHandle, "W", placeable, e -> e.width, (e, w) -> { e.width = w; Koui.updateElementSize(e); });
+            PropertyFields.int(ui, heightHandle, "H", placeable, e -> e.height, (e, h) -> { e.height = h; Koui.updateElementSize(e); });
+            if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.7)) {
+                // Each element goes back to its own first size
+                PropertyFields.apply("Reset size", placeable, (e, _) -> {
+                    var originalSize: Vec2 = elementSizes.get(sizeKey(e));
+                    if (originalSize == null) return;
+                    e.width = Std.int(originalSize.x);
+                    e.height = Std.int(originalSize.y);
+                    Koui.updateElementSize(e);
+                }, 0);
+            }
+        }
+        ui._y += 4;
+
+        PropertyFields.check(ui, visibleHandle, "Visible", elements, e -> e.visible, (e, v) -> e.visible = v);
+        PropertyFields.check(ui, disabledHandle, "Disabled", elements, e -> e.disabled, (e, d) -> e.disabled = d);
+
+        if (single && elements[0].canFocus) drawNavigation(ui, elements[0]);
+    }
+
+    /** The Key (name) field of a single element; names are unique among siblings. */
+    function drawKeyField(uiBase: UIBase, element: Element): Void {
+        var ui: Zui = uiBase.ui;
+        var elemName: String = sceneData.getElementKey(element);
+        if (elemName == null) elemName = "";
+
         nameHandle.text = elemName;
         var newName: String = ui.textInput(nameHandle, "Key", Right);
         if (nameHandle.changed) {
             // "/" separates the names in an element's path
             if (newName != null && newName != "" && newName != elemName && newName.indexOf("/") < 0) {
                 // Names are unique among siblings; a taken name gets a free number instead
-                var uniqueName: String = NameUtils.ensureUniqueName(newName, selectedElement, HierarchyUtils.getParentElement(selectedElement));
+                var uniqueName: String = NameUtils.ensureUniqueName(newName, element, HierarchyUtils.getParentElement(element));
                 if (uniqueName != elemName) {
-                    sceneData.updateElementKey(selectedElement, uniqueName);
+                    sceneData.updateElementKey(element, uniqueName);
                     History.edited("Rename");
                 }
             }
-            nameHandle.text = sceneData.getElementKey(selectedElement);
+            nameHandle.text = sceneData.getElementKey(element);
             uiBase.hwnds[PanelHierarchy].redraws = 2;
             uiBase.hwnds[PanelProperties].redraws = 2;
         }
-
-        // TID - editable text input
-        var originalTID: String = selectedElement.getTID();
-        tidHandle.text = originalTID;
-        var newTID: String = ui.textInput(tidHandle, "TID", Right);
-        if (tidHandle.changed) {
-            if (newTID != null && newTID != "") {
-                // Check if TID exists in theme
-                var style: Style = Style.getStyle(newTID);
-                if (style != null) {
-                    ElementEvents.propertyChanged.emit(selectedElement, "TID", originalTID, newTID);
-                    selectedElement.setTID(newTID);
-                    if (style.size.minWidth != 0 || style.size.minHeight != 0) {
-                        selectedElement.setPosition(0, 0);
-                    }
-                } else {
-                    // TID not found in theme, show error and revert
-                    trace('Error: TID "${newTID}" not found in theme. Reverting to "${originalTID}".');
-                    tidHandle.text = originalTID;
-                }
-
-                Koui.updateElementSize(selectedElement);
-                uiBase.hwnds[PanelHierarchy].redraws = 2;
-		        uiBase.hwnds[PanelProperties].redraws = 2;
-            }
-        }
-
-        // Anchor - 3x3 grid selector
-        if (isDynamicallySized) {
-            ui.row([1/4, 3/4]);
-            ui.text("Anchor", Left);
-            ui.text("Dynamically Sized", Left);
-        } else {
-            ui.text("Anchor", Left);
-            drawAnchorGrid(ui, selectedElement);
-        }
-
-        // Position - label, reset button, and X/Y inputs in one row
-        if (isDynamicallySized) {
-            ui.row([1/4, 3/4]);
-            ui.text("Position", Left);
-            ui.text("Dynamically Sized", Left);
-        } else {
-            ui.row([1/4, 5/16, 5/16, 1/8]);
-            ui.text("Position", Left);
-            posXHandle.text = Std.string(selectedElement.posX);
-            var posXStr: String = ui.textInput(posXHandle, "X", Right);
-            if (posXHandle.changed) {
-                var val: Int = Std.parseInt(posXStr);
-                if (val != null) {
-                    ElementEvents.propertyChanged.emit(selectedElement, "posX", selectedElement.posX, val);
-                    selectedElement.posX = val;
-                } else {
-                    // Reject non-numeric input, reset to current value
-                    posXHandle.text = Std.string(selectedElement.posX);
-                }
-            }
-            posYHandle.text = Std.string(selectedElement.posY);
-            var posYStr: String = ui.textInput(posYHandle, "Y", Right);
-            if (posYHandle.changed) {
-                var val: Int = Std.parseInt(posYStr);
-                if (val != null) {
-                    ElementEvents.propertyChanged.emit(selectedElement, "posY", selectedElement.posY, val);
-                    selectedElement.posY = val;
-                } else {
-                    // Reject non-numeric input, reset to current value
-                    posYHandle.text = Std.string(selectedElement.posY);
-                }
-            }
-            if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Position", false, false, 0.7)) {
-                ElementEvents.propertyChanged.emit(selectedElement, ["posX", "posY"], [selectedElement.posX, selectedElement.posY], [0, 0]);
-                selectedElement.posX = 0;
-                selectedElement.posY = 0;
-                posXHandle.text = Std.string(0);
-                posYHandle.text = Std.string(0);
-                selectedElement.invalidateElem();
-            }
-        }
-        ui._y += 4;
-
-        // Size - label, reset button, and Width/Height inputs in one row
-        if (isDynamicallySized) {
-            ui.row([1/4, 3/4]);
-            ui.text("Size", Left);
-            ui.text("Dynamically Sized", Left);
-        } else {
-            ui.row([1/4, 5/16, 5/16, 1/8]);
-            ui.text("Size", Left);
-            widthHandle.text = Std.string(selectedElement.width);
-            var widthStr: String = ui.textInput(widthHandle, "W", Right);
-            if (widthHandle.changed) {
-                var val: Int = Std.parseInt(widthStr);
-                if (val != null) {
-                    ElementEvents.propertyChanged.emit(selectedElement, "width", selectedElement.width, val);
-                    selectedElement.width = val;
-                    Koui.updateElementSize(selectedElement);
-                } else {
-                    // Reject non-numeric input, reset to current value
-                    widthHandle.text = Std.string(selectedElement.width);
-                }
-            }
-            heightHandle.text = Std.string(selectedElement.height);
-            var heightStr: String = ui.textInput(heightHandle, "H", Right);
-            if (heightHandle.changed) {
-                var val: Int = Std.parseInt(heightStr);
-                if (val != null) {
-                    ElementEvents.propertyChanged.emit(selectedElement, "height", selectedElement.height, val);
-                    selectedElement.height = val;
-                    Koui.updateElementSize(selectedElement);
-                } else {
-                    // Reject non-numeric input, reset to current value
-                    heightHandle.text = Std.string(selectedElement.height);
-                }
-            }
-            if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.7)) {
-                var originalSize: Vec2 = elementSizes.get(sizeKey(selectedElement));
-                if (originalSize != null) {
-                    ElementEvents.propertyChanged.emit(selectedElement, ["width", "height"], [selectedElement.width, selectedElement.height], [Std.int(originalSize.x), Std.int(originalSize.y)]);
-                    selectedElement.width = Std.int(originalSize.x);
-                    selectedElement.height = Std.int(originalSize.y);
-                    widthHandle.text = Std.string(selectedElement.width);
-                    heightHandle.text = Std.string(selectedElement.height);
-                    Koui.updateElementSize(selectedElement);
-                }
-            }
-        }
-        ui._y += 4;
-
-        // Visible checkbox
-        visibleHandle.selected = selectedElement.visible;
-        var newVisible = ui.check(visibleHandle, "Visible");
-        if (newVisible != selectedElement.visible) {
-            ElementEvents.propertyChanged.emit(selectedElement, "visible", selectedElement.visible, newVisible);
-            selectedElement.visible = newVisible;
-        }
-
-        // Disabled checkbox
-        disabledHandle.selected = selectedElement.disabled;
-        var newDisabled = ui.check(disabledHandle, "Disabled");
-        if (newDisabled != selectedElement.disabled) {
-            ElementEvents.propertyChanged.emit(selectedElement, "disabled", selectedElement.disabled, newDisabled);
-            selectedElement.disabled = newDisabled;
-        }
-
-        if (selectedElement.canFocus) {
-            ui._y += 4;
-            ui.text("Navigation", Left);
-            ui.separator();
-
-            var focusableNames: Array<String> = ["(none)"];
-            var elementMap: Map<String, Element> = new Map();
-            for (element in sceneData.getElements()) {
-                if (element != selectedElement && element.canFocus) {
-                    var key: String = sceneData.getElementKey(element);
-                    focusableNames.push(key);
-                    elementMap.set(key, element);
-                }
-            }
-
-            var drawFocusCombo = function(label: String, handle: Handle, currentTarget: Element, setTarget: Element->Void, propertyName: String) {
-                var newIdx = ui.combo(handle, focusableNames, label, true, Right);
-                if (handle.changed) {
-                    var selectedName = focusableNames[newIdx];
-                    var newTarget = selectedName == "(none)" ? null : elementMap.get(selectedName);
-                    ElementEvents.propertyChanged.emit(selectedElement, propertyName, currentTarget, newTarget);
-                    setTarget(newTarget);
-                }
-            };
-
-            drawFocusCombo("Focus Up", focusUpHandle, selectedElement.focusUp, function(e) selectedElement.focusUp = e, "focusUp");
-            drawFocusCombo("Focus Down", focusDownHandle, selectedElement.focusDown, function(e) selectedElement.focusDown = e, "focusDown");
-            drawFocusCombo("Focus Left", focusLeftHandle, selectedElement.focusLeft, function(e) selectedElement.focusLeft = e, "focusLeft");
-            drawFocusCombo("Focus Right", focusRightHandle, selectedElement.focusRight, function(e) selectedElement.focusRight = e, "focusRight");
-        }
     }
 
-    function drawAnchorGrid(ui: Zui, element: Element) {
-        var currentAnchor = element.anchor;
+    function setTID(element: Element, tID: String): Void {
+        element.setTID(tID);
+        // Theme-sized elements are placed by the theme
+        var style: Style = Style.getStyle(tID);
+        if (style.size.minWidth != 0 || style.size.minHeight != 0) element.setPosition(0, 0);
+        Koui.updateElementSize(element);
+    }
+
+    static function isDynamicallySized(element: Element): Bool {
+        return element.style != null && (element.style.size.minWidth != 0 || element.style.size.minHeight != 0);
+    }
+
+    function drawNavigation(ui: Zui, element: Element): Void {
+        ui._y += 4;
+        ui.text("Navigation", Left);
+        ui.separator();
+
+        var focusableNames: Array<String> = ["(none)"];
+        var elementMap: Map<String, Element> = new Map();
+        for (other in sceneData.getElements()) {
+            if (other != element && other.canFocus) {
+                var key: String = sceneData.getElementKey(other);
+                focusableNames.push(key);
+                elementMap.set(key, other);
+            }
+        }
+
+        var drawFocusCombo = function(label: String, handle: Handle, setTarget: Element->Void) {
+            var newIdx = ui.combo(handle, focusableNames, label, true, Right);
+            if (handle.changed) {
+                var selectedName = focusableNames[newIdx];
+                setTarget(selectedName == "(none)" ? null : elementMap.get(selectedName));
+                History.edited('Change $label');
+            }
+        };
+
+        drawFocusCombo("Focus Up", focusUpHandle, function(e) element.focusUp = e);
+        drawFocusCombo("Focus Down", focusDownHandle, function(e) element.focusDown = e);
+        drawFocusCombo("Focus Left", focusLeftHandle, function(e) element.focusLeft = e);
+        drawFocusCombo("Focus Right", focusRightHandle, function(e) element.focusRight = e);
+    }
+
+    function drawAnchorGrid(ui: Zui, elements: Array<Element>) {
+        // No anchor is highlighted when the elements' anchors differ
+        var currentAnchor: Null<Anchor> = PropertyFields.shared(elements, e -> e.anchor);
 
         // Define the anchor positions in a 3x3 grid
         var anchors = [
@@ -705,9 +629,7 @@ class PropertiesPanel {
 
                 // Use simple icon representation
                 if (ui.button("")) {
-                    ElementEvents.propertyChanged.emit(element, "anchor", currentAnchor, anchor);
-                    element.anchor = anchor;
-                    element.invalidateElem();
+                    PropertyFields.apply("Change anchor", elements, (e, a) -> { e.anchor = a; e.invalidateElem(); }, anchor);
                 }
 
                 // Restore colors if they were changed
@@ -724,13 +646,6 @@ class PropertiesPanel {
         ui.t.ELEMENT_H = origElementH;
         ui.t.ELEMENT_OFFSET = origElementOffset;
         ui._y += 2;
-    }
-
-    function drawElementProperties(uiBase: UIBase) {
-        var editor = ElementRegistry.getForElement(selectedElement);
-        if (editor != null) {
-            editor.drawProperties(uiBase.ui, selectedElement);
-        }
     }
 
     public function onElementAdded(entry: TElementEntry): Void {
@@ -750,44 +665,27 @@ class PropertiesPanel {
     }
 
     function onSelectionChanged(): Void {
-        var element: Element = Selection.primary;
-        selectedElement = element;
-
-        // Update all handles with the new element's values
-        if (element != null) {
-            // Register element size if not already tracked (for elements loaded from file)
+        // Remember each element's first size, for "Reset Size"
+        for (element in Selection.elements) {
             if (!elementSizes.exists(sizeKey(element))) {
                 elementSizes.set(sizeKey(element), new Vec2(element.width, element.height));
             }
+        }
 
-            var elemName: String = sceneData.getElementKey(element);
-            nameHandle.text = elemName != null ? elemName : "";
-            tidHandle.text = element.getTID();
-            posXHandle.text = Std.string(element.posX);
-            posYHandle.text = Std.string(element.posY);
-            widthHandle.text = Std.string(element.width);
-            heightHandle.text = Std.string(element.height);
-            visibleHandle.selected = element.visible;
-            disabledHandle.selected = element.disabled;
-            anchorHandle.position = element.anchor;
+        // The focus combos show the single selected element's targets
+        var element: Element = Selection.elements.length == 1 ? Selection.primary : null;
+        if (element != null && element.canFocus) {
+            // Same order as the focus combos in drawNavigation()
+            var focusable: Array<Element> = [for (e in sceneData.getElements()) if (e != element && e.canFocus) e];
+            var getIndex = function(targetElem: Element): Int {
+                if (targetElem == null) return 0;
+                return focusable.indexOf(targetElem) + 1;
+            };
 
-            if (element.canFocus) {
-                // Same order as the focus combos in drawProperties()
-                var focusable: Array<Element> = [for (e in sceneData.getElements()) if (e != element && e.canFocus) e];
-                var getIndex = function(targetElem: Element): Int {
-                    if (targetElem == null) return 0;
-                    return focusable.indexOf(targetElem) + 1;
-                };
-
-                focusUpHandle.position = getIndex(element.focusUp);
-                focusDownHandle.position = getIndex(element.focusDown);
-                focusLeftHandle.position = getIndex(element.focusLeft);
-                focusRightHandle.position = getIndex(element.focusRight);
-            }
-
-            // Sync type-specific editor handles
-            var editor = ElementRegistry.getForElement(element);
-            if (editor != null) editor.syncHandles(element);
+            focusUpHandle.position = getIndex(element.focusUp);
+            focusDownHandle.position = getIndex(element.focusDown);
+            focusLeftHandle.position = getIndex(element.focusLeft);
+            focusRightHandle.position = getIndex(element.focusRight);
         }
     }
 

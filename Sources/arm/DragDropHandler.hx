@@ -4,7 +4,9 @@ import arm.base.UIBase;
 import arm.data.History;
 import arm.data.SceneData;
 import arm.data.Selection;
+import arm.CanvasViewport.TScreenRect;
 import arm.panels.TopToolbar;
+import arm.tools.HierarchyUtils;
 import arm.types.Enums.PanelHandle;
 
 import iron.math.Vec2;
@@ -33,6 +35,17 @@ class DragDropHandler {
 	var dragStartY: Int = 0;
 	var dragMouseX: Float = 0;
 	var dragMouseY: Float = 0;
+
+	// Selection box: pressing on empty space and dragging past BOX_THRESHOLD pixels
+	static inline var BOX_THRESHOLD: Float = 4;
+	var boxPending: Bool = false;
+	var boxActive: Bool = false;
+	var boxStartX: Float = 0;
+	var boxStartY: Float = 0;
+	var boxEndX: Float = 0;
+	var boxEndY: Float = 0;
+	var boxToggles: Bool = false;
+	var boxAdds: Bool = false;
 
 	var borderSize: Int = 8;
 
@@ -112,11 +125,23 @@ class DragDropHandler {
 				// Clicking empty space clears the selection, unless adding to it
 				if (!toggle && !additive) Selection.clear();
 				draggedElement = null;
+
+				// Dragging from here draws a selection box
+				boxPending = true;
+				boxActive = false;
+				boxStartX = boxEndX = mouse.x;
+				boxStartY = boxEndY = mouse.y;
+				boxToggles = toggle;
+				boxAdds = additive;
 			}
 		} else if (mouseJustPressed && isInHierarchyPanel()) {
 			// Clicked in hierarchy panel — clear canvas drag state only.
 			// The hierarchy panel updates the selection itself.
 			draggedElement = null;
+		} else if (mouseDown && boxPending) {
+			boxEndX = mouse.x;
+			boxEndY = mouse.y;
+			if (Math.abs(boxEndX - boxStartX) > BOX_THRESHOLD || Math.abs(boxEndY - boxStartY) > BOX_THRESHOLD) boxActive = true;
 		} else if (mouseDown && draggedElement != null) {
 			// Positions are in canvas units: the mouse movement divided by the zoom.
 			// The anchor stays as it is; Koui lays the element out before drawing.
@@ -135,6 +160,9 @@ class DragDropHandler {
 			if (Math.round(newX) != draggedElement.posX) draggedElement.posX = Math.round(newX);
 			if (Math.round(newY) != draggedElement.posY) draggedElement.posY = Math.round(newY);
 		} else {
+			if (boxActive) selectInBox();
+			boxPending = boxActive = false;
+
 			if (draggedElement != null) {
 				if (draggedElement.posX != dragStartX || draggedElement.posY != dragStartY) {
 					History.edited("Move");
@@ -164,5 +192,50 @@ class DragDropHandler {
 
 	public function drawSelectedElements(g2: kha.graphics2.Graphics) {
 		viewport.drawSelection(g2);
+		if (boxActive) viewport.drawSelectionBox(g2, getBoxRect());
+	}
+
+	function getBoxRect(): TScreenRect {
+		var x: Int = Std.int(Math.min(boxStartX, boxEndX));
+		var y: Int = Std.int(Math.min(boxStartY, boxEndY));
+		return { x: x, y: y, w: Std.int(Math.max(boxStartX, boxEndX)) - x, h: Std.int(Math.max(boxStartY, boxEndY)) - y };
+	}
+
+	/**
+	 * Selects the visible elements fully inside the box, top-most only: an
+	 * element inside another one in the box is left out. Shift adds them to
+	 * the selection, Ctrl toggles them, otherwise they replace it.
+	 */
+	function selectInBox(): Void {
+		var box: TScreenRect = getBoxRect();
+		var inside: Array<Element> = [];
+		for (element in SceneData.data.getElements()) {
+			if (!element.isEffectivelyVisible()) continue;
+			var rect: TScreenRect = viewport.getScreenRect(element);
+			if (rect.x >= box.x && rect.y >= box.y && rect.x + rect.w <= box.x + box.w && rect.y + rect.h <= box.y + box.h) {
+				inside.push(element);
+			}
+		}
+
+		var topMost: Array<Element> = inside.filter(element -> {
+			var parent: Element = HierarchyUtils.getParentElement(element);
+			while (parent != null) {
+				if (inside.indexOf(parent) >= 0) return false;
+				parent = HierarchyUtils.getParentElement(parent);
+			}
+			return true;
+		});
+
+		if (boxToggles) {
+			var result: Array<Element> = Selection.elements.copy();
+			for (element in topMost) {
+				if (!result.remove(element)) result.push(element);
+			}
+			Selection.setAll(result);
+		} else if (boxAdds) {
+			Selection.setAll(Selection.elements.concat(topMost));
+		} else {
+			Selection.setAll(topMost);
+		}
 	}
 }

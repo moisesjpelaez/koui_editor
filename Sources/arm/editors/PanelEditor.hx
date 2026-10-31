@@ -24,6 +24,5 @@ class PanelEditor implements IElementEditor {
 	}
 
 	public function initHandles(): Void {}
-	public function syncHandles(element: Element): Void {}
-	public function drawProperties(ui: Zui, element: Element): Void {}
+	public function drawProperties(ui: Zui, elements: Array<Element>): Void {}
 }

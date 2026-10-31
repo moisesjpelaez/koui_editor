@@ -1,7 +1,7 @@
 package arm.editors;
 
 import arm.editors.IElementEditor;
-import arm.events.ElementEvents;
+import arm.panels.PropertyFields;
 import koui.elements.Element;
 import koui.elements.Label;
 import koui.utils.RadioGroup;
@@ -32,20 +32,10 @@ class LabelEditor implements IElementEditor {
 		textHandle = new Handle();
 	}
 
-	public function syncHandles(element: Element): Void {}
-
-	public function drawProperties(ui: Zui, element: Element): Void {
+	public function drawProperties(ui: Zui, elements: Array<Element>): Void {
 		ui.text("Label Properties", Center);
 		ui.separator();
 
-		var label: Label = cast element;
-		textHandle.text = label.text;
-		var newText: String = ui.textInput(textHandle, "Text", Right);
-		if (textHandle.changed) {
-			if (newText != null && newText != "") {
-				ElementEvents.propertyChanged.emit(label, "text", label.text, newText);
-				label.text = newText;
-			}
-		}
+		PropertyFields.text(ui, textHandle, "Text", elements, e -> (cast e: Label).text, (e, text) -> (cast e: Label).text = text);
 	}
 }

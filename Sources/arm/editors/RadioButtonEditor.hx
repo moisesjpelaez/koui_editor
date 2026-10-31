@@ -2,7 +2,7 @@ package arm.editors;
 
 import arm.data.SceneData;
 import arm.editors.IElementEditor;
-import arm.events.ElementEvents;
+import arm.panels.PropertyFields;
 import koui.elements.Element;
 import koui.elements.Panel;
 import koui.elements.RadioButton;
@@ -46,67 +46,33 @@ class RadioButtonEditor implements IElementEditor {
 		groupHandle = new Handle();
 	}
 
-	public function syncHandles(element: Element): Void {}
-
-	public function drawProperties(ui: Zui, element: Element): Void {
+	public function drawProperties(ui: Zui, elements: Array<Element>): Void {
 		ui.text("Radio Button Properties", Center);
 		ui.separator();
 
-		var radioButton: RadioButton = cast element;
-		var sceneData = SceneData.data;
-
-		textHandle.text = radioButton.text;
-		var newText: String = ui.textInput(textHandle, "Text", Right);
-		if (textHandle.changed) {
-			if (newText != null && newText != "") {
-				ElementEvents.propertyChanged.emit(radioButton, "text", radioButton.text, newText);
-				radioButton.text = newText;
-			}
-		}
-
-		isCheckedHandle.selected = radioButton.isChecked;
-		var newChecked = ui.check(isCheckedHandle, "Is Checked");
-		if (newChecked != radioButton.isChecked) {
-			ElementEvents.propertyChanged.emit(radioButton, "isChecked", radioButton.isChecked, newChecked);
-			if (newChecked) {
+		PropertyFields.text(ui, textHandle, "Text", elements, e -> (cast e: RadioButton).text, (e, text) -> (cast e: RadioButton).text = text);
+		PropertyFields.check(ui, isCheckedHandle, "Is Checked", elements, e -> (cast e: RadioButton).isChecked, (e, checked) -> {
+			var radioButton: RadioButton = cast e;
+			if (checked) {
 				radioButton.group.setActiveButton(radioButton);
 			} else {
 				radioButton.isChecked = false;
 				var checkSquare: Panel = radioButton.getChild(new TypeMatchBehaviour(Panel));
-				if (checkSquare != null)
-					checkSquare.setContextElement("");
+				if (checkSquare != null) checkSquare.setContextElement("");
 			}
-		}
+		});
 
 		// Radio group combo
-		var availableGroups = sceneData.radioGroups;
-		var groupNames: Array<String> = [];
-		var currentIndex = 0;
-		for (i in 0...availableGroups.length) {
-			groupNames.push(availableGroups[i].id);
-			if (radioButton.group != null && (availableGroups[i] == radioButton.group || availableGroups[i].id == radioButton.group.id)) {
-				currentIndex = i;
-			}
-		}
-
-		if (groupNames.length == 0) {
-			groupNames.push("(none)");
-			groupHandle.position = 0;
-			ui.combo(groupHandle, groupNames, "Radio Group", true, Right);
-		} else {
-			groupHandle.position = currentIndex;
-			var newGroupIndex = ui.combo(groupHandle, groupNames, "Radio Group", true, Right);
-			if (groupHandle.changed && newGroupIndex >= 0 && newGroupIndex < availableGroups.length) {
-				var newGroup = availableGroups[newGroupIndex];
-				if (radioButton.group == null || (radioButton.group != newGroup && radioButton.group.id != newGroup.id)) {
-					var oldGroupId = radioButton.group != null ? radioButton.group.id : "";
-					// Move button to new group
-					if (radioButton.group != null) radioButton.group.remove(radioButton);
-					radioButton.group = newGroup;
-					newGroup.add(radioButton);
-					ElementEvents.propertyChanged.emit(radioButton, "radioGroup", oldGroupId, newGroup.id);
-				}
-			}
-		}
+		var groups: Array<RadioGroup> = SceneData.data.radioGroups;
+		var groupNames: Array<String> = [for (group in groups) group.id];
+		PropertyFields.combo(ui, groupHandle, "Radio Group", groupNames, elements, e -> groups.indexOf((cast e: RadioButton).group), (e, index) -> {
+			var radioButton: RadioButton = cast e;
+			var newGroup: RadioGroup = groups[index];
+			if (radioButton.group == newGroup) return;
+			// Move button to new group
+			if (radioButton.group != null) radioButton.group.remove(radioButton);
+			radioButton.group = newGroup;
+			newGroup.add(radioButton);
+		});
 	}
 }

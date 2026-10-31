@@ -251,6 +251,14 @@ class CanvasViewport {
 		return null;
 	}
 
+	/** The selection box while it's being dragged. */
+	public function drawSelectionBox(g2: Graphics, rect: TScreenRect): Void {
+		g2.color = 0x30469cff;
+		g2.fillRect(rect.x, rect.y, rect.w, rect.h);
+		g2.color = 0xff469cff;
+		drawOutline(g2, rect, 1);
+	}
+
 	function drawOutline(g2: Graphics, rect: TScreenRect, thickness: Int): Void {
 		g2.fillRect(rect.x, rect.y, rect.w, thickness);
 		g2.fillRect(rect.x, rect.y + rect.h - thickness, rect.w, thickness);

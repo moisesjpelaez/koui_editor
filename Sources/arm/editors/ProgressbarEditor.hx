@@ -1,7 +1,7 @@
 package arm.editors;
 
 import arm.editors.IElementEditor;
-import arm.events.ElementEvents;
+import arm.panels.PropertyFields;
 import koui.elements.Element;
 import koui.elements.Progressbar;
 import koui.utils.RadioGroup;
@@ -40,65 +40,31 @@ class ProgressbarEditor implements IElementEditor {
 		valueHandle = new Handle();
 	}
 
-	public function syncHandles(element: Element): Void {}
-
-	public function drawProperties(ui: Zui, element: Element): Void {
+	public function drawProperties(ui: Zui, elements: Array<Element>): Void {
 		ui.text("Progressbar Properties", Center);
 		ui.separator();
 
-		var progressbar: Progressbar = cast element;
+		PropertyFields.text(ui, textHandle, "Text", elements, e -> bar(e).text, (e, text) -> bar(e).text = text, true);
+		PropertyFields.float(ui, minValueHandle, "Min Value", elements, e -> bar(e).minValue, (e, min) -> {
+			bar(e).minValue = min;
+			bar(e).value = Math.max(min, bar(e).value);
+		});
+		PropertyFields.float(ui, maxValueHandle, "Max Value", elements, e -> bar(e).maxValue, (e, max) -> {
+			bar(e).maxValue = max;
+			bar(e).value = Math.min(max, bar(e).value);
+		});
+		PropertyFields.int(ui, precisionHandle, "Precision", elements, e -> bar(e).precision, (e, precision) -> {
+			bar(e).precision = Std.int(Math.max(0, precision));
+			var steps: Float = Math.pow(10, -bar(e).precision);
+			bar(e).value = Math.round(bar(e).value / steps) * steps;
+		});
 
-		textHandle.text = progressbar.text;
-		var newText: String = ui.textInput(textHandle, "Text", Right);
-		if (textHandle.changed) {
-			ElementEvents.propertyChanged.emit(progressbar, "text", progressbar.text, newText);
-			progressbar.text = newText;
-		}
+		// The range and precision of the first selected bar
+		var first: Progressbar = bar(elements[0]);
+		PropertyFields.slider(ui, valueHandle, "Value", first.minValue, first.maxValue, first.precision, elements, e -> bar(e).value, (e, value) -> bar(e).value = value);
+	}
 
-		minValueHandle.text = Std.string(progressbar.minValue);
-		var newMinStr: String = ui.textInput(minValueHandle, "Min Value", Right);
-		if (minValueHandle.changed) {
-			var newMin: Float = Std.parseFloat(newMinStr);
-			if (!Math.isNaN(newMin)) {
-				ElementEvents.propertyChanged.emit(progressbar, "minValue", progressbar.minValue, newMin);
-				progressbar.minValue = newMin;
-				progressbar.value = Math.max(newMin, progressbar.value);
-			}
-		}
-
-		maxValueHandle.text = Std.string(progressbar.maxValue);
-		var newMaxStr: String = ui.textInput(maxValueHandle, "Max Value", Right);
-		if (maxValueHandle.changed) {
-			var newMax: Float = Std.parseFloat(newMaxStr);
-			if (!Math.isNaN(newMax)) {
-				ElementEvents.propertyChanged.emit(progressbar, "maxValue", progressbar.maxValue, newMax);
-				progressbar.maxValue = newMax;
-				progressbar.value = Math.min(newMax, progressbar.value);
-			}
-		}
-
-		precisionHandle.text = Std.string(progressbar.precision);
-		var newPrecisionStr: String = ui.textInput(precisionHandle, "Precision", Right);
-		var steps: Float = 0;
-		if (precisionHandle.changed) {
-			var newPrecision: Int = Std.parseInt(newPrecisionStr);
-			if (newPrecision != null) {
-				newPrecision = Std.int(Math.max(0, newPrecision));
-				ElementEvents.propertyChanged.emit(progressbar, "precision", progressbar.precision, newPrecision);
-				progressbar.precision = newPrecision;
-				steps = Math.pow(10, -progressbar.precision);
-				progressbar.value = Math.round(progressbar.value / steps) * steps;
-			}
-		}
-
-		valueHandle.value = progressbar.value;
-		steps = Math.pow(10, -progressbar.precision);
-		var newValue: Float = ui.slider(valueHandle, "Value", progressbar.minValue, progressbar.maxValue, true, 1 / steps, true, Right);
-		if (valueHandle.changed) {
-			newValue = Math.round(newValue / steps) * steps;
-			valueHandle.value = newValue;
-			ElementEvents.propertyChanged.emit(progressbar, "value", progressbar.value, newValue);
-			progressbar.value = newValue;
-		}
+	static inline function bar(element: Element): Progressbar {
+		return cast element;
 	}
 }

@@ -141,7 +141,6 @@ class KouiEditor extends iron.Trait {
 			ElementEvents.selectionChanged.connect(onSelectionChanged);
 			ElementEvents.elementDropped.connect(onElementDropped);
 			ElementEvents.elementRemoved.connect(onElementRemoved);
-			ElementEvents.propertyChanged.connect(onPropertyChanged);
 
 			SceneEvents.sceneAdded.connect(onSceneAdded);
 			SceneEvents.sceneChanged.connect(onSceneChanged);
@@ -313,11 +312,6 @@ class KouiEditor extends iron.Trait {
 
 	function applyResize(resetScale: Bool) {
 		viewport.onResized(resetScale ? false : sizeInit, baseH);
-	}
-
-	function onPropertyChanged(element: Element, properties: Dynamic, oldValues: Dynamic, newValues: Dynamic): Void {
-		var names: String = Std.isOfType(properties, String) ? properties : (properties: Array<String>).join(", ");
-		History.edited('Change $names');
 	}
 
 	function onSelectionChanged(): Void {

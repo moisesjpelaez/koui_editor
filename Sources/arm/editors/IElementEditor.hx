@@ -33,9 +33,9 @@ interface IElementEditor {
 	/** Initialize Zui handles for the property panel. Called once at registration. */
 	function initHandles(): Void;
 
-	/** Sync handle state to the currently selected element. Called when selection changes. */
-	function syncHandles(element: Element): Void;
-
-	/** Draw type-specific property fields in the PropertiesPanel. */
-	function drawProperties(ui: Zui, element: Element): Void;
+	/**
+	 * Draw type-specific property fields in the PropertiesPanel for the selected
+	 * elements, all of this type. Fields edit every one of them (see `PropertyFields`).
+	 */
+	function drawProperties(ui: Zui, elements: Array<Element>): Void;
 }

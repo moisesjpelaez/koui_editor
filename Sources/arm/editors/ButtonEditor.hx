@@ -1,7 +1,7 @@
 package arm.editors;
 
 import arm.editors.IElementEditor;
-import arm.events.ElementEvents;
+import arm.panels.PropertyFields;
 import koui.elements.Button;
 import koui.elements.Element;
 import koui.utils.RadioGroup;
@@ -36,36 +36,13 @@ class ButtonEditor implements IElementEditor {
 		isPressedHandle = new Handle();
 	}
 
-	public function syncHandles(element: Element): Void {}
-
-	public function drawProperties(ui: Zui, element: Element): Void {
+	public function drawProperties(ui: Zui, elements: Array<Element>): Void {
 		ui.text("Button Properties", Center);
 		ui.separator();
 
-		var button: Button = cast element;
-
-		textHandle.text = button.text;
-		var newText: String = ui.textInput(textHandle, "Text", Right);
-		if (textHandle.changed) {
-			if (newText != null && newText != "") {
-				ElementEvents.propertyChanged.emit(button, "text", button.text, newText);
-				button.text = newText;
-			}
-		}
-
-		// Only toggle buttons show as pressed; react to a click, not to that difference
-		isPressedHandle.selected = button.isToggle && button.isPressed;
-		var newPressed = ui.check(isPressedHandle, "Is Pressed");
-		if (isPressedHandle.changed && newPressed != button.isPressed) {
-			ElementEvents.propertyChanged.emit(button, "isPressed", button.isPressed, newPressed);
-			button.isPressed = newPressed;
-		}
-
-		isToggleHandle.selected = button.isToggle;
-		var newToggle = ui.check(isToggleHandle, "Is Toggle");
-		if (newToggle != button.isToggle) {
-			ElementEvents.propertyChanged.emit(button, "isToggle", button.isToggle, newToggle);
-			button.isToggle = newToggle;
-		}
+		PropertyFields.text(ui, textHandle, "Text", elements, e -> (cast e: Button).text, (e, text) -> (cast e: Button).text = text);
+		// Only toggle buttons show as pressed
+		PropertyFields.check(ui, isPressedHandle, "Is Pressed", elements, e -> (cast e: Button).isToggle && (cast e: Button).isPressed, (e, pressed) -> (cast e: Button).isPressed = pressed);
+		PropertyFields.check(ui, isToggleHandle, "Is Toggle", elements, e -> (cast e: Button).isToggle, (e, toggle) -> (cast e: Button).isToggle = toggle);
 	}
 }

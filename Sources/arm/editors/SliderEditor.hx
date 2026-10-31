@@ -1,7 +1,7 @@
 package arm.editors;
 
 import arm.editors.IElementEditor;
-import arm.events.ElementEvents;
+import arm.panels.PropertyFields;
 import koui.elements.Element;
 import koui.elements.Slider;
 import koui.elements.Slider.SliderOrientation;
@@ -43,82 +43,35 @@ class SliderEditor implements IElementEditor {
 		valueHandle = new Handle();
 	}
 
-	public function syncHandles(element: Element): Void {}
-
-	public function drawProperties(ui: Zui, element: Element): Void {
+	public function drawProperties(ui: Zui, elements: Array<Element>): Void {
 		ui.text("Slider Properties", Center);
 		ui.separator();
 
-		var slider: Slider = cast element;
+		var orientations: Array<SliderOrientation> = [Up, Down, Left, Right];
+		PropertyFields.combo(ui, orientationHandle, "Orientation", ["Up", "Down", "Left", "Right"], elements, e -> orientations.indexOf(slider(e).orientation), (e, index) -> {
+			slider(e).orientation = orientations[index];
+			Koui.updateElementSize(e);
+		});
+		PropertyFields.float(ui, minValueHandle, "Min Value", elements, e -> slider(e).minValue, (e, min) -> {
+			slider(e).minValue = min;
+			slider(e).value = Math.max(min, slider(e).value);
+		});
+		PropertyFields.float(ui, maxValueHandle, "Max Value", elements, e -> slider(e).maxValue, (e, max) -> {
+			slider(e).maxValue = max;
+			slider(e).value = Math.min(max, slider(e).value);
+		});
+		PropertyFields.int(ui, precisionHandle, "Precision", elements, e -> slider(e).precision, (e, precision) -> {
+			slider(e).precision = Std.int(Math.max(0, precision));
+			var steps: Float = Math.pow(10, -slider(e).precision);
+			slider(e).value = Math.round(slider(e).value / steps) * steps;
+		});
 
-		var orientation: Array<String> = ["Up", "Down", "Left", "Right"];
-		var currentIndex: Int = 0;
-		switch (slider.orientation) {
-			case Up: currentIndex = 0;
-			case Down: currentIndex = 1;
-			case Left: currentIndex = 2;
-			case Right: currentIndex = 3;
-		}
-		orientationHandle.position = currentIndex;
+		// The range and precision of the first selected slider
+		var first: Slider = slider(elements[0]);
+		PropertyFields.slider(ui, valueHandle, "Value", first.minValue, first.maxValue, first.precision, elements, e -> slider(e).value, (e, value) -> slider(e).value = value);
+	}
 
-		var newIndex: Int = ui.combo(orientationHandle, orientation, "Orientation", true, Right);
-		if (orientationHandle.changed) {
-			var newOrientation = slider.orientation;
-			switch (newIndex) {
-				case 0: newOrientation = Up;
-				case 1: newOrientation = Down;
-				case 2: newOrientation = Left;
-				case 3: newOrientation = Right;
-			}
-			ElementEvents.propertyChanged.emit(slider, "orientation", slider.orientation, newOrientation);
-			slider.orientation = newOrientation;
-			Koui.updateElementSize(slider);
-		}
-
-		minValueHandle.text = Std.string(slider.minValue);
-		var newMinStr: String = ui.textInput(minValueHandle, "Min Value", Right);
-		if (minValueHandle.changed) {
-			var newMin: Float = Std.parseFloat(newMinStr);
-			if (!Math.isNaN(newMin)) {
-				ElementEvents.propertyChanged.emit(slider, "minValue", slider.minValue, newMin);
-				slider.minValue = newMin;
-				slider.value = Math.max(newMin, slider.value);
-			}
-		}
-
-		maxValueHandle.text = Std.string(slider.maxValue);
-		var newMaxStr: String = ui.textInput(maxValueHandle, "Max Value", Right);
-		if (maxValueHandle.changed) {
-			var newMax: Float = Std.parseFloat(newMaxStr);
-			if (!Math.isNaN(newMax)) {
-				ElementEvents.propertyChanged.emit(slider, "maxValue", slider.maxValue, newMax);
-				slider.maxValue = newMax;
-				slider.value = Math.min(newMax, slider.value);
-			}
-		}
-
-		precisionHandle.text = Std.string(slider.precision);
-		var newPrecisionStr: String = ui.textInput(precisionHandle, "Precision", Right);
-		var steps: Float = 0;
-		if (precisionHandle.changed) {
-			var newPrecision: Int = Std.parseInt(newPrecisionStr);
-			if (newPrecision != null) {
-				newPrecision = Std.int(Math.max(0, newPrecision));
-				ElementEvents.propertyChanged.emit(slider, "precision", slider.precision, newPrecision);
-				slider.precision = newPrecision;
-				steps = Math.pow(10, -slider.precision);
-				slider.value = Math.round(slider.value / steps) * steps;
-			}
-		}
-
-		valueHandle.value = slider.value;
-		steps = Math.pow(10, -slider.precision);
-		var newValue: Float = ui.slider(valueHandle, "Value", slider.minValue, slider.maxValue, true, 1 / steps, true, Right);
-		if (valueHandle.changed) {
-			newValue = Math.round(newValue / steps) * steps;
-			valueHandle.value = newValue;
-			ElementEvents.propertyChanged.emit(slider, "value", slider.value, newValue);
-			slider.value = newValue;
-		}
+	static inline function slider(element: Element): Slider {
+		return cast element;
 	}
 }

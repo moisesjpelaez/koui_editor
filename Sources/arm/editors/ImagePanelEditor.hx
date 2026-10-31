@@ -1,7 +1,8 @@
 package arm.editors;
 
 import arm.editors.IElementEditor;
-import arm.events.ElementEvents;
+import arm.panels.PropertyFields;
+import arm.data.History;
 import arm.tools.CanvasUtils;
 import koui.elements.Element;
 import koui.elements.ImagePanel;
@@ -40,66 +41,46 @@ class ImagePanelEditor implements IElementEditor {
 		scaleHandle = new Handle();
 	}
 
-	public function syncHandles(element: Element): Void {}
-
-	public function drawProperties(ui: Zui, element: Element): Void {
+	public function drawProperties(ui: Zui, elements: Array<Element>): Void {
 		ui.text("Image Properties", Center);
 		ui.separator();
 
-		var imagePanel: ImagePanel = cast element;
-
-		// Build list of available images from Koui.imageMap
+		// Available images from Koui.imageMap; a missing image shows as "(none)"
 		var imageNames: Array<String> = ["(none)"];
 		for (key in Koui.imageMap.keys()) {
 			imageNames.push(key);
 		}
+		PropertyFields.combo(ui, imageHandle, "Image", imageNames, elements, e -> {
+			var index: Int = imageNames.indexOf(CanvasUtils.getImageName((cast e: ImagePanel).image));
+			index >= 0 ? index : 0;
+		}, (e, index) -> applyImage(cast e, index == 0 ? "" : imageNames[index]));
 
-		// Find current selection index
-		var currentImageName: String = CanvasUtils.getImageName(imagePanel.image);
-		var currentIndex: Int = 0;
-		for (i in 0...imageNames.length) {
-			if (imageNames[i] == currentImageName) {
-				currentIndex = i;
-				break;
-			}
+		var missing: Array<String> = [];
+		for (e in elements) {
+			var missingName: Null<String> = CanvasUtils.getMissingImageName(cast e);
+			if (missingName != null && missing.indexOf(missingName) < 0) missing.push(missingName);
 		}
-		imageHandle.position = currentIndex;
-
-		var newIndex: Int = ui.combo(imageHandle, imageNames, "Image", true, Right);
-		if (imageHandle.changed) {
-			var selectedName: String = imageNames[newIndex];
-			applyImage(imagePanel, selectedName == "(none)" ? "" : selectedName);
+		if (missing.length > 0) {
+			ui.text('Missing image ${missing.join(", ")}: the name is kept when saving', Left);
 		}
 
-		var missingName: Null<String> = CanvasUtils.getMissingImageName(imagePanel);
-		if (missingName != null) {
-			ui.text('Image "$missingName" is missing; its name is kept when saving', Left);
-		}
-
-		scaleHandle.selected = imagePanel.scale;
-		var newScale: Bool = ui.check(scaleHandle, "Scale to Size");
-		if (newScale != imagePanel.scale) {
-			ElementEvents.propertyChanged.emit(imagePanel, "scale", imagePanel.scale, newScale);
-			imagePanel.scale = newScale;
-		}
+		PropertyFields.check(ui, scaleHandle, "Scale to Size", elements, e -> (cast e: ImagePanel).scale, (e, scale) -> (cast e: ImagePanel).scale = scale);
 	}
 
 	/** Shows the image named `name` in `imagePanel`, or no image if `name` is "". */
 	public function applyImage(imagePanel: ImagePanel, name: String): Void {
-		var currentImageName: String = CanvasUtils.getImageName(imagePanel.image);
 		if (name == "") {
-			ElementEvents.propertyChanged.emit(imagePanel, "image", currentImageName, "");
 			imagePanel.image = null;
 			imagePanel.width = 32;
 			imagePanel.height = 32;
 		} else {
 			var img: kha.Image = Koui.getImage(name);
 			if (img == null) return;
-			ElementEvents.propertyChanged.emit(imagePanel, "image", currentImageName, name);
 			imagePanel.image = img;
 		}
 		// A chosen image (or none) replaces a missing one
 		CanvasUtils.forgetMissingImage(imagePanel);
 		Koui.updateElementSize(imagePanel);
+		History.edited("Change image");
 	}
 }
