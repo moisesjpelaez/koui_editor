@@ -8,10 +8,7 @@ import arm.utils
 import arm.props_traits as pt
 import arm.log as log
 
-# Capture this library's directory at module load time.
-# Armory reuses the same 'blender' module name for all libraries, so __file__
-# will point to whichever library was loaded last. Freezing it here ensures
-# KOUI_OT_launch_editor always resolves to the koui_editor directory.
+# This library's folder: the built editor is in its tools/ folder, the default theme in its Assets/
 _KOUI_EDITOR_DIR = os.path.dirname(os.path.realpath(__file__))
 
 

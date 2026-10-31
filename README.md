@@ -1,7 +1,7 @@
 # Koui Editor
 A [Koui](https://gitlab.com/koui/Koui) editor for [Armory 3D](https://armory3d.org/engine/). This library replaces Armory 2D when the user creates and edits a new UI Canvas.
 
-## Instalation and Setup
+## Installation and Setup
 - Locate the `.blend` file you are working with
 - Create `Libraries` folder alongside your `.blend` file
 - `git clone --recursive https://github.com/moisesjpelaez/koui_editor.git` into `Libraries` folder
