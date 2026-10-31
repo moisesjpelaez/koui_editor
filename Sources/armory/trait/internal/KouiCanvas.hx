@@ -16,13 +16,6 @@ import koui.events.MouseEvent.MouseHoverEvent;
 import koui.utils.RadioGroup;
 import koui.utils.SceneManager;
 
-// Runtime scene storage
-private typedef TKouiScene = {
-	var key: String;
-	var root: AnchorPane;
-	/** The name of each element; elements are found by path through the tree. */
-	var keys: Map<Element, String>;
-}
 
 /**
  * Runtime trait for loading and displaying Koui canvases.
@@ -45,13 +38,13 @@ class KouiCanvas extends Trait {
 	public var cnvName: String;
 
 	/** All scenes in this canvas */
-	private var scenes: Map<String, TKouiScene>;
+	private var scenes: Map<String, TBuiltScene>;
 
 	/** Global radio groups shared across all scenes */
 	private var radioGroups: Map<String, RadioGroup>;
 
 	/** The currently active scene */
-	private var currentScene: TKouiScene;
+	private var currentScene: TBuiltScene;
 
 	/** Whether the canvas has finished loading */
 	public var ready(get, null): Bool;
@@ -174,49 +167,20 @@ class KouiCanvas extends Trait {
 			}
 		}
 
-		// Radio groups are shared by all scenes
-		for (group in CanvasLoader.createRadioGroups(canvasData)) {
-			radioGroups.set(group.id, group);
-		}
-
-		// Build each scene
-		var builtScenes: Map<String, TBuiltScene> = new Map();
-		for (sceneData in canvasData.scenes) {
-			if (scenes.exists(sceneData.key)) throw 'two scenes are named "${sceneData.key}"';
-			buildScene(sceneData, canvasData.canvas.width, canvasData.canvas.height);
-			var kouiScene: TKouiScene = scenes.get(sceneData.key);
-			builtScenes.set(sceneData.key, { root: kouiScene.root, keys: kouiScene.keys });
-		}
-		CanvasLoader.applyActiveButtons(canvasData, radioGroups, builtScenes);
-
-		// Activate the scene marked as active (if any)
-		for (sceneData in canvasData.scenes) {
-			if (sceneData.active) {
-				setScene(sceneData.key);
-				break;
-			}
-		}
-	}
-
-	/**
-	 * Build a single scene from JSON data.
-	 */
-	private function buildScene(sceneData: TSceneData, canvasWidth: Int, canvasHeight: Int): Void {
-		var kouiScene: TKouiScene = {
-			key: sceneData.key,
-			root: null,
-			keys: new Map()
-		};
-
-		// Registered first, so a scene that fails to build is still cleaned up
-		scenes.set(sceneData.key, kouiScene);
-
-		// Use SceneManager to create the scene
-		SceneManager.addScene(sceneData.key, function(scenePane: AnchorPane) {
-			scenePane.setSize(canvasWidth, canvasHeight);
-			kouiScene.root = scenePane;
-			kouiScene.keys = CanvasLoader.buildScene(sceneData, scenePane, radioGroups);
+		// Each scene is built into a Koui scene; registered first, so one that fails to build is still cleaned up
+		var built: TBuiltCanvas = CanvasLoader.buildCanvas(canvasData, key -> {
+			var scene: TBuiltScene = { key: key, root: null, keys: new Map() };
+			scenes.set(key, scene);
+			SceneManager.addScene(key, pane -> {
+				pane.setSize(canvasData.canvas.width, canvasData.canvas.height);
+				scene.root = pane;
+			});
+			return scene.root;
 		});
+		for (scene in built.scenes) scenes.set(scene.key, scene);
+		for (group in built.radioGroups) radioGroups.set(group.id, group);
+
+		if (built.activeScene != null) setScene(built.activeScene);
 	}
 
 	function onAppResized(w: Int, h: Int): Void {
@@ -261,7 +225,7 @@ class KouiCanvas extends Trait {
 	 * @return True if the scene was found and switched, false otherwise
 	 */
 	public function setScene(sceneName: String): Bool {
-		var scene: TKouiScene = scenes.get(sceneName);
+		var scene: TBuiltScene = scenes.get(sceneName);
 		if (scene == null) {
 			trace('[KouiCanvas] Scene not found: "$sceneName"');
 			return false;
@@ -313,7 +277,7 @@ class KouiCanvas extends Trait {
 	 * @return The element, or null if not found
 	 */
 	public function getElement(path: String, ?sceneName: String): Null<Element> {
-		var scene: TKouiScene = getSceneForAccess(sceneName);
+		var scene: TBuiltScene = getSceneForAccess(sceneName);
 		if (scene == null) return null;
 
 		var element: Element = CanvasLoader.findByPath(scene.root, scene.keys, path);
@@ -354,7 +318,7 @@ class KouiCanvas extends Trait {
 	 * @return Array of all element paths
 	 */
 	public function getElementKeys(?sceneName: String): Array<String> {
-		var scene: TKouiScene = getSceneForAccess(sceneName);
+		var scene: TBuiltScene = getSceneForAccess(sceneName);
 		if (scene == null) return [];
 		var paths: Array<String> = [];
 		collectElementPaths(scene, scene.root, "", paths);
@@ -364,7 +328,7 @@ class KouiCanvas extends Trait {
 	/**
 	 * Internal helper to recursively collect element paths.
 	 */
-	private function collectElementPaths(scene: TKouiScene, parent: Element, parentPath: String, output: Array<String>): Void {
+	private function collectElementPaths(scene: TBuiltScene, parent: Element, parentPath: String, output: Array<String>): Void {
 		for (child in HierarchyUtils.getChildren(parent)) {
 			var childKey = scene.keys.get(child);
 			if (childKey == null) continue;
@@ -379,12 +343,12 @@ class KouiCanvas extends Trait {
 	}
 
 	/** The named scene, or the current one if `sceneName` is null; traces why if there is none. */
-	private function getSceneForAccess(sceneName: Null<String>): Null<TKouiScene> {
+	private function getSceneForAccess(sceneName: Null<String>): Null<TBuiltScene> {
 		if (sceneName == null) {
 			if (currentScene == null) trace('[KouiCanvas] No scene active');
 			return currentScene;
 		}
-		var scene: TKouiScene = scenes.get(sceneName);
+		var scene: TBuiltScene = scenes.get(sceneName);
 		if (scene == null) trace('[KouiCanvas] Scene not found: "$sceneName"');
 		return scene;
 	}
@@ -462,7 +426,7 @@ class KouiCanvas extends Trait {
 	 * @return True if added, false otherwise (the reason is traced)
 	 */
 	public function addElement(sceneName: String, key: String, element: Element, anchor: Anchor = Anchor.TopLeft, parentKey: String = null): Bool {
-		var scene: TKouiScene = scenes.get(sceneName);
+		var scene: TBuiltScene = scenes.get(sceneName);
 		if (scene == null) {
 			trace('[KouiCanvas] Scene not found: "$sceneName"');
 			return false;
@@ -532,7 +496,6 @@ class KouiCanvas extends Trait {
 			trace('[KouiCanvas] Z-order control not supported for GridLayout/RowLayout/ColLayout');
 			return false;
 		}
-		// The container's own list of children (AnchorPane, ScrollPane, Expander or Panel)
 		var children: Array<Element> = HierarchyUtils.getChildren(parent);
 
 		// Clamp index
@@ -542,6 +505,7 @@ class KouiCanvas extends Trait {
 		// Move to desired index
 		children.remove(element);
 		children.insert(index, element);
+		HierarchyUtils.setChildren(parent, children);
 
 		return true;
 	}
@@ -555,7 +519,7 @@ class KouiCanvas extends Trait {
 	 * @return True if removed, false if it wasn't found
 	 */
 	public function removeElement(sceneName: String, keyOrPath: String): Bool {
-		var scene: TKouiScene = scenes.get(sceneName);
+		var scene: TBuiltScene = scenes.get(sceneName);
 		if (scene == null) return false;
 
 		var element: Element = CanvasLoader.findByPath(scene.root, scene.keys, keyOrPath);
@@ -570,7 +534,7 @@ class KouiCanvas extends Trait {
 	}
 
 	/** Removes the names of `element` and everything inside it. */
-	function forgetKeys(scene: TKouiScene, element: Element): Void {
+	function forgetKeys(scene: TBuiltScene, element: Element): Void {
 		for (child in HierarchyUtils.getChildren(element)) forgetKeys(scene, child);
 		scene.keys.remove(element);
 	}

@@ -20,17 +20,6 @@ import arm.tools.NameUtils;
 import arm.types.Enums;
 import arm.types.Types;
 import arm.editors.ElementRegistry;
-import arm.editors.LabelEditor;
-import arm.editors.ImagePanelEditor;
-import arm.editors.PanelEditor;
-import arm.editors.ButtonEditor;
-import arm.editors.CheckboxEditor;
-import arm.editors.RadioButtonEditor;
-import arm.editors.AnchorPaneEditor;
-import arm.editors.ColLayoutEditor;
-import arm.editors.RowLayoutEditor;
-import arm.editors.ProgressbarEditor;
-import arm.editors.SliderEditor;
 
 import iron.App;
 import iron.system.Input;
@@ -77,17 +66,7 @@ class KouiEditor extends iron.Trait {
 		super();
 
 		// Register element editors
-		ElementRegistry.register(new LabelEditor());
-		ElementRegistry.register(new PanelEditor());
-		ElementRegistry.register(new ImagePanelEditor());
-		ElementRegistry.register(new ButtonEditor());
-		ElementRegistry.register(new CheckboxEditor());
-		ElementRegistry.register(new RadioButtonEditor());
-		ElementRegistry.register(new AnchorPaneEditor());
-		ElementRegistry.register(new ColLayoutEditor());
-		ElementRegistry.register(new RowLayoutEditor());
-		ElementRegistry.register(new ProgressbarEditor());
-		ElementRegistry.register(new SliderEditor());
+		ElementRegistry.registerAll();
 
 		Assets.loadEverything(function() {
 			// Initialize framework

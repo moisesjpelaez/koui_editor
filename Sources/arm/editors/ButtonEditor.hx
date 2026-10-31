@@ -1,39 +1,21 @@
 package arm.editors;
 
-import arm.editors.IElementEditor;
 import arm.panels.PropertyFields;
 import koui.elements.Button;
 import koui.elements.Element;
-import koui.utils.RadioGroup;
 import zui.Zui;
 import zui.Zui.Handle;
 
-class ButtonEditor implements IElementEditor {
-	var textHandle: Handle;
-	var isToggleHandle: Handle;
-	var isPressedHandle: Handle;
+class ButtonEditor extends ElementEditor {
+	var textHandle: Handle = new Handle();
+	var isToggleHandle: Handle = new Handle();
+	var isPressedHandle: Handle = new Handle();
 
-	public function new() { initHandles(); }
-
-	public var typeName(get, never): String;
-	public var displayName(get, never): String;
-	public var category(get, never): String;
-
-	function get_typeName(): String return "Button";
-	function get_displayName(): String return "Button";
-	function get_category(): String return "Buttons";
-
-	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
-		return new Button("New Button");
+	public function new() {
+		super("Button", "Button", "Buttons", groups -> new Button("New Button"));
 	}
 
-	public function initHandles(): Void {
-		textHandle = new Handle();
-		isToggleHandle = new Handle();
-		isPressedHandle = new Handle();
-	}
-
-	public function drawProperties(ui: Zui, elements: Array<Element>): Void {
+	override public function drawProperties(ui: Zui, elements: Array<Element>): Void {
 		ui.text("Button Properties", Center);
 		ui.separator();
 

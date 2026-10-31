@@ -8,7 +8,7 @@ import arm.data.Selection;
 import arm.events.SceneEvents;
 import arm.events.ElementEvents;
 import arm.editors.ElementRegistry;
-import arm.editors.IElementEditor;
+import arm.editors.ElementEditor;
 import arm.types.Enums;
 import arm.types.Types;
 import arm.base.UIBase;
@@ -417,7 +417,7 @@ class PropertiesPanel {
 		var single: Bool = elements.length == 1;
 
 		// The type-specific section only shows when all selected elements share a type
-		var editor: IElementEditor = PropertyFields.shared(elements, e -> ElementRegistry.getForElement(e));
+		var editor: ElementEditor = PropertyFields.shared(elements, e -> ElementRegistry.getForElement(e));
 		if (!single) ui.text('${elements.length} elements selected', Left);
 		ui.text(editor != null ? editor.typeName : "Mixed types", Right);
 		if (editor != null) editor.drawProperties(ui, elements);

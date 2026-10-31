@@ -504,15 +504,7 @@ class CanvasUtils {
 	 */
 	static function deserializeCanvas(canvasData: TCanvasData): Void {
 		checkBuildable(canvasData);
-
-		var activeSceneKey: String = null;
-		for (sceneDataEntry in canvasData.scenes) {
-			if (sceneDataEntry.active) {
-				activeSceneKey = sceneDataEntry.key;
-				break;
-			}
-		}
-		rebuildCanvas(canvasData, activeSceneKey);
+		rebuildCanvas(canvasData, null);
 
 		var reported: Array<String> = [];
 		for (panel => name in imageNames) {
@@ -530,8 +522,8 @@ class CanvasUtils {
 
 	/**
 	 * Replaces the editor's canvas with `canvasData`, which must be valid, and
-	 * shows the scene `sceneKey` (or the last scene if it is null). Used by
-	 * loading and by undo/redo.
+	 * shows the scene `sceneKey` (or the one saved as shown if it is null).
+	 * Used by loading and by undo/redo.
 	 */
 	public static function rebuildCanvas(canvasData: TCanvasData, sceneKey: Null<String>): Void {
 		// Remove and free the existing scenes
@@ -544,38 +536,32 @@ class CanvasUtils {
 		CanvasSettings.scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
 		CanvasSettings.scaleVertical = canvasData.canvas.settings.scaleVertical;
 
-		// Radio groups are shared by all scenes; the editor always has at least one
-		var radioGroups: Array<RadioGroup> = CanvasLoader.createRadioGroups(canvasData);
-		if (radioGroups.length == 0) radioGroups.push(new RadioGroup("RadioGroup"));
-		var radioGroupMap: Map<String, RadioGroup> = [for (group in radioGroups) group.id => group];
-
-		var builtScenes: Map<String, TBuiltScene> = new Map();
+		// Each scene is built into an editor scene (KouiEditor.onSceneAdded sets it up)
+		var built: TBuiltCanvas = CanvasLoader.buildCanvas(canvasData, key -> {
+			SceneEvents.sceneAdded.emit(key);
+			return sceneData.currentScene.root;
+		});
+		for (builtScene in built.scenes) {
+			var scene: TSceneEntry = sceneData.getScene(builtScene.key);
+			for (element => key in builtScene.keys) sceneData.registerElement(element, key, scene);
+		}
 		for (sceneDataEntry in canvasData.scenes) {
-			// Emit sceneAdded - this triggers KouiEditor.onSceneAdded which properly sets up the scene
-			SceneEvents.sceneAdded.emit(sceneDataEntry.key);
-			var scene: TSceneEntry = sceneData.currentScene;
-
-			var keys: Map<Element, String> = CanvasLoader.buildScene(sceneDataEntry, scene.root, radioGroupMap);
-			for (element => key in keys) sceneData.registerElement(element, key, scene);
-			builtScenes.set(scene.key, { root: scene.root, keys: keys });
-
+			var scene: TSceneEntry = sceneData.getScene(sceneDataEntry.key);
 			for (elemData in sceneDataEntry.elements) {
 				var path: String = CanvasLoader.joinPath(elemData.parent, elemData.key);
-				rememberImageName(CanvasLoader.findByPath(scene.root, keys, path), elemData);
+				rememberImageName(CanvasLoader.findByPath(scene.root, scene.keys, path), elemData);
 			}
 		}
 
-		// Radio buttons may have created groups the canvas didn't list
-		for (group in radioGroupMap) {
-			if (radioGroups.indexOf(group) < 0) radioGroups.push(group);
-		}
-		sceneData.radioGroups = radioGroups;
-		CanvasLoader.applyActiveButtons(canvasData, radioGroupMap, builtScenes);
+		// Radio groups are shared by all scenes; the editor always has at least one
+		if (built.radioGroups.length == 0) built.radioGroups.push(new RadioGroup("RadioGroup"));
+		sceneData.radioGroups = built.radioGroups;
 
 		// If no scenes were loaded, create a default scene
 		if (sceneData.scenes.length == 0) {
 			SceneEvents.sceneAdded.emit(SceneData.FIRST_SCENE);
 		}
+		if (sceneKey == null) sceneKey = built.activeScene;
 		if (sceneKey == null || sceneData.getScene(sceneKey) == null) sceneKey = sceneData.currentScene.key;
 		SceneEvents.sceneChanged.emit(sceneKey);
 
@@ -584,18 +570,14 @@ class CanvasUtils {
 
 	/** Builds `canvasData` into throwaway panes, so invalid data throws before the editor is changed. */
 	static function checkBuildable(canvasData: TCanvasData): Void {
-		var radioGroupMap: Map<String, RadioGroup> = [for (group in CanvasLoader.createRadioGroups(canvasData)) group.id => group];
-		var builtScenes: Map<String, TBuiltScene> = new Map();
 		var roots: Array<AnchorPane> = [];
-
+		var makeRoot = key -> {
+			var root: AnchorPane = new AnchorPane(0, 0, canvasData.canvas.width, canvasData.canvas.height);
+			roots.push(root);
+			return root;
+		};
 		try {
-			for (sceneDataEntry in canvasData.scenes) {
-				if (builtScenes.exists(sceneDataEntry.key)) throw 'two scenes are named "${sceneDataEntry.key}"';
-				var root: AnchorPane = new AnchorPane(0, 0, canvasData.canvas.width, canvasData.canvas.height);
-				roots.push(root);
-				builtScenes.set(sceneDataEntry.key, { root: root, keys: CanvasLoader.buildScene(sceneDataEntry, root, radioGroupMap) });
-			}
-			CanvasLoader.applyActiveButtons(canvasData, radioGroupMap, builtScenes);
+			CanvasLoader.buildCanvas(canvasData, makeRoot);
 		} catch (e: Dynamic) {
 			for (root in roots) root.destroy();
 			throw e;
@@ -638,42 +620,32 @@ class CanvasUtils {
 
 		// Pasted radio buttons join the canvas' groups
 		var radioGroupMap: Map<String, RadioGroup> = [for (group in sceneData.radioGroups) group.id => group];
-
-		// Map from a copied element's path (within its copied tree) to its new element
-		var pathToElement: Map<String, Element> = new Map();
 		var pastedRoots: Array<Element> = [];
 
+		// The clipboard holds one or more copied trees, each starting with its root (parent "")
+		var trees: Array<Array<TElementData>> = [];
 		for (elemData in clipboardData) {
-			// The clipboard can hold several copied trees; paths only need to be unique within each
-			var isTreeRoot: Bool = elemData.parent == "";
-			if (isTreeRoot) pathToElement = new Map();
+			if (elemData.parent == "") trees.push([]);
+			if (trees.length > 0) trees[trees.length - 1].push(elemData);
+		}
 
-			var parent: Element = isTreeRoot ? pasteParent : pathToElement.get(elemData.parent);
-			if (parent == null) continue;
-
-			var element: Element = CanvasElements.create(elemData, radioGroupMap);
-			if (element == null) continue;
-			rememberImageName(element, elemData);
-
-			// Names are unique among siblings: a copied tree's root gets a free name in
-			// the container it's pasted into; the elements inside it keep theirs
-			var proposedKey: String = isTreeRoot ? NameUtils.nextUniqueName(elemData.key, NameUtils.getSiblingNames(null, pasteParent)) : elemData.key;
-
-			pathToElement.set(CanvasLoader.joinPath(elemData.parent, elemData.key), element);
-
-			if (isTreeRoot) {
-				if (!Std.isOfType(pasteParent, GridLayout)) element.setPosition(elemData.posX + 10, elemData.posY + 10);
-				if (pasteParent == scene.root) {
-					scene.root.add(element, cast elemData.anchor);
-				} else {
-					HierarchyUtils.moveAsChild(element, pasteParent);
-				}
-				pastedRoots.push(element);
-			} else {
-				// Child element — add to its parent
-				HierarchyUtils.moveAsChild(element, parent);
+		for (tree in trees) {
+			// Pasted next to the original, except in a Row/Col cell, without changing the clipboard
+			var rootData: TElementData = Reflect.copy(tree[0]);
+			if (!Std.isOfType(pasteParent, GridLayout)) {
+				rootData.posX += 10;
+				rootData.posY += 10;
 			}
-			sceneData.registerElement(element, proposedKey, scene);
+			tree[0] = rootData;
+
+			// Names are unique among siblings: the tree's root gets a free name in the container
+			// it's pasted into (before it's there); the elements inside it keep theirs
+			var rootKey: String = NameUtils.nextUniqueName(rootData.key, NameUtils.getSiblingNames(null, pasteParent));
+			var built: TBuiltTree = CanvasLoader.buildTree(tree, pasteParent, radioGroupMap, "pasted elements");
+			var pastedRoot: Element = built.byPath.get(rootData.key);
+			for (element => key in built.keys) sceneData.registerElement(element, element == pastedRoot ? rootKey : key, scene);
+			for (elemData in tree) rememberImageName(built.byPath.get(CanvasLoader.joinPath(elemData.parent, elemData.key)), elemData);
+			pastedRoots.push(pastedRoot);
 		}
 
 		// A pasted radio button whose group was deleted since the copy brings the group back

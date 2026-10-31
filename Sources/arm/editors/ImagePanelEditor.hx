@@ -1,44 +1,29 @@
 package arm.editors;
 
-import arm.editors.IElementEditor;
 import arm.panels.PropertyFields;
 import arm.data.History;
 import arm.tools.CanvasUtils;
 import koui.elements.Element;
 import koui.elements.ImagePanel;
 import koui.Koui;
-import koui.utils.RadioGroup;
 import zui.Zui;
 import zui.Zui.Handle;
 
 @:access(koui.Koui)
-class ImagePanelEditor implements IElementEditor {
-	var imageHandle: Handle;
-	var scaleHandle: Handle;
+class ImagePanelEditor extends ElementEditor {
+	var imageHandle: Handle = new Handle();
+	var scaleHandle: Handle = new Handle();
 
-	public function new() { initHandles(); }
-
-	public var typeName(get, never): String;
-	public var displayName(get, never): String;
-	public var category(get, never): String;
-
-	function get_typeName(): String return "ImagePanel";
-	function get_displayName(): String return "Image Panel";
-	function get_category(): String return "Basic";
-
-	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
-		var imagePanel = new ImagePanel(null);
-		imagePanel.width = 32;
-		imagePanel.height = 32;
-		return imagePanel;
+	public function new() {
+		super("ImagePanel", "Image Panel", "Basic", groups -> {
+			var imagePanel: ImagePanel = new ImagePanel(null);
+			imagePanel.width = 32;
+			imagePanel.height = 32;
+			imagePanel;
+		});
 	}
 
-	public function initHandles(): Void {
-		imageHandle = new Handle();
-		scaleHandle = new Handle();
-	}
-
-	public function drawProperties(ui: Zui, elements: Array<Element>): Void {
+	override public function drawProperties(ui: Zui, elements: Array<Element>): Void {
 		ui.text("Image Properties", Center);
 		ui.separator();
 

@@ -1,39 +1,21 @@
 package arm.editors;
 
-import arm.editors.IElementEditor;
 import arm.canvas.CanvasElements;
 import arm.panels.PropertyFields;
 import koui.elements.Checkbox;
 import koui.elements.Element;
-import koui.utils.RadioGroup;
 import zui.Zui;
 import zui.Zui.Handle;
 
-@:access(koui.elements.Element)
-class CheckboxEditor implements IElementEditor {
-	var textHandle: Handle;
-	var isCheckedHandle: Handle;
+class CheckboxEditor extends ElementEditor {
+	var textHandle: Handle = new Handle();
+	var isCheckedHandle: Handle = new Handle();
 
-	public function new() { initHandles(); }
-
-	public var typeName(get, never): String;
-	public var displayName(get, never): String;
-	public var category(get, never): String;
-
-	function get_typeName(): String return "Checkbox";
-	function get_displayName(): String return "Checkbox";
-	function get_category(): String return "Buttons";
-
-	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
-		return new Checkbox("New Checkbox");
+	public function new() {
+		super("Checkbox", "Checkbox", "Buttons", groups -> new Checkbox("New Checkbox"));
 	}
 
-	public function initHandles(): Void {
-		textHandle = new Handle();
-		isCheckedHandle = new Handle();
-	}
-
-	public function drawProperties(ui: Zui, elements: Array<Element>): Void {
+	override public function drawProperties(ui: Zui, elements: Array<Element>): Void {
 		ui.text("Checkbox Properties", Center);
 		ui.separator();
 

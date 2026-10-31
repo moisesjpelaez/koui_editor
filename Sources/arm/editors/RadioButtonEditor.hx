@@ -1,7 +1,6 @@
 package arm.editors;
 
 import arm.data.SceneData;
-import arm.editors.IElementEditor;
 import arm.canvas.CanvasElements;
 import arm.panels.PropertyFields;
 import koui.elements.Element;
@@ -10,39 +9,19 @@ import koui.utils.RadioGroup;
 import zui.Zui;
 import zui.Zui.Handle;
 
-@:access(koui.elements.Element)
-class RadioButtonEditor implements IElementEditor {
-	var textHandle: Handle;
-	var isCheckedHandle: Handle;
-	var groupHandle: Handle;
+class RadioButtonEditor extends ElementEditor {
+	var textHandle: Handle = new Handle();
+	var isCheckedHandle: Handle = new Handle();
+	var groupHandle: Handle = new Handle();
 
-	public function new() { initHandles(); }
-
-	public var typeName(get, never): String;
-	public var displayName(get, never): String;
-	public var category(get, never): String;
-
-	function get_typeName(): String return "RadioButton";
-	function get_displayName(): String return "Radio Button";
-	function get_category(): String return "Buttons";
-
-	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
-		var group: RadioGroup = null;
-		if (radioGroups != null && radioGroups.length > 0) {
-			group = radioGroups[0];
-		} else {
-			group = new RadioGroup("RadioGroup");
-		}
-		return new RadioButton(group, "New Radio");
+	public function new() {
+		super("RadioButton", "Radio Button", "Buttons", groups -> {
+			var group: RadioGroup = groups.length > 0 ? groups[0] : new RadioGroup("RadioGroup");
+			new RadioButton(group, "New Radio");
+		});
 	}
 
-	public function initHandles(): Void {
-		textHandle = new Handle();
-		isCheckedHandle = new Handle();
-		groupHandle = new Handle();
-	}
-
-	public function drawProperties(ui: Zui, elements: Array<Element>): Void {
+	override public function drawProperties(ui: Zui, elements: Array<Element>): Void {
 		ui.text("Radio Button Properties", Center);
 		ui.separator();
 
