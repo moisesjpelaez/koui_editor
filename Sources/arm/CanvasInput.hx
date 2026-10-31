@@ -65,8 +65,9 @@ class CanvasInput {
 	// The first one is the primary element; the others change by the same amount.
 	var resizeHandle: Null<THandle> = null;
 	var resizedElements: Array<TResizedElement> = [];
-	var resizeLeadRect: TScreenRect;
-	var resizeRootRect: TScreenRect;
+	/** The primary element's top-left corner when the resize started, in canvas units (see `canvasCorner`). */
+	var resizeLeadX: Float = 0;
+	var resizeLeadY: Float = 0;
 
 	// Drag state: the dragged elements with their positions, and the mouse position, when the press started.
 	// The first one is the element under the mouse (or its selected container); it snaps to the grid.
@@ -74,9 +75,9 @@ class CanvasInput {
 	var dragStarted: Bool = false;
 	var dragMouseX: Float = 0;
 	var dragMouseY: Float = 0;
-	/** The lead element's and the scene's screen rectangles when the drag started, for snapping to the grid. */
-	var dragLeadRect: TScreenRect;
-	var dragRootRect: TScreenRect;
+	/** The lead element's top-left corner when the drag started, in canvas units, for snapping to the grid. */
+	var dragLeadX: Float = 0;
+	var dragLeadY: Float = 0;
 	/** Pressed on an already selected element: if the mouse doesn't move, only this one gets selected on release. */
 	var clickedInSelection: Null<Element> = null;
 
@@ -253,8 +254,8 @@ class CanvasInput {
 			else draggedElements.push(dragged);
 		}
 		if (draggedElements.length > 0) {
-			dragLeadRect = viewport.getScreenRect(draggedElements[0].element);
-			dragRootRect = viewport.getScreenRect(SceneData.data.getRoot());
+			dragLeadX = canvasCorner(draggedElements[0].element, true);
+			dragLeadY = canvasCorner(draggedElements[0].element, false);
 		}
 	}
 
@@ -264,6 +265,7 @@ class CanvasInput {
 	 * snapping, the first element's top-left corner lands on the grid (drawn
 	 * from the scene's corner, whatever the element's anchor or container) and
 	 * the others move by the same amount, so their spacing stays the same.
+	 * Moving and resizing snap by the same rule, see `canvasCorner`.
 	 */
 	function moveDraggedElements(mouse: Mouse): Void {
 		var mouseMoveX: Float = mouse.x - dragMouseX;
@@ -283,18 +285,8 @@ class CanvasInput {
 		topToolbar.snapInverted = Input.getKeyboard().down("control");
 		if (topToolbar.isSnapping()) {
 			var snapValue: Float = topToolbar.snapValue;
-			var lead: TDraggedElement = draggedElements[0];
-			// Directly in the scene, a left/top-anchored position is the corner in exact canvas units;
-			// otherwise the corner is measured as drawn (in whole pixels), like resizing does
-			var inScene: Bool = HierarchyUtils.getParentElement(lead.element) == SceneData.data.getRoot();
-			if (!lockX) {
-				var left: Float = inScene && anchorSide(lead.element, true) == -1 ? lead.startX : (dragLeadRect.x - dragRootRect.x) / Koui.uiScale;
-				moveX = Math.round((left + moveX) / snapValue) * snapValue - left;
-			}
-			if (!lockY) {
-				var top: Float = inScene && anchorSide(lead.element, false) == -1 ? lead.startY : (dragLeadRect.y - dragRootRect.y) / Koui.uiScale;
-				moveY = Math.round((top + moveY) / snapValue) * snapValue - top;
-			}
+			if (!lockX) moveX = Math.round((dragLeadX + moveX) / snapValue) * snapValue - dragLeadX;
+			if (!lockY) moveY = Math.round((dragLeadY + moveY) / snapValue) * snapValue - dragLeadY;
 		}
 
 		for (dragged in draggedElements) {
@@ -366,8 +358,8 @@ class CanvasInput {
 			if (element == Selection.primary) resizedElements.unshift(resized);
 			else resizedElements.push(resized);
 		}
-		resizeLeadRect = viewport.getScreenRect(Selection.primary);
-		resizeRootRect = viewport.getScreenRect(SceneData.data.getRoot());
+		resizeLeadX = canvasCorner(Selection.primary, true);
+		resizeLeadY = canvasCorner(Selection.primary, false);
 		draggedElements = [];
 		clickedInSelection = null;
 		dragStarted = false;
@@ -395,13 +387,13 @@ class CanvasInput {
 		var moveY: Float = 0;
 		if (handle.x != 0) {
 			// The grabbed edge, in canvas units from the scene's left side, like the grid
-			var edge: Float = (resizeLeadRect.x + (handle.x > 0 ? resizeLeadRect.w : 0) - resizeRootRect.x) / Koui.uiScale;
+			var edge: Float = resizeLeadX + (handle.x > 0 ? lead.startW : 0);
 			var target: Float = edge + (mouse.x - dragMouseX) / Koui.uiScale;
 			if (snapping) target = Math.round(target / snapValue) * snapValue;
 			moveX = target - edge;
 		}
 		if (handle.y != 0) {
-			var edge: Float = (resizeLeadRect.y + (handle.y > 0 ? resizeLeadRect.h : 0) - resizeRootRect.y) / Koui.uiScale;
+			var edge: Float = resizeLeadY + (handle.y > 0 ? lead.startH : 0);
 			var target: Float = edge + (mouse.y - dragMouseY) / Koui.uiScale;
 			if (snapping) target = Math.round(target / snapValue) * snapValue;
 			moveY = target - edge;
@@ -453,6 +445,35 @@ class CanvasInput {
 		if (anchor == side) newPos = start + move * dragDirection(element, horizontal);
 		else if (anchor == 0) newPos = start + Std.int(move / 2);
 		return [newPos, newSize];
+	}
+
+	/**
+	 * The element's left (top) edge in canvas units from the scene's corner,
+	 * where the grid is drawn from. In the scene and in AnchorPanes it follows
+	 * Koui's layout rules without rounding to screen pixels, so snapping is
+	 * exact at every zoom. Row/Col layouts round each cell to whole pixels at
+	 * the current zoom, so there the edge is measured as drawn.
+	 */
+	function canvasCorner(element: Element, horizontal: Bool): Float {
+		var root: AnchorPane = SceneData.data.getRoot();
+		if (element == root) return 0;
+
+		if (Std.isOfType(element.layout, AnchorPane)) {
+			var pane: AnchorPane = cast element.layout;
+			var pos: Float = horizontal ? element.posX : element.posY;
+			var size: Float = horizontal ? element.layoutWidth : element.layoutHeight;
+			var paneSize: Float = horizontal ? pane.layoutWidth : pane.layoutHeight;
+			var offset: Float = switch (anchorSide(element, horizontal)) {
+				case -1: pos + (horizontal ? pane.paddingLeft : pane.paddingTop);
+				case 0: paneSize / 2 - size / 2 + pos;
+				default: paneSize - size + pos - (horizontal ? pane.paddingRight : pane.paddingBottom);
+			}
+			return canvasCorner(pane, horizontal) + offset;
+		}
+
+		var rect: TScreenRect = viewport.getScreenRect(element);
+		var rootRect: TScreenRect = viewport.getScreenRect(root);
+		return horizontal ? (rect.x - rootRect.x) / Koui.uiScale : (rect.y - rootRect.y) / Koui.uiScale;
 	}
 
 	/** -1 if the element is placed from its left (top) edge, 0 from its center, 1 from its right (bottom) edge. */
