@@ -51,14 +51,15 @@ class ImagePanelEditor implements IElementEditor {
 			imageNames.push(key);
 		}
 		PropertyFields.combo(ui, imageHandle, "Image", imageNames, elements, e -> {
-			var index: Int = imageNames.indexOf(CanvasUtils.getImageName((cast e: ImagePanel).image));
+			var index: Int = imageNames.indexOf(CanvasUtils.getImageName(cast e));
 			index >= 0 ? index : 0;
 		}, (e, index) -> applyImage(cast e, index == 0 ? "" : imageNames[index]));
 
 		var missing: Array<String> = [];
 		for (e in elements) {
-			var missingName: Null<String> = CanvasUtils.getMissingImageName(cast e);
-			if (missingName != null && missing.indexOf(missingName) < 0) missing.push(missingName);
+			if (!CanvasUtils.isImageMissing(cast e)) continue;
+			var missingName: String = CanvasUtils.getImageName(cast e);
+			if (missing.indexOf(missingName) < 0) missing.push(missingName);
 		}
 		if (missing.length > 0) {
 			ui.text('Missing image ${missing.join(", ")}: the name is kept when saving', Left);
@@ -79,7 +80,7 @@ class ImagePanelEditor implements IElementEditor {
 			imagePanel.image = img;
 		}
 		// A chosen image (or none) replaces a missing one
-		CanvasUtils.forgetMissingImage(imagePanel);
+		CanvasUtils.setImageName(imagePanel, name);
 		Koui.updateElementSize(imagePanel);
 		History.edited("Change image");
 	}

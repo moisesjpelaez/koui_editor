@@ -160,6 +160,9 @@ class PropertiesPanel {
                 uiBase.ui.text("On Window Resize", Center);
                 uiBase.ui.separator();
 
+                // The checkboxes show the canvas' settings, which loading and undo change
+                expandOnResizeHandle.selected = CanvasSettings.expandOnResize;
+                scaleOnResizeHandle.selected = CanvasSettings.scaleOnResize;
                 CanvasSettings.expandOnResize = uiBase.ui.check(expandOnResizeHandle, "Expand");
                 if (CanvasSettings.expandOnResize) CanvasSettings.scaleOnResize = uiBase.ui.check(scaleOnResizeHandle, "Scale");
 
@@ -263,8 +266,9 @@ class PropertiesPanel {
                 ui.text("No buttons in this group.");
             } else {
                 for (button in group.buttons.copy()) {
-                    var key = sceneData.getElementKey(button);
-                    var label = key != null ? key : "(removed)";
+                    // Groups are canvas-wide: a button can be in any scene
+                    var path: Null<String> = elementLabel(button);
+                    var label = path != null ? path : "(removed)";
                     if (group.activeButton == button) label += " [active]";
 
                     ui.row([5/6, 1/6]);
@@ -301,7 +305,7 @@ class PropertiesPanel {
 
         for (element in sceneData.getElements()) {
             if (Std.isOfType(element, RadioButton)) {
-                entries.push({ key: sceneData.getElementKey(element), button: cast element });
+                entries.push({ key: elementLabel(element), button: cast element });
             }
         }
 
@@ -529,9 +533,12 @@ class PropertiesPanel {
 
         nameHandle.text = elemName;
         var newName: String = ui.textInput(nameHandle, "Key", Right);
+        // The rename goes to the element it was typed for, even if the selection changed since
+        element = PropertyFields.textEditTargets(ui, nameHandle, [element])[0];
+        elemName = sceneData.getElementKey(element);
         if (nameHandle.changed) {
             // "/" separates the names in an element's path
-            if (newName != null && newName != "" && newName != elemName && newName.indexOf("/") < 0) {
+            if (elemName != null && newName != null && newName != "" && newName != elemName && newName.indexOf("/") < 0) {
                 // Names are unique among siblings; a taken name gets a free number instead
                 var uniqueName: String = NameUtils.ensureUniqueName(newName, element, HierarchyUtils.getParentElement(element));
                 if (uniqueName != elemName) {
@@ -539,7 +546,6 @@ class PropertiesPanel {
                     History.edited("Rename");
                 }
             }
-            nameHandle.text = sceneData.getElementKey(element);
             uiBase.hwnds[PanelHierarchy].redraws = 2;
             uiBase.hwnds[PanelProperties].redraws = 2;
         }
@@ -562,29 +568,33 @@ class PropertiesPanel {
         ui.text("Navigation", Left);
         ui.separator();
 
-        var focusableNames: Array<String> = ["(none)"];
-        var elementMap: Map<String, Element> = new Map();
-        for (other in sceneData.getElements()) {
-            if (other != element && other.canFocus) {
-                var key: String = sceneData.getElementKey(other);
-                focusableNames.push(key);
-                elementMap.set(key, other);
-            }
-        }
+        // Listed by path and picked by position: names are only unique among siblings
+        var focusable: Array<Element> = [for (other in sceneData.getElements()) if (other != element && other.canFocus) other];
+        var labels: Array<String> = ["(none)"].concat([for (other in focusable) elementLabel(other)]);
 
-        var drawFocusCombo = function(label: String, handle: Handle, setTarget: Element->Void) {
-            var newIdx = ui.combo(handle, focusableNames, label, true, Right);
+        var drawFocusCombo = function(label: String, handle: Handle, target: Element, setTarget: Element->Void) {
+            handle.position = focusable.indexOf(target) + 1;
+            var picked: Int = ui.combo(handle, labels, label, true, Right);
             if (handle.changed) {
-                var selectedName = focusableNames[newIdx];
-                setTarget(selectedName == "(none)" ? null : elementMap.get(selectedName));
+                setTarget(picked > 0 ? focusable[picked - 1] : null);
                 History.edited('Change $label');
             }
         };
 
-        drawFocusCombo("Focus Up", focusUpHandle, function(e) element.focusUp = e);
-        drawFocusCombo("Focus Down", focusDownHandle, function(e) element.focusDown = e);
-        drawFocusCombo("Focus Left", focusLeftHandle, function(e) element.focusLeft = e);
-        drawFocusCombo("Focus Right", focusRightHandle, function(e) element.focusRight = e);
+        drawFocusCombo("Focus Up", focusUpHandle, element.focusUp, function(e) element.focusUp = e);
+        drawFocusCombo("Focus Down", focusDownHandle, element.focusDown, function(e) element.focusDown = e);
+        drawFocusCombo("Focus Left", focusLeftHandle, element.focusLeft, function(e) element.focusLeft = e);
+        drawFocusCombo("Focus Right", focusRightHandle, element.focusRight, function(e) element.focusRight = e);
+    }
+
+    /** The element's path in the current scene, "scene: path" in another one, or null if it's in no scene. */
+    function elementLabel(element: Element): Null<String> {
+        for (scene in sceneData.scenes) {
+            if (!scene.keys.exists(element)) continue;
+            var path: String = CanvasLoader.getPath(element, scene.root, scene.keys);
+            return scene == sceneData.currentScene ? path : scene.key + ": " + path;
+        }
+        return null;
     }
 
     function drawAnchorGrid(ui: Zui, elements: Array<Element>) {
@@ -672,21 +682,6 @@ class PropertiesPanel {
             }
         }
 
-        // The focus combos show the single selected element's targets
-        var element: Element = Selection.elements.length == 1 ? Selection.primary : null;
-        if (element != null && element.canFocus) {
-            // Same order as the focus combos in drawNavigation()
-            var focusable: Array<Element> = [for (e in sceneData.getElements()) if (e != element && e.canFocus) e];
-            var getIndex = function(targetElem: Element): Int {
-                if (targetElem == null) return 0;
-                return focusable.indexOf(targetElem) + 1;
-            };
-
-            focusUpHandle.position = getIndex(element.focusUp);
-            focusDownHandle.position = getIndex(element.focusDown);
-            focusLeftHandle.position = getIndex(element.focusLeft);
-            focusRightHandle.position = getIndex(element.focusRight);
-        }
     }
 
     function sizeKey(element: Element): String {
@@ -700,8 +695,6 @@ class PropertiesPanel {
     }
 
     public function onCanvasLoaded(): Void {
-        scaleOnResizeHandle.selected = CanvasSettings.scaleOnResize;
-
         var editorScale: Float = EditorSettings.getEditorUIScale();
         editorUiScaleHandle.value = editorScale;
         if (UIBase.inst != null && UIBase.inst.ui != null) {
@@ -713,10 +706,6 @@ class PropertiesPanel {
         radioGroupNameHandle.text = "RadioGroup";
 
         ensureRadioGroups();
-
-        if (CanvasSettings.autoScale) scaleOnResizeGroup.position = 0;
-        else if (CanvasSettings.scaleHorizontal) scaleOnResizeGroup.position = 1;
-        else if (CanvasSettings.scaleVertical) scaleOnResizeGroup.position = 2;
     }
 
     public function setIcons(iconsImage: Dynamic): Void {

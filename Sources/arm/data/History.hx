@@ -130,7 +130,13 @@ class History {
 
 	static function restore(snapshot: TSnapshot): Void {
 		restoring = true;
-		CanvasUtils.rebuildCanvas(Json.parse(snapshot.canvas), snapshot.scene);
+		try {
+			CanvasUtils.rebuildCanvas(Json.parse(snapshot.canvas), snapshot.scene);
+		} catch (e: Dynamic) {
+			// Otherwise every later edit would be ignored
+			restoring = false;
+			throw e;
+		}
 		restoring = false;
 		current = snapshot;
 

@@ -39,6 +39,7 @@ class CanvasLoader {
 		for (data in sceneData.elements) {
 			var where: String = 'scene "${sceneData.key}", element "${joinPath(data.parent, data.key)}"';
 
+			if (data.key == "" || data.key.indexOf("/") >= 0) throw '$where: a name can\'t be empty or contain "/"';
 			var parent: Element = byPath.get(data.parent);
 			if (parent == null) throw '$where: parent not found (parents must come before their children)';
 			var path: String = joinPath(data.parent, data.key);

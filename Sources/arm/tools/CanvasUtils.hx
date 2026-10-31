@@ -35,8 +35,12 @@ class CanvasUtils {
 
 	static var sceneData: SceneData = SceneData.data;
 
-	/** Names of images the project doesn't have, by ImagePanel, so saving keeps them. */
-	static var missingImageNames: Map<ImagePanel, String> = new Map();
+	/**
+	 * The name of each ImagePanel's image. Saving uses it rather than looking
+	 * the image object up: reloading the images replaces the objects, and an
+	 * image the project doesn't have has no object.
+	 */
+	static var imageNames: Map<ImagePanel, String> = new Map();
 
 	/**
 	 * Initializes the canvas name from command line arguments.
@@ -75,6 +79,14 @@ class CanvasUtils {
 	}
 
 	/**
+	 * The editor's own data folder (tools/<backend>/data), for files that
+	 * belong to the editor rather than to the game: settings and scratch files.
+	 */
+	public static function editorDataDir(): String {
+		return Krom.getFilesLocation() + "/data";
+	}
+
+	/**
 	 * Gets the full path for the canvas JSON file.
 	 * Path: Bundled/koui_canvas/[canvasName].json
 	 */
@@ -82,12 +94,20 @@ class CanvasUtils {
 		return projectDir + "/Bundled/koui_canvas/" + canvasName + ".json";
 	}
 
-	/**
-	 * Looks up the asset name for a kha.Image by searching Koui.imageMap.
-	 * Returns empty string if not found.
-	 */
-	public static function getImageName(image: kha.Image): String {
-		return CanvasElements.getImageName(image);
+	/** The name of the image `panel` shows (or would show, if the project has it), or "" for none. */
+	public static function getImageName(panel: ImagePanel): String {
+		var name: Null<String> = imageNames.get(panel);
+		return name != null ? name : CanvasElements.getImageName(panel.image);
+	}
+
+	public static function setImageName(panel: ImagePanel, name: String): Void {
+		imageNames.set(panel, name);
+	}
+
+	/** Whether `panel` names an image the project doesn't have. */
+	public static function isImageMissing(panel: ImagePanel): Bool {
+		var name: String = getImageName(panel);
+		return name != "" && Koui.getImage(name) == null;
 	}
 
 	/**
@@ -124,6 +144,12 @@ class CanvasUtils {
 				loadAllImages(function() {
 					// After assets are loaded, apply the theme
 					var error: String = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
+
+					// The images were loaded again as new objects: panels show the new ones, and missing ones that now exist
+					for (panel => name in imageNames) {
+						var image: kha.Image = name != "" ? Koui.getImage(name) : null;
+						if (image != null) panel.image = image;
+					}
 
 					if (error != null) {
 						trace('Theme reload ERROR: ${error}');
@@ -171,7 +197,7 @@ class CanvasUtils {
 		}
 
 		// Use system command to list font files
-		var listFile: String = projectDir + "/Assets/fonts/_fontlist.txt";
+		var listFile: String = editorDataDir() + "/_fontlist.txt";
 		if (kha.System.systemId == "Windows") {
 			listFile = StringTools.replace(listFile, "/", "\\");
 		}
@@ -250,7 +276,7 @@ class CanvasUtils {
 		}
 
 		// Use system command to list image files recursively
-		var listFile: String = projectDir + "/Assets/_imagelist.txt";
+		var listFile: String = editorDataDir() + "/_imagelist.txt";
 		if (kha.System.systemId == "Windows") {
 			listFile = StringTools.replace(listFile, "/", "\\");
 		}
@@ -468,9 +494,7 @@ class CanvasUtils {
 		};
 
 		var properties: Dynamic = CanvasElements.serializeProperties(element);
-		if (type == "ImagePanel" && properties.imageName == "" && missingImageNames.exists(cast element)) {
-			properties.imageName = missingImageNames.get(cast element);
-		}
+		if (type == "ImagePanel") properties.imageName = getImageName(cast element);
 
 		return {
 			key: key,
@@ -516,29 +540,17 @@ class CanvasUtils {
 		rebuildCanvas(canvasData, activeSceneKey);
 
 		var reported: Array<String> = [];
-		for (name in missingImageNames) {
-			if (reported.indexOf(name) >= 0) continue;
+		for (panel => name in imageNames) {
+			if (!isImageMissing(panel) || reported.indexOf(name) >= 0) continue;
 			reported.push(name);
 			trace('Image "${name}" is not in the project; its name is kept when saving');
 		}
 	}
 
-	/** If `data` is an ImagePanel whose image the project doesn't have, remembers the image's name for saving. */
-	static function rememberMissingImage(element: Null<Element>, data: TElementData): Void {
+	/** If `data` is an ImagePanel, remembers its image's name for saving. */
+	static function rememberImageName(element: Null<Element>, data: TElementData): Void {
 		if (element == null || data.type != "ImagePanel") return;
-		var name: String = data.properties.imageName;
-		var panel: ImagePanel = cast element;
-		if (name != "" && getImageName(panel.image) != name) missingImageNames.set(panel, name);
-	}
-
-	/** The name of the missing image `panel` shows, or null. */
-	public static function getMissingImageName(panel: ImagePanel): Null<String> {
-		return missingImageNames.get(panel);
-	}
-
-	/** Forgets the missing image of `panel`, e.g. when another image is chosen for it. */
-	public static function forgetMissingImage(panel: ImagePanel): Void {
-		missingImageNames.remove(panel);
+		imageNames.set(cast element, data.properties.imageName);
 	}
 
 	/**
@@ -574,7 +586,7 @@ class CanvasUtils {
 
 			for (elemData in sceneDataEntry.elements) {
 				var path: String = CanvasLoader.joinPath(elemData.parent, elemData.key);
-				rememberMissingImage(CanvasLoader.findByPath(scene.root, keys, path), elemData);
+				rememberImageName(CanvasLoader.findByPath(scene.root, keys, path), elemData);
 			}
 		}
 
@@ -666,7 +678,7 @@ class CanvasUtils {
 
 			var element: Element = CanvasElements.create(elemData, radioGroupMap);
 			if (element == null) continue;
-			rememberMissingImage(element, elemData);
+			rememberImageName(element, elemData);
 
 			// Names are unique among siblings: a copied tree's root gets a free name in
 			// the container it's pasted into; the elements inside it keep theirs
@@ -705,7 +717,7 @@ class CanvasUtils {
 		// Clear the scenes array and reset current scene
 		sceneData.scenes.resize(0);
 		sceneData.currentScene = null;
-		missingImageNames.clear();
+		imageNames.clear();
 
 		Selection.clear();
 	}

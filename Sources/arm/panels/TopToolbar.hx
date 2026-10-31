@@ -1,6 +1,7 @@
 package arm.panels;
 
 import arm.base.UIBase;
+import arm.CanvasViewport.TScreenRect;
 import arm.data.History;
 import arm.tools.CanvasUtils;
 import arm.tools.ImageUtils;
@@ -85,16 +86,27 @@ class TopToolbar {
 		ui._x += w + spacing;
 	}
 
+	/** Where the toolbar floats over the canvas, centered at the top, in screen pixels. */
+	public function getRect(uiBase: UIBase): TScreenRect {
+		var uiScale: Float = uiBase.ui.SCALE();
+		var w: Int = Std.int(TOOLBAR_WIDTH * uiScale);
+		return {
+			x: Std.int((App.w() - uiBase.getSidebarW()) / 2 - w / 2),
+			y: Std.int(5 * uiScale),
+			w: w,
+			h: Std.int(TOOLBAR_HEIGHT * uiScale)
+		};
+	}
+
 	public function draw(uiBase: UIBase): Void {
 		var ui: Zui = uiBase.ui;
 		var uiScale: Float = ui.SCALE();
-		var toolbarWidth: Int = Std.int(TOOLBAR_WIDTH * uiScale);
-		var toolbarHeight: Int = Std.int(TOOLBAR_HEIGHT * uiScale);
+		var rect: TScreenRect = getRect(uiBase);
+		var toolbarWidth: Int = rect.w;
+		var toolbarHeight: Int = rect.h;
 		var buttonSize: Int = Std.int(BUTTON_SIZE * uiScale);
-
-		// Calculate center position
-		var centerX: Int = Std.int((App.w() - uiBase.getSidebarW()) / 2 - toolbarWidth / 2);
-		var topY: Int = Std.int(5 * uiScale);
+		var centerX: Int = rect.x;
+		var topY: Int = rect.y;
 
 		// Don't fill background, make it floating
 		var savedFillBg: Bool = ui.t.FILL_WINDOW_BG;

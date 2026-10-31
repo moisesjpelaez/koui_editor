@@ -15,8 +15,28 @@ import zui.Zui.Handle;
  * text field is blank and checkboxes and combos say "(mixed)". A change sets
  * the new value on every element and is recorded as one undo step.
  */
+@:access(zui.Zui)
 class PropertyFields {
 	static inline var MIXED: String = "(mixed)";
+
+	/** The elements each text field's edit started on, while it's being edited. */
+	static var editTargets: haxe.ds.ObjectMap<Handle, Array<Element>> = new haxe.ds.ObjectMap();
+
+	/**
+	 * The elements a text field edits. Zui commits a text edit a frame after
+	 * the field loses focus, when the selection may already be another one:
+	 * the edit still goes to the elements it was started on. Call right after
+	 * `ui.textInput`.
+	 */
+	public static function textEditTargets(ui: Zui, handle: Handle, elements: Array<Element>): Array<Element> {
+		if (ui.textSelectedHandle == handle) {
+			editTargets.set(handle, elements.copy());
+			return elements;
+		}
+		var started: Null<Array<Element>> = editTargets.get(handle);
+		if (handle.changed) editTargets.remove(handle);
+		return handle.changed && started != null ? started : elements;
+	}
 
 	/** The value all `elements` share, or null if they differ (or there are none). */
 	public static function shared<T>(elements: Array<Element>, get: Element->T): Null<T> {
@@ -43,10 +63,14 @@ class PropertyFields {
 		var current: Null<T> = shared(elements, get);
 		handle.text = current != null ? format(current) : "";
 		var typed: String = ui.textInput(handle, label, align != null ? align : Right);
+		var targets: Array<Element> = textEditTargets(ui, handle, elements);
 		if (!handle.changed) return;
 
+		// Only elements whose value changes are set (Koui re-lays out an element even when a value is set to itself)
 		var parsed: Null<T> = parse(typed);
-		if (parsed != null) apply('Change $label', elements, set, parsed);
+		if (parsed == null) return;
+		var changing: Array<Element> = targets.filter(e -> get(e) != parsed);
+		if (changing.length > 0) apply('Change $label', changing, set, parsed);
 	}
 
 	/** A text field for text that must not be empty. */

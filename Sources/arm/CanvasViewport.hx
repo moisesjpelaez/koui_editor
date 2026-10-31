@@ -43,7 +43,7 @@ class CanvasViewport {
 
 	public function new() {}
 
-	public function canvasControl(isInCanvas: Bool, isInElementsPanel: Bool): Void {
+	public function canvasControl(isInCanvas: Bool): Void {
 		var rootPane: AnchorPane = sceneData.getRoot();
 		if (rootPane == null) return;
 
@@ -74,12 +74,12 @@ class CanvasViewport {
 			Krom.setMouseCursor(0);
 		}
 
-		if (isInCanvas && !isPanning && !isInElementsPanel && mouse.wheelDelta != 0) {
+		if (isInCanvas && !isPanning && mouse.wheelDelta != 0) {
 			var newScale: Float = mouse.wheelDelta < 0 ? Math.min(3.0, currentScale + 0.1) : Math.max(0.25, currentScale - 0.1);
 			if (newScale != currentScale) zoomAt(mouse.x, mouse.y, newScale);
 		}
 
-		if (keyboard.started("f") && isInCanvas) resetCanvasView();
+		if (keyboard.started("f") && isInCanvas && !uiBase.ui.isTyping) resetCanvasView();
 	}
 
 	public function resetCanvasView(): Void {

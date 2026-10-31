@@ -54,14 +54,10 @@ class EditorSettings {
 	}
 
 	/**
-	 * Get the full path to the settings file
+	 * The settings file, in the editor's own folder: the game's Bundled/ folder is packed into every build
 	 */
 	private static function getSettingsPath(): String {
-		var projectDir = arm.tools.CanvasUtils.projectDir;
-		if (projectDir != "") {
-			return projectDir + "/Bundled/koui_editor_settings.json";
-		}
-		return "Bundled/koui_editor_settings.json";
+		return arm.tools.CanvasUtils.editorDataDir() + "/koui_editor_settings.json";
 	}
 
 	/**

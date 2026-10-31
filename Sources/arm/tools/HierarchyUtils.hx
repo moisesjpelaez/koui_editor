@@ -300,6 +300,8 @@ class HierarchyUtils {
 			untyped cast(parent, Layout).add(element);
 			elements = untyped cast(parent, Layout).elements;
 		} else {
+			// Panel: detaching cleared the element's parent, so add it back before placing it
+			parent.addChild(element);
 			elements = parent.children;
 		}
 		elements.remove(element);

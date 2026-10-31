@@ -9,3 +9,4 @@ Sources/Main.hx
 Sources/arm/node*
 tools/d3d11/data/*.json
 tools/opengl/data/*.json
+tools/*/data/_*list.txt

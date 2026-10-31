@@ -8,10 +8,8 @@ import iron.Trait;
 import koui.Koui;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.Layout.Anchor;
-import koui.elements.layouts.RowLayout;
 import koui.events.FocusEvent;
 import koui.events.MouseEvent.MouseClickEvent;
 import koui.events.MouseEvent.MouseHoverEvent;
@@ -106,10 +104,13 @@ class KouiCanvas extends Trait {
 
 				try {
 					buildCanvas(canvasData);
-					trace('[KouiCanvas] Canvas loaded: $canvasName');
 				} catch (e: Dynamic) {
-					trace('[KouiCanvas] Failed to build canvas: $e');
+					// Nothing half-built stays on screen
+					trace('[KouiCanvas] Failed to build canvas "$canvasName": $e');
+					clearCanvas();
+					return;
 				}
+				trace('[KouiCanvas] Canvas loaded: $canvasName');
 
 				notifyOnRender2D(render2D);
 				notifyOnRemove(onRemove);
@@ -131,10 +132,17 @@ class KouiCanvas extends Trait {
 	}
 
 	function onRemove(): Void {
-		// Clean up when trait is removed
-		SceneManager.clearScenes();
-		for (scene in scenes) scene.root.destroy();
+		clearCanvas();
+	}
+
+	/** Removes and frees this canvas' scenes (only its own: other canvases keep theirs). */
+	function clearCanvas(): Void {
+		for (scene in scenes) {
+			SceneManager.removeScene(scene.key);
+			if (scene.root != null) scene.root.destroy();
+		}
 		scenes.clear();
+		radioGroups.clear();
 		currentScene = null;
 		if (expandOnResize) App.resized.disconnect(onAppResized);
 	}
@@ -164,6 +172,7 @@ class KouiCanvas extends Trait {
 		// Build each scene
 		var builtScenes: Map<String, TBuiltScene> = new Map();
 		for (sceneData in canvasData.scenes) {
+			if (scenes.exists(sceneData.key)) throw 'two scenes are named "${sceneData.key}"';
 			buildScene(sceneData, canvasData.canvas.width, canvasData.canvas.height);
 			var kouiScene: TKouiScene = scenes.get(sceneData.key);
 			builtScenes.set(sceneData.key, { root: kouiScene.root, keys: kouiScene.keys });
@@ -189,14 +198,15 @@ class KouiCanvas extends Trait {
 			keys: new Map()
 		};
 
+		// Registered first, so a scene that fails to build is still cleaned up
+		scenes.set(sceneData.key, kouiScene);
+
 		// Use SceneManager to create the scene
 		SceneManager.addScene(sceneData.key, function(scenePane: AnchorPane) {
 			scenePane.setSize(canvasWidth, canvasHeight);
 			kouiScene.root = scenePane;
 			kouiScene.keys = CanvasLoader.buildScene(sceneData, scenePane, radioGroups);
 		});
-
-		scenes.set(sceneData.key, kouiScene);
 	}
 
 	function onAppResized(w: Int, h: Int): Void {
@@ -418,35 +428,36 @@ class KouiCanvas extends Trait {
 	}
 
 	/**
-	 * Add a custom element to a specific scene programmatically.
-	 * Use this to add elements that aren't supported by the editor (e.g., ImagePanel).
+	 * Add an element made in code to a scene, at the scene's root or inside
+	 * a container made in the editor (AnchorPane, RowLayout, ColLayout, Panel).
 	 *
 	 * Example:
 	 * ```haxe
 	 * var imagePanel = new koui.elements.ImagePanel(kha.Assets.images.logo);
-	 * imagePanel.posX = 100;
-	 * imagePanel.posY = 50;
+	 * imagePanel.setPosition(100, 50);
 	 * imagePanel.setSize(200, 150);
 	 * canvas.addElement("Scene_1", "logo_image", imagePanel);
 	 *
-	 * // Or add to a specific container you made in the editor:
-	 * canvas.addElement("Scene_1", "icon", imagePanel, "header_container");
-	 *
-	 * // With anchor:
-	 * canvas.addElement("Scene_1", "icon", imagePanel, null, Anchor.MiddleCenter);
+	 * // Centered, inside a container made in the editor:
+	 * canvas.addElement("Scene_1", "icon", imagePanel, Anchor.MiddleCenter, "header/icons");
 	 * ```
 	 *
 	 * @param sceneName The scene to add the element to
-	 * @param key Unique key for this element (for later retrieval via getElement)
+	 * @param key The element's name; unique among its siblings, not empty, without "/"
 	 * @param element The element to add
-	 * @param parentKey Optional parent element key/path. If null, adds to root.
-	 * @param anchor Optional anchor position for the element.
-	 * @return True if added successfully, false otherwise
+	 * @param anchor The element's anchor
+	 * @param parentKey The path of the container to add it to; the scene's root if null
+	 * @return True if added, false otherwise (the reason is traced)
 	 */
 	public function addElement(sceneName: String, key: String, element: Element, anchor: Anchor = Anchor.TopLeft, parentKey: String = null): Bool {
 		var scene: TKouiScene = scenes.get(sceneName);
 		if (scene == null) {
 			trace('[KouiCanvas] Scene not found: "$sceneName"');
+			return false;
+		}
+
+		if (key == null || key == "" || key.indexOf("/") >= 0) {
+			trace('[KouiCanvas] Invalid element name "$key": names can\'t be empty or contain "/"');
 			return false;
 		}
 
@@ -472,14 +483,13 @@ class KouiCanvas extends Trait {
 			}
 		}
 
-		// Add to parent layout
-		if (Std.isOfType(parent, AnchorPane)) {
-			cast(parent, AnchorPane).add(element);
-		} else if (Std.isOfType(parent, GridLayout)) {
-			var grid: GridLayout = cast parent;
-			grid.add(element, 0, grid.amountCols);
+		// Same as loading a canvas: Row/Col layouts get a new slot, Panels a new child
+		if (parent == scene.root) {
+			scene.root.add(element, anchor);
+		} else if (HierarchyUtils.canAcceptChild(parent)) {
+			HierarchyUtils.moveAsChild(element, parent);
 		} else {
-			trace('[KouiCanvas] Parent "$parentKey" is not a layout container');
+			trace('[KouiCanvas] Parent "$parentKey" can\'t contain elements');
 			return false;
 		}
 
@@ -499,26 +509,19 @@ class KouiCanvas extends Trait {
 	 * @return True if moved successfully, false otherwise
 	 */
 	public function setElementZIndex(sceneName: String, keyOrPath: String, index: Int): Bool {
-		var scene: TKouiScene = scenes.get(sceneName);
-		if (scene == null) return false;
-
 		var element: Element = getElement(keyOrPath, sceneName);
 		if (element == null) return false;
 
-		var parent: Element = element.layout;
-		if (parent == null) parent = element.parent;
+		var parent: Element = HierarchyUtils.getParentElement(element);
 		if (parent == null) return false;
 
-		// Get children array
-		var children: Array<Element> = null;
-		if (Std.isOfType(parent, AnchorPane)) {
-			children = untyped parent.elements;
-		} else if (Std.isOfType(parent, GridLayout) || Std.isOfType(parent, RowLayout) || Std.isOfType(parent, ColLayout)) {
+		// Row/Col cells are placed side by side, not drawn over each other
+		if (Std.isOfType(parent, GridLayout)) {
 			trace('[KouiCanvas] Z-order control not supported for GridLayout/RowLayout/ColLayout');
 			return false;
-		} else {
-			children = parent.children;
 		}
+		// The container's own list of children (AnchorPane, ScrollPane, Expander or Panel)
+		var children: Array<Element> = HierarchyUtils.getChildren(parent);
 
 		// Clamp index
 		if (index < 0) index = 0;
@@ -532,12 +535,12 @@ class KouiCanvas extends Trait {
 	}
 
 	/**
-	 * Remove a programmatically added element from a specific scene.
-	 * Supports both simple keys and paths (e.g., "parent/child/element").
+	 * Remove an element, with everything inside it, from a scene and free it.
+	 * To hide an element for a while, set its `visible` to false instead.
 	 *
 	 * @param sceneName The scene containing the element
-	 * @param keyOrPath The element's key or path
-	 * @return True if removed successfully, false otherwise
+	 * @param keyOrPath The element's path (just its name if it's in the scene's root)
+	 * @return True if removed, false if it wasn't found
 	 */
 	public function removeElement(sceneName: String, keyOrPath: String): Bool {
 		var scene: TKouiScene = scenes.get(sceneName);
@@ -546,20 +549,18 @@ class KouiCanvas extends Trait {
 		var element: Element = CanvasLoader.findByPath(scene.root, scene.keys, keyOrPath);
 		if (element == null) return false;
 
-		// Remove from parent layout
-		var parent = element.layout;
-		if (parent != null) {
-			if (Std.isOfType(parent, AnchorPane)) {
-				cast(parent, AnchorPane).remove(element);
-			} else if (Std.isOfType(parent, GridLayout)) {
-				cast(parent, GridLayout).remove(element);
-			}
-		}
-
-		// Remove from scene
-		scene.keys.remove(element);
+		// Detached the way the editor does it (Row/Col layouts close the gap), then freed
+		HierarchyUtils.detachFromCurrentParent(element);
+		forgetKeys(scene, element);
+		element.destroy();
 
 		return true;
+	}
+
+	/** Removes the names of `element` and everything inside it. */
+	function forgetKeys(scene: TKouiScene, element: Element): Void {
+		for (child in HierarchyUtils.getChildren(element)) forgetKeys(scene, child);
+		scene.keys.remove(element);
 	}
 
 	/**

@@ -5,11 +5,11 @@ import arm.data.History;
 import arm.data.SceneData;
 import arm.data.Selection;
 import arm.CanvasViewport.TScreenRect;
+import arm.panels.ElementsPanel;
 import arm.panels.TopToolbar;
 import arm.tools.HierarchyUtils;
 import arm.types.Enums.PanelHandle;
 
-import iron.math.Vec2;
 import iron.system.Input;
 import iron.system.Input.Keyboard;
 import iron.system.Input.Mouse;
@@ -47,6 +47,7 @@ class DragDropHandler {
 	var uiBase: UIBase;
 	var viewport: CanvasViewport;
 	var topToolbar: TopToolbar;
+	var elementsPanel: ElementsPanel;
 
 	/** How far (in pixels) the mouse must move while pressed before it drags instead of clicking. */
 	static inline var MOVE_THRESHOLD: Float = 4;
@@ -88,17 +89,23 @@ class DragDropHandler {
 
 	var borderSize: Int = 8;
 
-	public function new(uiBase: UIBase, viewport: CanvasViewport, topToolbar: TopToolbar) {
+	public function new(uiBase: UIBase, viewport: CanvasViewport, topToolbar: TopToolbar, elementsPanel: ElementsPanel) {
 		this.uiBase = uiBase;
 		this.viewport = viewport;
 		this.topToolbar = topToolbar;
+		this.elementsPanel = elementsPanel;
 	}
 
+	/** Whether the mouse is over the canvas: left of the sidebar, above the bottom panel, and not on the toolbar or the Elements panel floating over it. */
 	public function isInCanvas(): Bool {
 		var mouse: Mouse = Input.getMouse();
-		var canvasMargin1: Vec2 = new Vec2(App.w() - uiBase.getSidebarW() - borderSize * 0.5, App.h() - uiBase.getBottomH() - borderSize * 0.5);
-		var canvasMargin2: Vec2 = new Vec2(canvasMargin1.x - borderSize * 0.5, App.h() - uiBase.getSidebarH1() - borderSize * 0.5);
-		return mouse.x < canvasMargin1.x && mouse.y < canvasMargin1.y || mouse.x < canvasMargin2.x && mouse.y < canvasMargin2.y;
+		if (mouse.x >= App.w() - uiBase.getSidebarW() - borderSize * 0.5) return false;
+		if (mouse.y >= App.h() - uiBase.getBottomH() - borderSize * 0.5) return false;
+		return !contains(topToolbar.getRect(uiBase), mouse.x, mouse.y) && !contains(elementsPanel.getRect(uiBase), mouse.x, mouse.y);
+	}
+
+	static function contains(rect: TScreenRect, x: Float, y: Float): Bool {
+		return x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h;
 	}
 
 	public function isInHierarchyPanel(): Bool {
@@ -107,16 +114,6 @@ class DragDropHandler {
 		var w: Int = uiBase.getSidebarW();
 		var h0: Int = uiBase.getSidebarH0() - Std.int(borderSize * 0.5);
 		return mouse.x > tabx && mouse.x < tabx + w && mouse.y > 0 && mouse.y < h0;
-	}
-
-	public function isInElementsPanel(): Bool {
-		var mouse: Mouse = Input.getMouse();
-		var uiScale: Float = uiBase.ui.SCALE();
-		var panelX: Int = Std.int(10 * uiScale);
-		var panelY: Int = Std.int(10 * uiScale);
-		var panelW: Int = Std.int(100 * uiScale);
-		var panelH: Int = App.h() - uiBase.getBottomH() - Std.int(20 * uiScale);
-		return mouse.x > panelX && mouse.x < panelX + panelW && mouse.y > panelY && mouse.y < panelY + panelH;
 	}
 
 	function isDynamicSized(element: Element): Bool {

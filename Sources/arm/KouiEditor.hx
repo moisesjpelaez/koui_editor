@@ -107,7 +107,7 @@ class KouiEditor extends iron.Trait {
 			viewport.uiBase = uiBase;
 			viewport.sceneData = sceneData;
 			viewport.topToolbar = topToolbar;
-			dragDrop = new DragDropHandler(uiBase, viewport, topToolbar);
+			dragDrop = new DragDropHandler(uiBase, viewport, topToolbar, elementsPanel);
 
 			Koui.init(function() {
 				Koui.setPadding(100, 100, 75, 75);
@@ -186,7 +186,7 @@ class KouiEditor extends iron.Trait {
 		}
 
 		uiBase.update();
-		viewport.canvasControl(dragDrop.isInCanvas(), dragDrop.isInElementsPanel());
+		viewport.canvasControl(dragDrop.isInCanvas());
 
 		var keyboard: Keyboard = Input.getKeyboard();
 		var isTyping: Bool = uiBase.ui.isTyping;
@@ -384,19 +384,12 @@ class KouiEditor extends iron.Trait {
 				return;
 		}
 
-		// Check if dropping as sibling to root AnchorPane (which has no parent)
-		var currentParent: Element = HierarchyUtils.getParentElement(element);
-		if (target == rootPane) {
-			var rootFirstElement: Element = cast(target, AnchorPane).elements[0];
-			if (rootFirstElement != element) HierarchyUtils.moveRelativeToTarget(element, rootFirstElement, true);
-			History.edited("Move");
-			uiBase.hwnds[PanelHierarchy].redraws = 2;
-			uiBase.hwnds[PanelProperties].redraws = 2;
-			return;
-		}
+		// Dropped on the scene itself (which has no parent): the element goes first in the scene
+		var droppedOnScene: Bool = target == rootPane;
+		if (droppedOnScene) newParent = rootPane;
 
 		// Validate newParent can accept children
-		if (newParent != null && !HierarchyUtils.canAcceptChild(newParent)) {
+		if (!droppedOnScene && newParent != null && !HierarchyUtils.canAcceptChild(newParent)) {
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 			uiBase.hwnds[PanelProperties].redraws = 2;
 			return;
@@ -408,14 +401,19 @@ class KouiEditor extends iron.Trait {
 		var uniqueName: String = NameUtils.ensureUniqueName(currentName, element, newParent);
 
 		// Perform the mutation
-		switch (zone) {
-			case AsChild:
-				HierarchyUtils.moveAsChild(element, target, rootPane);
-			case BeforeSibling:
-				HierarchyUtils.moveRelativeToTarget(element, target, true);
-			case AfterSibling:
-				HierarchyUtils.moveRelativeToTarget(element, target, false);
-			case None:
+		if (droppedOnScene) {
+			var rootFirstElement: Element = rootPane.elements[0];
+			if (rootFirstElement != element) HierarchyUtils.moveRelativeToTarget(element, rootFirstElement, true);
+		} else {
+			switch (zone) {
+				case AsChild:
+					HierarchyUtils.moveAsChild(element, target, rootPane);
+				case BeforeSibling:
+					HierarchyUtils.moveRelativeToTarget(element, target, true);
+				case AfterSibling:
+					HierarchyUtils.moveRelativeToTarget(element, target, false);
+				case None:
+			}
 		}
 
 		// Update name if it changed due to conflict
