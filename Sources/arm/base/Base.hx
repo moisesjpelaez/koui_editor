@@ -1,5 +1,6 @@
 package arm.base;
 
+import arm.data.LayoutSettings;
 import armory.system.Signal;
 import zui.Themes;
 
@@ -10,7 +11,7 @@ class Base {
 	public static var resizing: Signal = new Signal();
 
 	public static function init() {
-		Config.init();
+		LayoutSettings.init();
 		theme = Themes.dark;
 		theme.FILL_WINDOW_BG = true; // Fill window background with color
 	}

@@ -1,5 +1,6 @@
 package arm.panels;
 
+import arm.data.EditorSettings;
 import arm.base.UIBase;
 import arm.CanvasViewport.TScreenRect;
 import arm.data.History;
@@ -34,7 +35,7 @@ class TopToolbar {
 
 	public function new() {
 		snapHandle = new Handle();
-		snapHandle.value = 64.0;
+		snapHandle.value = snapValue;
 		windowHandle = Id.handle();
 
 	}
@@ -46,6 +47,13 @@ class TopToolbar {
 
 	public function toggleSnapping(): Void {
 		snappingEnabled = !snappingEnabled;
+		EditorSettings.setSnap(snappingEnabled, snapValue);
+	}
+
+	/** Takes the snapping toggle and size saved in the editor's settings; the size is kept within `snapMaxValue`. */
+	public function applySavedSnap(): Void {
+		snappingEnabled = EditorSettings.data.snapEnabled;
+		setSnapValue(EditorSettings.data.snapValue);
 	}
 
 	/** Sets the snap size, rounded to a multiple of SNAP_STEP within the slider's range. */
@@ -55,6 +63,7 @@ class TopToolbar {
 		if (value == snapValue) return;
 		snapValue = value;
 		snapHandle.value = value;
+		EditorSettings.setSnap(snappingEnabled, snapValue);
 	}
 
 	// Wrapper for ZuiUtils.iconButton with local icons

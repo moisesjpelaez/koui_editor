@@ -109,6 +109,7 @@ class KouiEditor extends iron.Trait {
 
 				// Set snap max value based on canvas size
 				topToolbar.snapMaxValue = Math.min(canvasWidth, canvasHeight) * 0.5;
+				topToolbar.applySavedSnap();
 				kouiReady = true;
 			});
 

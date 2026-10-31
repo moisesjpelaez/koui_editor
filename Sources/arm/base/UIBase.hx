@@ -5,6 +5,7 @@ import zui.Zui.Handle;
 import iron.App;
 import iron.system.Input;
 import arm.data.EditorSettings;
+import arm.data.LayoutSettings;
 import arm.types.Enums;
 
 class UIBase {
@@ -51,20 +52,20 @@ class UIBase {
 		// Clamp sidebar width when window is resized
 		var maxW = Std.int(App.w() * 0.7);
 		if (maxW < MIN_SIDEBAR_W) maxW = MIN_SIDEBAR_W;
-		if (Config.raw.layout[LayoutSidebarW] > maxW) {
-			Config.raw.layout[LayoutSidebarW] = maxW;
+		if (LayoutSettings.sizes[LayoutSidebarW] > maxW) {
+			LayoutSettings.sizes[LayoutSidebarW] = maxW;
 		}
 
 		// Handle resize dragging
 		if (borderHandle != null) {
 			// Horizontal resize (left border of sidebar)
 			if (borderStarted == SideLeft) {
-				Config.raw.layout[LayoutSidebarW] -= Std.int(mouse.movementX);
+				LayoutSettings.sizes[LayoutSidebarW] -= Std.int(mouse.movementX);
 				// Clamp
-				if (Config.raw.layout[LayoutSidebarW] < MIN_SIDEBAR_W) {
-					Config.raw.layout[LayoutSidebarW] = MIN_SIDEBAR_W;
-				} else if (Config.raw.layout[LayoutSidebarW] > maxW) {
-					Config.raw.layout[LayoutSidebarW] = maxW;
+				if (LayoutSettings.sizes[LayoutSidebarW] < MIN_SIDEBAR_W) {
+					LayoutSettings.sizes[LayoutSidebarW] = MIN_SIDEBAR_W;
+				} else if (LayoutSettings.sizes[LayoutSidebarW] > maxW) {
+					LayoutSettings.sizes[LayoutSidebarW] = maxW;
 				}
 			}
 
@@ -74,20 +75,20 @@ class UIBase {
 				// Check if resizing sidebar panels or bottom center panel
 				if (borderHandle == hwnds[PanelBottom]) {
 					// Bottom center panel - resize by top border
-					Config.raw.layout[LayoutBottomH] -= my;
+					LayoutSettings.sizes[LayoutBottomH] -= my;
 					// Clamp
 					var maxBottomH: Int = Std.int(App.h() * 0.7);
-					if (Config.raw.layout[LayoutBottomH] < MIN_PANEL_SIZE) {
-						Config.raw.layout[LayoutBottomH] = MIN_PANEL_SIZE;
-					} else if (Config.raw.layout[LayoutBottomH] > maxBottomH) {
-						Config.raw.layout[LayoutBottomH] = maxBottomH;
+					if (LayoutSettings.sizes[LayoutBottomH] < MIN_PANEL_SIZE) {
+						LayoutSettings.sizes[LayoutBottomH] = MIN_PANEL_SIZE;
+					} else if (LayoutSettings.sizes[LayoutBottomH] > maxBottomH) {
+						LayoutSettings.sizes[LayoutBottomH] = maxBottomH;
 					}
 				} else {
 					// Sidebar panels
-					if (Config.raw.layout[LayoutSidebarH0] + my > MIN_PANEL_SIZE &&
-						Config.raw.layout[LayoutSidebarH1] - my > MIN_PANEL_SIZE) {
-						Config.raw.layout[LayoutSidebarH0] += my;
-						Config.raw.layout[LayoutSidebarH1] -= my;
+					if (LayoutSettings.sizes[LayoutSidebarH0] + my > MIN_PANEL_SIZE &&
+						LayoutSettings.sizes[LayoutSidebarH1] - my > MIN_PANEL_SIZE) {
+						LayoutSettings.sizes[LayoutSidebarH0] += my;
+						LayoutSettings.sizes[LayoutSidebarH1] -= my;
 					}
 				}
 			}
@@ -99,6 +100,8 @@ class UIBase {
 				borderHandle = null;
 				Base.isResizing = false;
 				Krom.setMouseCursor(Cursor.Default);
+				// Remembered for the next time the editor opens
+				LayoutSettings.save();
 			}
 		}
 
@@ -151,7 +154,7 @@ class UIBase {
 	public function getTabX(): Int {
 		var w: Int = App.w();
 		if (w < MIN_SIDEBAR_W) return 0; // Window minimized or too small
-		var sidebarW: Int = Config.raw.layout[LayoutSidebarW];
+		var sidebarW: Int = LayoutSettings.sizes[LayoutSidebarW];
 		if (sidebarW > w - MIN_PANEL_SIZE) sidebarW = w - MIN_PANEL_SIZE;
 		return w - sidebarW;
 	}
@@ -159,26 +162,26 @@ class UIBase {
 	public function getSidebarW(): Int {
 		var w: Int = App.w();
 		if (w < MIN_SIDEBAR_W) return MIN_SIDEBAR_W; // Return minimum when window too small
-		var sidebarW: Int = Config.raw.layout[LayoutSidebarW];
+		var sidebarW: Int = LayoutSettings.sizes[LayoutSidebarW];
 		if (sidebarW > w - MIN_PANEL_SIZE) return w - MIN_PANEL_SIZE;
 		if (sidebarW < MIN_SIDEBAR_W) return MIN_SIDEBAR_W;
 		return sidebarW;
 	}
 
 	public function getSidebarH0(): Int {
-		var h: Int = Config.raw.layout[LayoutSidebarH0];
+		var h: Int = LayoutSettings.sizes[LayoutSidebarH0];
 		if (h < MIN_PANEL_SIZE) return MIN_PANEL_SIZE;
 		return h;
 	}
 
 	public function getSidebarH1(): Int {
-		var h: Int = Config.raw.layout[LayoutSidebarH1];
+		var h: Int = LayoutSettings.sizes[LayoutSidebarH1];
 		if (h < MIN_PANEL_SIZE) return MIN_PANEL_SIZE;
 		return h;
 	}
 
 	public function getBottomH(): Int {
-		var h: Int = Config.raw.layout[LayoutBottomH];
+		var h: Int = LayoutSettings.sizes[LayoutBottomH];
 		if (h < MIN_PANEL_SIZE) return MIN_PANEL_SIZE;
 		return h;
 	}
@@ -189,35 +192,35 @@ class UIBase {
 		// Skip adjustment if window is minimized or too small
 		if (totalH < MIN_PANEL_SIZE * 2) return;
 
-		var currentTotal = Config.raw.layout[LayoutSidebarH0] + Config.raw.layout[LayoutSidebarH1];
+		var currentTotal = LayoutSettings.sizes[LayoutSidebarH0] + LayoutSettings.sizes[LayoutSidebarH1];
 
 		// If heights are corrupted (zero or too small), reset to defaults
 		if (currentTotal < MIN_PANEL_SIZE * 2) {
-			Config.raw.layout[LayoutSidebarH0] = Std.int(totalH / 2);
-			Config.raw.layout[LayoutSidebarH1] = totalH - Config.raw.layout[LayoutSidebarH0];
+			LayoutSettings.sizes[LayoutSidebarH0] = Std.int(totalH / 2);
+			LayoutSettings.sizes[LayoutSidebarH1] = totalH - LayoutSettings.sizes[LayoutSidebarH0];
 		} else if (currentTotal != totalH) {
-			var ratio = Config.raw.layout[LayoutSidebarH0] / currentTotal;
-			Config.raw.layout[LayoutSidebarH0] = Std.int(totalH * ratio);
-			Config.raw.layout[LayoutSidebarH1] = totalH - Config.raw.layout[LayoutSidebarH0];
+			var ratio = LayoutSettings.sizes[LayoutSidebarH0] / currentTotal;
+			LayoutSettings.sizes[LayoutSidebarH0] = Std.int(totalH * ratio);
+			LayoutSettings.sizes[LayoutSidebarH1] = totalH - LayoutSettings.sizes[LayoutSidebarH0];
 		}
 
 		// Ensure minimum sizes
-		if (Config.raw.layout[LayoutSidebarH0] < MIN_PANEL_SIZE) {
-			Config.raw.layout[LayoutSidebarH0] = MIN_PANEL_SIZE;
-			Config.raw.layout[LayoutSidebarH1] = totalH - MIN_PANEL_SIZE;
+		if (LayoutSettings.sizes[LayoutSidebarH0] < MIN_PANEL_SIZE) {
+			LayoutSettings.sizes[LayoutSidebarH0] = MIN_PANEL_SIZE;
+			LayoutSettings.sizes[LayoutSidebarH1] = totalH - MIN_PANEL_SIZE;
 		}
-		if (Config.raw.layout[LayoutSidebarH1] < MIN_PANEL_SIZE) {
-			Config.raw.layout[LayoutSidebarH1] = MIN_PANEL_SIZE;
-			Config.raw.layout[LayoutSidebarH0] = totalH - MIN_PANEL_SIZE;
+		if (LayoutSettings.sizes[LayoutSidebarH1] < MIN_PANEL_SIZE) {
+			LayoutSettings.sizes[LayoutSidebarH1] = MIN_PANEL_SIZE;
+			LayoutSettings.sizes[LayoutSidebarH0] = totalH - MIN_PANEL_SIZE;
 		}
 
 		// Clamp bottom panel height
 		var maxBottomH = Std.int(App.h() * 0.7);
-		if (Config.raw.layout[LayoutBottomH] > maxBottomH) {
-			Config.raw.layout[LayoutBottomH] = maxBottomH;
+		if (LayoutSettings.sizes[LayoutBottomH] > maxBottomH) {
+			LayoutSettings.sizes[LayoutBottomH] = maxBottomH;
 		}
-		if (Config.raw.layout[LayoutBottomH] < MIN_PANEL_SIZE) {
-			Config.raw.layout[LayoutBottomH] = MIN_PANEL_SIZE;
+		if (LayoutSettings.sizes[LayoutBottomH] < MIN_PANEL_SIZE) {
+			LayoutSettings.sizes[LayoutBottomH] = MIN_PANEL_SIZE;
 		}
 	}
 }
