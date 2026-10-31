@@ -1,6 +1,7 @@
 import os
 import subprocess
 import glob
+import json
 import bpy
 from bpy.props import StringProperty
 import arm.utils
@@ -13,23 +14,170 @@ import arm.log as log
 # KOUI_OT_launch_editor always resolves to the koui_editor directory.
 _KOUI_EDITOR_DIR = os.path.dirname(os.path.realpath(__file__))
 
-# Stored originals for Armory patching
-_original_arm_edit_canvas_execute = None
-_original_arm_edit_canvas_label = None
-_original_arm_new_canvas_execute = None
-_original_export_trait_code = None
-_original_fetch_script_names = None
+
+def koui_canvas_file(canvas_name):
+    """The canvas' file in Bundled/koui_canvas; a canvas with a file there is a Koui canvas."""
+    return os.path.join(arm.utils.get_fp(), 'Bundled', 'koui_canvas', canvas_name + '.json')
 
 
-def get_os():
-    import platform
-    s = platform.system()
-    if s == 'Windows':
-        return 'win'
-    elif s == 'Darwin':
-        return 'mac'
-    else:
-        return 'linux'
+# Patching
+#
+# Each patch keeps the function it replaced on the wrapper (_koui_original).
+# Patching again first unwraps the previous patch, and unpatching restores the
+# function the current patch replaced. This keeps working when Armory reloads
+# this module (it shares the 'blender' name with other libraries), which
+# resets the module's variables.
+
+def _patch(owner, name, make_wrapper):
+    current = getattr(owner, name)
+    original = getattr(current, '_koui_original', current)
+    wrapper = make_wrapper(original)
+    wrapper._koui_original = original
+    setattr(owner, name, wrapper)
+
+
+def _unpatch(owner, name):
+    original = getattr(getattr(owner, name, None), '_koui_original', None)
+    if original is not None:
+        setattr(owner, name, original)
+
+
+def _make_edit_canvas_execute(original):
+    """The Edit Canvas button: Koui canvases open in the Koui Editor, other canvases as before."""
+    def execute(self, context):
+        obj = bpy.context.object if self.is_object else bpy.context.scene
+        item = obj.arm_traitlist[obj.arm_traitlist_index]
+        canvas_name = item.canvas_name_prop if item.canvas_name_prop else item.name
+        if not canvas_name or not os.path.exists(koui_canvas_file(canvas_name)):
+            return original(self, context)
+
+        log.info(f"Koui Editor: Using canvas name = '{canvas_name}'")
+        bpy.ops.koui.launch_editor(canvas_name=canvas_name)
+        return {'FINISHED'}
+    return execute
+
+
+def _make_new_canvas_execute(original):
+    """The New Canvas dialog: writes an empty Koui canvas and opens it in the Koui Editor."""
+    def execute(self, context):
+        obj = bpy.context.object if self.is_object else bpy.context.scene
+
+        self.canvas_name = self.canvas_name.replace(' ', '')
+
+        # Create empty canvas JSON file so it shows up in the list
+        canvas_file = koui_canvas_file(self.canvas_name)
+        os.makedirs(os.path.dirname(canvas_file), exist_ok=True)
+        if not os.path.exists(canvas_file):
+            # Create a minimal empty canvas with one scene
+            render_settings = bpy.context.scene.render
+            empty_canvas = {
+                "name": self.canvas_name,
+                "version": "2.0",
+                "canvas": {
+                    "width": render_settings.resolution_x,
+                    "height": render_settings.resolution_y,
+                    "settings": {
+                        "expandOnResize": True,
+                        "scaleOnResize": True,
+                        "autoScale": True,
+                        "scaleHorizontal": False,
+                        "scaleVertical": False
+                    }
+                },
+                "radioGroups": [],
+                "scenes": [
+                    {
+                        "key": "Scene_1",
+                        "active": True,
+                        "elements": []
+                    }
+                ]
+            }
+            with open(canvas_file, 'w') as f:
+                json.dump(empty_canvas, f, indent=2)
+            log.info(f"Koui Editor: Created canvas file '{canvas_file}'")
+
+        # Refresh scripts so the new canvas shows up in the list
+        bpy.ops.arm.refresh_scripts()
+
+        # Set the canvas name on the trait
+        item = obj.arm_traitlist[obj.arm_traitlist_index]
+        item.canvas_name_prop = self.canvas_name
+
+        log.info(f"Koui Editor: Created canvas trait '{self.canvas_name}'")
+
+        # Auto-launch Koui Editor for new canvas
+        bpy.ops.koui.launch_editor(canvas_name=self.canvas_name)
+
+        return {'FINISHED'}
+    return execute
+
+
+def _make_export_traits(original):
+    """
+    Exports Koui canvas traits as KouiCanvas. Armory's export runs unchanged and
+    its result is fixed afterwards, so the traits' data is never touched.
+    """
+    from arm import exporter
+
+    def export_traits(self, bobject, o):
+        koui_canvases = []
+        for item in getattr(bobject, 'arm_traitlist', []):
+            if not item.enabled_prop and not item.fake_user:
+                continue
+            if item.type_prop == 'UI Canvas' and item.canvas_name_prop and os.path.exists(koui_canvas_file(item.canvas_name_prop)):
+                koui_canvases.append(item.canvas_name_prop)
+
+        if not koui_canvases:
+            return original(self, bobject, o)
+
+        # Armory looks for every canvas in Bundled/canvas and warns that Koui canvases
+        # aren't there; only those warnings are left out, and only during this call
+        warn = exporter.log.warn
+        expected = [f'Referenced canvas "{name}" not found' for name in koui_canvases]
+
+        def filtered_warn(text, *args, **kwargs):
+            if any(message in str(text) for message in expected):
+                return
+            return warn(text, *args, **kwargs)
+
+        exporter.log.warn = filtered_warn
+        try:
+            original(self, bobject, o)
+        finally:
+            exporter.log.warn = warn
+
+        # An Armory2D canvas with the same name in Bundled/canvas gave a CanvasScript: the Koui canvas replaces it
+        parameters = ["'" + name + "'" for name in koui_canvases]
+        traits = [t for t in o.get('traits', [])
+                  if not (t.get('class_name') == 'armory.trait.internal.CanvasScript' and t.get('parameters', [None])[0] in parameters)]
+        koui_traits = [{
+            'type': 'Script',
+            'class_name': 'armory.trait.internal.KouiCanvas',
+            'parameters': [parameter]
+        } for parameter in parameters]
+        o['traits'] = koui_traits + traits
+        exporter.ArmoryExporter.export_ui = True
+        for name in koui_canvases:
+            log.info(f"Koui Editor: Using KouiCanvas for '{name}'")
+
+    return export_traits
+
+
+def _make_fetch_script_names(original):
+    """The canvas list also lists the canvases in Bundled/koui_canvas."""
+    def fetch_script_names():
+        original()
+
+        wrd = bpy.data.worlds['Arm']
+        koui_canvas_path = os.path.join(arm.utils.get_fp(), 'Bundled', 'koui_canvas')
+        if os.path.isdir(koui_canvas_path):
+            listed = [c.name for c in wrd.arm_canvas_list]
+            for file in glob.glob(os.path.join(koui_canvas_path, '*.json')):
+                name = os.path.basename(file).rsplit('.', 1)[0]
+                if name not in listed:
+                    wrd.arm_canvas_list.add().name = name
+    return fetch_script_names
 
 
 class KOUI_OT_launch_editor(bpy.types.Operator):
@@ -42,7 +190,7 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
 
     def execute(self, context):
         sdk_path = arm.utils.get_sdk_path()
-        ext = 'd3d11' if get_os() == 'win' else 'opengl'
+        ext = 'd3d11' if arm.utils.get_os() == 'win' else 'opengl'
         sdk_koui_path = os.path.join(_KOUI_EDITOR_DIR, 'tools', ext) if sdk_path else ""
 
         if sdk_koui_path and os.path.exists(sdk_koui_path):
@@ -82,7 +230,7 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
         cmd.append(project_dir)
         cmd.append(ext)
 
-        if get_os() == 'win':
+        if arm.utils.get_os() == 'win':
             cmd.append('--consolepid')
             cmd.append(str(os.getpid()))
 
@@ -97,230 +245,35 @@ classes = (
 )
 
 
-# Handler to refresh canvas list when a file is loaded
-@bpy.app.handlers.persistent
-def on_load_post(dummy):
-    """Called after a blend file is loaded - refresh scripts to include koui_canvas"""
-    try:
-        if 'Arm' in bpy.data.worlds and bpy.data.filepath:
-            bpy.ops.arm.refresh_scripts()
-    except Exception:
-        pass  # Silently ignore errors during load
+def _patch_targets():
+    """(owner, attribute, wrapper factory) of each patch; owners Armory doesn't have are left out."""
+    from arm import exporter
+    targets = [
+        (getattr(pt, 'ArmEditCanvasButton', None), 'execute', _make_edit_canvas_execute),
+        (getattr(pt, 'ArmNewCanvasDialog', None), 'execute', _make_new_canvas_execute),
+        (getattr(exporter, 'ArmoryExporter', None), 'export_traits', _make_export_traits),
+        (arm.utils, 'fetch_script_names', _make_fetch_script_names),
+    ]
+    return [target for target in targets if target[0] is not None]
 
 
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
-    # Register load handler
-    if on_load_post not in bpy.app.handlers.load_post:
-        bpy.app.handlers.load_post.append(on_load_post)
-
-    try:
-        ArmEditCanvasButton = pt.ArmEditCanvasButton
-    except Exception:
-        ArmEditCanvasButton = None
-
-    try:
-        ArmNewCanvasDialog = pt.ArmNewCanvasDialog
-    except Exception:
-        ArmNewCanvasDialog = None
-
-    # Patch Edit Canvas button
-    if ArmEditCanvasButton is not None:
-        global _original_arm_edit_canvas_execute, _original_arm_edit_canvas_label
-        _original_arm_edit_canvas_execute = ArmEditCanvasButton.execute
+    for owner, name, make_wrapper in _patch_targets():
         try:
-            _original_arm_edit_canvas_label = ArmEditCanvasButton.bl_label
-        except Exception:
-            _original_arm_edit_canvas_label = None
+            _patch(owner, name, make_wrapper)
+            log.info(f"Koui Editor: Patched {getattr(owner, '__name__', owner)}.{name}")
+        except Exception as e:
+            log.warn(f"Koui Editor: Could not patch {name}: {e}")
 
-        # Change label
-        ArmEditCanvasButton.bl_label = 'Edit with Koui'
-
-        # Define replacement execute
-        def _koui_edit_canvas_execute(self, context):
-            canvas_name = 'UntitledCanvas'
-            try:
-                if self.is_object:
-                    obj = bpy.context.object
-                else:
-                    obj = bpy.context.scene
-                item = obj.arm_traitlist[obj.arm_traitlist_index]
-
-                # Use canvas_name_prop if set, otherwise use the trait's name
-                if item.canvas_name_prop:
-                    canvas_name = item.canvas_name_prop
-                elif item.name:
-                    canvas_name = item.name
-
-                log.info(f"Koui Editor: Using canvas name = '{canvas_name}'")
-
-                # Launch Koui editor via our operator
-                bpy.ops.koui.launch_editor(canvas_name=canvas_name)
-            except Exception as e:
-                log.error(f"Koui Editor: could not launch from patched button: {e}")
-                import traceback
-                log.error(traceback.format_exc())
-            return {'FINISHED'}
-
-        ArmEditCanvasButton.execute = _koui_edit_canvas_execute
-        log.info("Koui Editor: Patched ArmEditCanvasButton to open Koui")
-
-    # Patch New Canvas dialog
-    if ArmNewCanvasDialog is not None:
-        global _original_arm_new_canvas_execute
-        _original_arm_new_canvas_execute = ArmNewCanvasDialog.execute
-
-        def _koui_new_canvas_execute(self, context):
-            if self.is_object:
-                obj = bpy.context.object
-            else:
-                obj = bpy.context.scene
-
-            self.canvas_name = self.canvas_name.replace(' ', '')
-
-            # Create empty canvas JSON file so it shows up in the list
-            canvas_path = arm.utils.get_fp() + '/Bundled/koui_canvas'
-            if not os.path.exists(canvas_path):
-                os.makedirs(canvas_path)
-
-            canvas_file = os.path.join(canvas_path, self.canvas_name + '.json')
-            if not os.path.exists(canvas_file):
-                # Create a minimal empty canvas with one scene
-                import json
-                render_settings = bpy.context.scene.render
-                empty_canvas = {
-                    "name": self.canvas_name,
-                    "version": "2.0",
-                    "canvas": {
-                        "width": render_settings.resolution_x,
-                        "height": render_settings.resolution_y,
-                        "settings": {
-                            "expandOnResize": True,
-                            "scaleOnResize": True,
-                            "autoScale": True,
-                            "scaleHorizontal": False,
-                            "scaleVertical": False
-                        }
-                    },
-                    "radioGroups": [],
-                    "scenes": [
-                        {
-                            "key": "Scene_1",
-                            "active": True,
-                            "elements": []
-                        }
-                    ]
-                }
-                with open(canvas_file, 'w') as f:
-                    json.dump(empty_canvas, f, indent=2)
-                log.info(f"Koui Editor: Created canvas file '{canvas_file}'")
-
-            # Refresh scripts so the new canvas shows up in the list
-            bpy.ops.arm.refresh_scripts()
-
-            # Set the canvas name on the trait
-            item = obj.arm_traitlist[obj.arm_traitlist_index]
-            item.canvas_name_prop = self.canvas_name
-
-            log.info(f"Koui Editor: Created canvas trait '{self.canvas_name}'")
-
-            # Auto-launch Koui Editor for new canvas
-            bpy.ops.koui.launch_editor(canvas_name=self.canvas_name)
-
-            return {'FINISHED'}
-
-        ArmNewCanvasDialog.execute = _koui_new_canvas_execute
-        log.info("Koui Editor: Patched ArmNewCanvasDialog to use KouiCanvas")
-
-    # Patch exporter to use KouiCanvas class for koui_canvas folder
+    # Armory filled the canvas list before loading libraries: add the Koui canvases
     try:
-        from arm import exporter
-        global _original_export_trait_code
-
-        if hasattr(exporter, 'ArmoryExporter'):
-            _original_export_trait_code = exporter.ArmoryExporter.export_traits
-
-            def patched_export_traits(self, bobject, o):
-                if not hasattr(bobject, 'arm_traitlist'):
-                    return
-
-                # Track which traits we handle (by index) so we can skip them in original
-                handled_indices = set()
-
-                for idx, traitlistItem in enumerate(bobject.arm_traitlist):
-                    if not traitlistItem.enabled_prop and not traitlistItem.fake_user:
-                        continue
-
-                    # Handle UI Canvas - check koui_canvas folder first
-                    if traitlistItem.type_prop == 'UI Canvas':
-                        canvas_name = traitlistItem.canvas_name_prop
-                        koui_cpath = os.path.join(arm.utils.get_fp(), 'Bundled', 'koui_canvas', canvas_name + '.json')
-
-                        if os.path.exists(koui_cpath):
-                            # Use KouiCanvas for koui_canvas folder
-                            out_trait = {
-                                'type': 'Script',
-                                'class_name': 'armory.trait.internal.KouiCanvas',
-                                'parameters': ["'" + canvas_name + "'"]
-                            }
-                            if 'traits' not in o:
-                                o['traits'] = []
-                            o['traits'].append(out_trait)
-                            exporter.ArmoryExporter.export_ui = True
-                            handled_indices.add(idx)
-                            log.info(f"Koui Editor: Using KouiCanvas for '{canvas_name}'")
-
-                # Temporarily disable handled traits before calling original.
-                original_enabled = {}
-                for idx in handled_indices:
-                    original_enabled[idx] = bobject.arm_traitlist[idx].enabled_prop
-                    bobject.arm_traitlist[idx]["enabled_prop"] = False
-
-                # Call original for all other traits
-                _original_export_trait_code(self, bobject, o)
-
-                # Restore enabled state
-                for idx, enabled in original_enabled.items():
-                    bobject.arm_traitlist[idx]["enabled_prop"] = enabled
-
-            exporter.ArmoryExporter.export_traits = patched_export_traits
-            log.info("Koui Editor: Patched export_traits to support KouiCanvas")
+        if bpy.data.filepath and 'Arm' in bpy.data.worlds:
+            arm.utils.fetch_script_names()
     except Exception as e:
-        log.warn(f"Koui Editor: Could not patch exporter: {e}")
-
-    # Patch fetch_script_names to also scan koui_canvas folder
-    try:
-        global _original_fetch_script_names
-        _original_fetch_script_names = arm.utils.fetch_script_names
-
-        def patched_fetch_script_names():
-            # Call original first
-            _original_fetch_script_names()
-
-            # Also add canvases from koui_canvas folder
-            wrd = bpy.data.worlds['Arm']
-            koui_canvas_path = arm.utils.get_fp() + '/Bundled/koui_canvas'
-            if os.path.isdir(koui_canvas_path):
-                for file in glob.glob(os.path.join(koui_canvas_path, '*.json')):
-                    name = os.path.basename(file).rsplit('.', 1)[0]
-                    # Check if not already in the list
-                    if name not in [c.name for c in wrd.arm_canvas_list]:
-                        wrd.arm_canvas_list.add().name = name
-
-        arm.utils.fetch_script_names = patched_fetch_script_names
-        log.info("Koui Editor: Patched fetch_script_names to scan koui_canvas folder")
-
-        # Refresh the canvas list immediately to pick up koui_canvas files
-        try:
-            if bpy.data.filepath:  # Only if a project is loaded
-                patched_fetch_script_names()
-                log.info("Koui Editor: Refreshed canvas list")
-        except Exception:
-            pass  # May fail if 'Arm' world doesn't exist yet
-    except Exception as e:
-        log.warn(f"Koui Editor: Could not patch fetch_script_names: {e}")
+        log.warn(f"Koui Editor: Could not refresh the canvas list: {e}")
 
     # Ensure Assets/koui_canvas exist and default files are copied on import
     try:
@@ -333,45 +286,8 @@ def register():
 
 
 def unregister():
-    try:
-        ArmEditCanvasButton = pt.ArmEditCanvasButton
-    except Exception:
-        ArmEditCanvasButton = None
-
-    try:
-        ArmNewCanvasDialog = pt.ArmNewCanvasDialog
-    except Exception:
-        ArmNewCanvasDialog = None
-
-    # Restore Edit Canvas button
-    if ArmEditCanvasButton is not None and _original_arm_edit_canvas_execute is not None:
-        ArmEditCanvasButton.execute = _original_arm_edit_canvas_execute
-        if _original_arm_edit_canvas_label is not None:
-            ArmEditCanvasButton.bl_label = _original_arm_edit_canvas_label
-        log.info("Koui Editor: Restored ArmEditCanvasButton")
-
-    # Restore New Canvas dialog
-    if ArmNewCanvasDialog is not None and _original_arm_new_canvas_execute is not None:
-        ArmNewCanvasDialog.execute = _original_arm_new_canvas_execute
-        log.info("Koui Editor: Restored ArmNewCanvasDialog")
-
-    # Restore exporter
-    try:
-        from arm import exporter
-        if hasattr(exporter, 'ArmoryExporter') and _original_export_trait_code is not None:
-            exporter.ArmoryExporter.export_traits = _original_export_trait_code
-            log.info("Koui Editor: Restored export_traits")
-    except Exception:
-        pass
-
-    # Restore fetch_script_names
-    if _original_fetch_script_names is not None:
-        arm.utils.fetch_script_names = _original_fetch_script_names
-        log.info("Koui Editor: Restored fetch_script_names")
-
-    # Remove load handler
-    if on_load_post in bpy.app.handlers.load_post:
-        bpy.app.handlers.load_post.remove(on_load_post)
+    for owner, name, _ in _patch_targets():
+        _unpatch(owner, name)
 
     for cls in reversed(classes):
         try:
