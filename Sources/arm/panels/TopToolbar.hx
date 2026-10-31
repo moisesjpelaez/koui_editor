@@ -142,7 +142,7 @@ class TopToolbar {
 			}
 			hSeparator(ui, 1 * uiScale, 8 * uiScale);
 
-			if (iconButton(ui, 0, 3, "Toggle Snapping (Shift+S; hold Ctrl while dragging to invert)", isSnapping())) {
+			if (iconButton(ui, 0, 3, "Toggle Snapping (Shift+S; hold Ctrl while dragging to invert, Shift to lock the axis or keep proportions)", isSnapping())) {
 				toggleSnapping();
 			}
 			ui._x += 4 * uiScale; // Small padding on the left

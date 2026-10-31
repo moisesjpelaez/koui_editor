@@ -28,7 +28,21 @@ typedef TDraggedElement = {
 	var startY: Int;
 }
 
-@:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane)
+typedef TResizedElement = {
+	var element: Element;
+	var startX: Int;
+	var startY: Int;
+	var startW: Int;
+	var startH: Int;
+}
+
+/** A resize handle: the edges it moves, -1 for left/top, 1 for right/bottom, 0 for neither. */
+typedef THandle = {
+	var x: Int;
+	var y: Int;
+}
+
+@:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane, arm.base.UIBase)
 class DragDropHandler {
 	var uiBase: UIBase;
 	var viewport: CanvasViewport;
@@ -36,6 +50,21 @@ class DragDropHandler {
 
 	/** How far (in pixels) the mouse must move while pressed before it drags instead of clicking. */
 	static inline var MOVE_THRESHOLD: Float = 4;
+
+	/** A resize handle's square, in pixels at UI scale 1. */
+	static inline var HANDLE_SIZE: Float = 7;
+	/** Corners first, so they win where handles overlap. */
+	static final HANDLES: Array<THandle> = [
+		{ x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: 1, y: 1 },
+		{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }
+	];
+
+	// Resize state: the grabbed handle of the primary element, and the selected elements with their positions and sizes.
+	// The first one is the primary element; the others change by the same amount.
+	var resizeHandle: Null<THandle> = null;
+	var resizedElements: Array<TResizedElement> = [];
+	var resizeLeadRect: TScreenRect;
+	var resizeRootRect: TScreenRect;
 
 	// Drag state: the dragged elements with their positions, and the mouse position, when the press started.
 	// The first one is the element under the mouse (or its selected container); it snaps to the grid.
@@ -106,7 +135,9 @@ class DragDropHandler {
 		var mouseDown: Bool = mouse.down();
 		var mouseJustPressed: Bool = mouseDown && !wasMouseDown;
 
-		if (mouseJustPressed && isInCanvas()) {
+		if (mouseJustPressed && isInCanvas() && startResize(mouse)) {
+			// Grabbed a handle of the primary element: resize, even over another element
+		} else if (mouseJustPressed && isInCanvas()) {
 			var clickedElement: Element = viewport.getElementAt(Std.int(mouse.x), Std.int(mouse.y));
 			var keyboard: Keyboard = Input.getKeyboard();
 			var toggle: Bool = keyboard.down("control");
@@ -143,6 +174,11 @@ class DragDropHandler {
 			// Clicked in hierarchy panel — clear canvas drag state only.
 			// The hierarchy panel updates the selection itself.
 			draggedElements = [];
+		} else if (mouseDown && resizeHandle != null) {
+			if (!dragStarted && (Math.abs(mouse.x - dragMouseX) > MOVE_THRESHOLD || Math.abs(mouse.y - dragMouseY) > MOVE_THRESHOLD)) {
+				dragStarted = true;
+			}
+			if (dragStarted) resizeElements(mouse);
 		} else if (mouseDown && boxPending) {
 			boxEndX = mouse.x;
 			boxEndY = mouse.y;
@@ -165,12 +201,30 @@ class DragDropHandler {
 				uiBase.hwnds[PanelHierarchy].redraws = 2;
 				uiBase.hwnds[PanelProperties].redraws = 2;
 			}
+			if (resizeHandle != null) {
+				var resized: Bool = false;
+				for (r in resizedElements) {
+					var e: Element = r.element;
+					if (e.posX != r.startX || e.posY != r.startY || e.width != r.startW || e.height != r.startH) resized = true;
+				}
+				if (resized) History.edited("Resize");
+				uiBase.hwnds[PanelProperties].redraws = 2;
+				resizeHandle = null;
+				resizedElements = [];
+			}
 			// A click without dragging on a selected element selects only that one
 			if (clickedInSelection != null && !dragStarted) Selection.select(clickedInSelection);
 			clickedInSelection = null;
 			draggedElements = [];
 			dragStarted = false;
 			topToolbar.snapInverted = false;
+		}
+
+		// A resize cursor over a handle and while resizing
+		var hovered: Null<THandle> = resizeHandle != null ? resizeHandle : (!mouseDown && isInCanvas() ? getHandleAt(mouse.x, mouse.y) : null);
+		if (hovered != null) {
+			Krom.setMouseCursor(hovered.x == 0 ? 4 : hovered.y == 0 ? 3 : hovered.x == hovered.y ? 6 : 5);
+			uiBase.cursorSet = true;
 		}
 
 		wasMouseDown = mouseDown;
@@ -207,14 +261,24 @@ class DragDropHandler {
 		var lead: TDraggedElement = draggedElements[0];
 		var leadDirX: Int = dragDirection(lead.element, true);
 		var leadDirY: Int = dragDirection(lead.element, false);
-		var leadX: Float = lead.startX + (mouse.x - dragMouseX) / Koui.uiScale * leadDirX;
-		var leadY: Float = lead.startY + (mouse.y - dragMouseY) / Koui.uiScale * leadDirY;
+		var mouseMoveX: Float = mouse.x - dragMouseX;
+		var mouseMoveY: Float = mouse.y - dragMouseY;
+		// Holding Shift while dragging locks the movement to the axis moved along most
+		// (pressing with Shift adds to the selection instead)
+		var lockX: Bool = false;
+		var lockY: Bool = false;
+		if (Input.getKeyboard().down("shift")) {
+			if (Math.abs(mouseMoveX) >= Math.abs(mouseMoveY)) lockY = true;
+			else lockX = true;
+		}
+		var leadX: Float = lockX ? lead.startX : lead.startX + mouseMoveX / Koui.uiScale * leadDirX;
+		var leadY: Float = lockY ? lead.startY : lead.startY + mouseMoveY / Koui.uiScale * leadDirY;
 		// Holding Ctrl while dragging inverts snapping (pressing with Ctrl toggles the selection instead)
 		topToolbar.snapInverted = Input.getKeyboard().down("control");
 		if (topToolbar.isSnapping()) {
 			var snapValue: Float = topToolbar.snapValue;
-			leadX = Math.round(leadX / snapValue) * snapValue;
-			leadY = Math.round(leadY / snapValue) * snapValue;
+			if (!lockX) leadX = Math.round(leadX / snapValue) * snapValue;
+			if (!lockY) leadY = Math.round(leadY / snapValue) * snapValue;
 		}
 		// The movement on screen, in canvas units
 		var moveX: Float = (leadX - lead.startX) * leadDirX;
@@ -228,6 +292,166 @@ class DragDropHandler {
 			// (without laying it out again), so only set what changed
 			if (newX != element.posX) element.posX = newX;
 			if (newY != element.posY) element.posY = newY;
+		}
+	}
+
+	/** Whether `element` shows resize handles: a placed (not theme-sized) visible element of the scene. */
+	function canResize(element: Null<Element>): Bool {
+		return element != null && element != SceneData.data.getRoot() && SceneData.data.isRegistered(element)
+			&& !isDynamicSized(element) && element.isEffectivelyVisible();
+	}
+
+	/**
+	 * The square of handle `handle` on screen rectangle `rect`. Edge handles
+	 * are left out when the side is too short to hold them besides the corners.
+	 */
+	function getHandleRect(rect: TScreenRect, handle: THandle): Null<TScreenRect> {
+		var size: Int = Std.int(HANDLE_SIZE * uiBase.ui.SCALE());
+		if (handle.x == 0 && rect.w < size * 4) return null;
+		if (handle.y == 0 && rect.h < size * 4) return null;
+		var cx: Int = rect.x + Std.int(rect.w * (handle.x + 1) / 2);
+		var cy: Int = rect.y + Std.int(rect.h * (handle.y + 1) / 2);
+		return { x: cx - Std.int(size / 2), y: cy - Std.int(size / 2), w: size, h: size };
+	}
+
+	/**
+	 * The primary element's handle at the screen point, or null. A handle can
+	 * be grabbed a little outside its square, but reaches at most a quarter
+	 * into the element, so a small element can still be moved.
+	 */
+	function getHandleAt(x: Float, y: Float): Null<THandle> {
+		var element: Null<Element> = Selection.primary;
+		if (!canResize(element)) return null;
+		var rect: TScreenRect = viewport.getScreenRect(element);
+		var margin: Float = 3 * uiBase.ui.SCALE();
+		for (handle in HANDLES) {
+			var square: Null<TScreenRect> = getHandleRect(rect, handle);
+			if (square == null) continue;
+			var left: Float = square.x - margin;
+			var right: Float = square.x + square.w + margin;
+			var top: Float = square.y - margin;
+			var bottom: Float = square.y + square.h + margin;
+			if (handle.x < 0) right = Math.min(right, rect.x + rect.w / 4);
+			if (handle.x > 0) left = Math.max(left, rect.x + rect.w * 3 / 4);
+			if (handle.y < 0) bottom = Math.min(bottom, rect.y + rect.h / 4);
+			if (handle.y > 0) top = Math.max(top, rect.y + rect.h * 3 / 4);
+			if (x >= left && x <= right && y >= top && y <= bottom) return handle;
+		}
+		return null;
+	}
+
+	/** Starts resizing the selection if the mouse is on a handle of the primary element. */
+	function startResize(mouse: Mouse): Bool {
+		var handle: Null<THandle> = getHandleAt(mouse.x, mouse.y);
+		if (handle == null) return false;
+
+		resizeHandle = handle;
+		resizedElements = [];
+		for (element in Selection.elements) {
+			if (!canResize(element)) continue;
+			var resized: TResizedElement = { element: element, startX: element.posX, startY: element.posY, startW: element.width, startH: element.height };
+			if (element == Selection.primary) resizedElements.unshift(resized);
+			else resizedElements.push(resized);
+		}
+		resizeLeadRect = viewport.getScreenRect(Selection.primary);
+		resizeRootRect = viewport.getScreenRect(SceneData.data.getRoot());
+		draggedElements = [];
+		clickedInSelection = null;
+		dragStarted = false;
+		dragMouseX = mouse.x;
+		dragMouseY = mouse.y;
+		return true;
+	}
+
+	/**
+	 * Moves the grabbed edges of the primary element with the mouse, and the
+	 * same edges of the other selected elements by the same amount. The
+	 * opposite edges stay where they are, whatever the anchor. With snapping,
+	 * the primary element's grabbed edges land on the grid; Shift on a corner
+	 * keeps the primary element's proportions.
+	 */
+	function resizeElements(mouse: Mouse): Void {
+		var handle: THandle = resizeHandle;
+		var lead: TResizedElement = resizedElements[0];
+		topToolbar.snapInverted = Input.getKeyboard().down("control");
+		var snapping: Bool = topToolbar.isSnapping();
+		var snapValue: Float = topToolbar.snapValue;
+
+		// How far each grabbed edge moves, in canvas units
+		var moveX: Float = 0;
+		var moveY: Float = 0;
+		if (handle.x != 0) {
+			// The grabbed edge, in canvas units from the scene's left side, like the grid
+			var edge: Float = (resizeLeadRect.x + (handle.x > 0 ? resizeLeadRect.w : 0) - resizeRootRect.x) / Koui.uiScale;
+			var target: Float = edge + (mouse.x - dragMouseX) / Koui.uiScale;
+			if (snapping) target = Math.round(target / snapValue) * snapValue;
+			moveX = target - edge;
+		}
+		if (handle.y != 0) {
+			var edge: Float = (resizeLeadRect.y + (handle.y > 0 ? resizeLeadRect.h : 0) - resizeRootRect.y) / Koui.uiScale;
+			var target: Float = edge + (mouse.y - dragMouseY) / Koui.uiScale;
+			if (snapping) target = Math.round(target / snapValue) * snapValue;
+			moveY = target - edge;
+		}
+
+		// Shift on a corner: the side that changed most (relatively) decides the size
+		if (handle.x != 0 && handle.y != 0 && Input.getKeyboard().down("shift") && lead.startW > 0 && lead.startH > 0) {
+			var w: Float = lead.startW + moveX * handle.x;
+			var h: Float = lead.startH + moveY * handle.y;
+			if (Math.abs(w / lead.startW - 1) >= Math.abs(h / lead.startH - 1)) h = w * lead.startH / lead.startW;
+			else w = h * lead.startW / lead.startH;
+			moveX = (w - lead.startW) * handle.x;
+			moveY = (h - lead.startH) * handle.y;
+		}
+
+		for (resized in resizedElements) {
+			var horizontal: Array<Int> = resizeAxis(resized.element, true, handle.x, Math.round(moveX), resized.startX, resized.startW);
+			var vertical: Array<Int> = resizeAxis(resized.element, false, handle.y, Math.round(moveY), resized.startY, resized.startH);
+			var element: Element = resized.element;
+			// Koui resets the laid-out position when a position is set to its current value, so only set what changed
+			if (horizontal[0] != element.posX) element.posX = horizontal[0];
+			if (vertical[0] != element.posY) element.posY = vertical[0];
+			if (horizontal[1] != element.width || vertical[1] != element.height) {
+				element.width = horizontal[1];
+				element.height = vertical[1];
+				Koui.updateElementSize(element);
+			}
+		}
+	}
+
+	/**
+	 * The new position and size along one axis when the grabbed edge (`side`:
+	 * -1 left/top, 1 right/bottom, 0 none) moves by `move` canvas units. Koui
+	 * places an element from its anchor, so the position changes so the other
+	 * edge stays put. The size stays at least 1.
+	 */
+	static function resizeAxis(element: Element, horizontal: Bool, side: Int, move: Int, start: Int, size: Int): Array<Int> {
+		if (side == 0) return [start, size];
+		// The size can't go below 1: the edge stops before the opposite one
+		if (side < 0) move = Std.int(Math.min(move, size - 1));
+		else move = Std.int(Math.max(move, 1 - size));
+
+		var anchor: Int = anchorSide(element, horizontal);
+		// Centered elements grow on both sides, so they change by an even amount to keep the other edge exact
+		if (anchor == 0 && move % 2 != 0) move -= move > 0 ? 1 : -1;
+
+		var newSize: Int = size + move * side;
+		var newPos: Int = start;
+		if (anchor == side) newPos = start + move * dragDirection(element, horizontal);
+		else if (anchor == 0) newPos = start + Std.int(move / 2);
+		return [newPos, newSize];
+	}
+
+	/** -1 if the element is placed from its left (top) edge, 0 from its center, 1 from its right (bottom) edge. */
+	static function anchorSide(element: Element, horizontal: Bool): Int {
+		return switch (element.getAnchorResolved()) {
+			case TopLeft | MiddleLeft | BottomLeft if (horizontal): -1;
+			case TopCenter | MiddleCenter | BottomCenter if (horizontal): 0;
+			case TopRight | MiddleRight | BottomRight if (horizontal): 1;
+			case TopLeft | TopCenter | TopRight: -1;
+			case MiddleLeft | MiddleCenter | MiddleRight: 0;
+			case BottomLeft | BottomCenter | BottomRight: 1;
+			default: -1;
 		}
 	}
 
@@ -248,6 +472,21 @@ class DragDropHandler {
 	public function drawSelectedElements(g2: kha.graphics2.Graphics) {
 		viewport.drawSelection(g2);
 		if (boxActive) viewport.drawSelectionBox(g2, getBoxRect());
+		else drawHandles(g2);
+	}
+
+	function drawHandles(g2: kha.graphics2.Graphics): Void {
+		var element: Null<Element> = Selection.primary;
+		if (!canResize(element)) return;
+		var rect: TScreenRect = viewport.getScreenRect(element);
+		for (handle in HANDLES) {
+			var square: Null<TScreenRect> = getHandleRect(rect, handle);
+			if (square == null) continue;
+			g2.color = 0xff469cff;
+			g2.fillRect(square.x, square.y, square.w, square.h);
+			g2.color = 0xffffffff;
+			g2.fillRect(square.x + 1, square.y + 1, square.w - 2, square.h - 2);
+		}
 	}
 
 	function getBoxRect(): TScreenRect {
