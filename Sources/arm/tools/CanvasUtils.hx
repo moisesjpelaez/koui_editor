@@ -20,8 +20,7 @@ import koui.elements.ImagePanel;
 import koui.elements.Label;
 import koui.elements.RadioButton;
 import koui.elements.layouts.AnchorPane;
-import koui.elements.layouts.ColLayout;
-import koui.elements.layouts.RowLayout;
+import koui.elements.layouts.GridLayout;
 import koui.utils.RadioGroup;
 import koui.utils.SceneManager;
 
@@ -637,19 +636,18 @@ class CanvasUtils {
 	}
 
 	/**
-	 * Pastes elements from clipboard data into the current scene.
-	 * Creates new elements with unique names and restores parent-child relationships.
-	 * If targetParent is a layout container, each copied tree is pasted into it.
+	 * Pastes elements from clipboard data into the current scene and returns
+	 * the root of each pasted tree. Creates new elements with unique names and
+	 * restores parent-child relationships. If targetParent is a container, each
+	 * copied tree is pasted into it, otherwise into the scene. Pasted trees are
+	 * offset by 10 units, except in grid cells.
 	 */
-	public static function pasteElements(clipboardData: Array<TElementData>, ?targetParent: Element): Void {
+	public static function pasteElements(clipboardData: Array<TElementData>, ?targetParent: Element): Array<Element> {
 		var scene = sceneData.currentScene;
-		if (scene == null || clipboardData.length == 0) return;
+		if (scene == null || clipboardData.length == 0) return [];
 
 		// Determine where to paste the root element
-		var pasteParent: Element = scene.root;
-		if (targetParent != null && (Std.isOfType(targetParent, AnchorPane) || Std.isOfType(targetParent, RowLayout) || Std.isOfType(targetParent, ColLayout))) {
-			pasteParent = targetParent;
-		}
+		var pasteParent: Element = HierarchyUtils.canAcceptChild(targetParent) ? targetParent : scene.root;
 
 		// Pasted radio buttons join the canvas' groups
 		var radioGroupMap: Map<String, RadioGroup> = [for (group in sceneData.radioGroups) group.id => group];
@@ -677,8 +675,8 @@ class CanvasUtils {
 			pathToElement.set(CanvasLoader.joinPath(elemData.parent, elemData.key), element);
 
 			if (isTreeRoot) {
+				if (!Std.isOfType(pasteParent, GridLayout)) element.setPosition(elemData.posX + 10, elemData.posY + 10);
 				if (pasteParent == scene.root) {
-					element.setPosition(elemData.posX + 10, elemData.posY + 10);
 					scene.root.add(element, cast elemData.anchor);
 				} else {
 					HierarchyUtils.moveAsChild(element, pasteParent);
@@ -691,7 +689,7 @@ class CanvasUtils {
 			sceneData.registerElement(element, proposedKey, scene);
 		}
 
-		Selection.setAll(pastedRoots);
+		return pastedRoots;
 	}
 
 	/**

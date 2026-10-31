@@ -22,6 +22,11 @@ class TopToolbar {
     public var snappingEnabled: Bool = false;
 	public var snapValue: Float = 8.0;
 	public var snapMaxValue: Float = 288.0;
+	/** Set while a drag is going on with Ctrl held: snapping is inverted. */
+	public var snapInverted: Bool = false;
+
+	/** The snap size steps by this much (Ctrl+[ / Ctrl+]). */
+	public static inline var SNAP_STEP: Float = 8;
 
 	static inline var TOOLBAR_WIDTH: Int = 378;
 	static inline var TOOLBAR_HEIGHT: Int = 32;
@@ -37,6 +42,26 @@ class TopToolbar {
 		snapHandle.value = 64.0;
 		windowHandle = Id.handle();
 
+	}
+
+	/** Whether moving elements snaps to the grid right now: the toggle, inverted while Ctrl is held during a drag. */
+	public function isSnapping(): Bool {
+		return snappingEnabled != snapInverted;
+	}
+
+	public function toggleSnapping(): Void {
+		snappingEnabled = !snappingEnabled;
+		snappingToggled.emit(snappingEnabled, snapValue);
+	}
+
+	/** Sets the snap size, rounded to a multiple of SNAP_STEP within the slider's range. */
+	public function setSnapValue(value: Float): Void {
+		value = Math.round(value / SNAP_STEP) * SNAP_STEP;
+		value = Math.max(SNAP_STEP, Math.min(snapMaxValue, value));
+		if (value == snapValue) return;
+		snapValue = value;
+		snapHandle.value = value;
+		snapValueChanged.emit(value);
 	}
 
 	// Wrapper for ZuiUtils.iconButton with local icons
@@ -87,24 +112,24 @@ class TopToolbar {
 				buttonSize / toolbarWidth, (buttonSize * 4) / toolbarWidth]);
 
 			ui._x += 8 * uiScale; // Small padding on the left
-			if (iconButton(ui, 3, 1, "Clear Canvas")) {
+			if (iconButton(ui, 3, 1, "Clear Canvas (Ctrl+N)")) {
 				CanvasUtils.clearToEmptyScene();
 			}
-			if (iconButton(ui, 2, 2, "Load Canvas")) {
+			if (iconButton(ui, 2, 2, "Load Canvas (Ctrl+O)")) {
 				CanvasUtils.loadCanvas();
 			}
-			if (iconButton(ui, 3, 2, "Save Canvas")) {
+			if (iconButton(ui, 3, 2, "Save Canvas (Ctrl+S)")) {
 				CanvasUtils.saveCanvas();
 			}
 			hSeparator(ui, 1 * uiScale, 8 * uiScale);
 
-			if (iconButton(ui, 6, 2, "Undo", false, !History.canUndo())) {
+			if (iconButton(ui, 6, 2, "Undo (Ctrl+Z)", false, !History.canUndo())) {
 				if (History.undo()) {
 					uiBase.hwnds[PanelHierarchy].redraws = 2;
 					uiBase.hwnds[PanelProperties].redraws = 2;
 				}
 			}
-			if (iconButton(ui, 7, 2, "Redo", false, !History.canRedo())) {
+			if (iconButton(ui, 7, 2, "Redo (Ctrl+Shift+Z / Ctrl+Y)", false, !History.canRedo())) {
 				if (History.redo()) {
 					uiBase.hwnds[PanelHierarchy].redraws = 2;
 					uiBase.hwnds[PanelProperties].redraws = 2;
@@ -112,26 +137,19 @@ class TopToolbar {
 			}
 			hSeparator(ui, 1 * uiScale, 8 * uiScale);
 
-			if (iconButton(ui, 5, 0, "Reload Theme")) {
+			if (iconButton(ui, 5, 0, "Reload Theme (Ctrl+R)")) {
 				CanvasUtils.refreshTheme();
 			}
 			hSeparator(ui, 1 * uiScale, 8 * uiScale);
 
-			if (iconButton(ui, 0, 3, "Toggle Snapping", snappingEnabled)) {
-				snappingEnabled = !snappingEnabled;
-                snappingToggled.emit(snappingEnabled, snapValue);
+			if (iconButton(ui, 0, 3, "Toggle Snapping (Shift+S; hold Ctrl while dragging to invert)", isSnapping())) {
+				toggleSnapping();
 			}
 			ui._x += 4 * uiScale; // Small padding on the left
-			snapValue = ui.slider(snapHandle, "Snap", 8, snapMaxValue, true, 1/8, true, Align.Right);
-			// Round to nearest multiple of 8
-			if (snapHandle.changed) {
-				snapValue = Math.round(snapValue / 8) * 8;
-				snapHandle.value = snapValue; // Update handle to match rounded value
-			}
-			if (ui.isHovered) ui.tooltip("Grid Snap Value");
-			if (snapHandle.changed) {
-				snapValueChanged.emit(snapHandle.value);
-			}
+			snapHandle.value = snapValue;
+			var newSnapValue: Float = ui.slider(snapHandle, "Snap", SNAP_STEP, snapMaxValue, true, 1 / SNAP_STEP, true, Align.Right);
+			if (snapHandle.changed) setSnapValue(newSnapValue);
+			if (ui.isHovered) ui.tooltip("Grid Snap Value (Ctrl+[ / Ctrl+])");
 
 			ui._y -= yOffset;
 		}

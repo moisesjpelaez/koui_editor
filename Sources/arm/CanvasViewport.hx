@@ -134,7 +134,7 @@ class CanvasViewport {
 
 	public function drawGrid(g2: Graphics): Void {
 		var rootPane: AnchorPane = sceneData.getRoot();
-		if (!topToolbar.snappingEnabled || rootPane == null) return;
+		if (!topToolbar.isSnapping() || rootPane == null) return;
 
 		var cellSize: Float = topToolbar.snapValue * currentScale;
 		if (cellSize < 4) return;

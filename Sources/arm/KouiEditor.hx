@@ -227,6 +227,36 @@ class KouiEditor extends iron.Trait {
 				uiBase.hwnds[PanelProperties].redraws = 2;
 			}
 		}
+
+		// Duplicate (Ctrl+D)
+		if (!isTyping && keyboard.down("control") && keyboard.started("d")) {
+			duplicateSelection();
+		}
+
+		// Toolbar: save (Ctrl+S), load (Ctrl+O), clear (Ctrl+N), reload theme (Ctrl+R)
+		if (!isTyping && keyboard.down("control") && keyboard.started("s")) {
+			CanvasUtils.saveCanvas();
+		}
+		if (!isTyping && keyboard.down("control") && keyboard.started("o")) {
+			CanvasUtils.loadCanvas();
+		}
+		if (!isTyping && keyboard.down("control") && keyboard.started("n")) {
+			CanvasUtils.clearToEmptyScene();
+		}
+		if (!isTyping && keyboard.down("control") && keyboard.started("r")) {
+			CanvasUtils.refreshTheme();
+		}
+
+		// Snapping: toggle (Shift+S), snap size (Ctrl+[ / Ctrl+])
+		if (!isTyping && keyboard.down("shift") && !keyboard.down("control") && keyboard.started("s")) {
+			topToolbar.toggleSnapping();
+		}
+		if (!isTyping && keyboard.down("control") && keyboard.started("[")) {
+			topToolbar.setSnapValue(topToolbar.snapValue - TopToolbar.SNAP_STEP);
+		}
+		if (!isTyping && keyboard.down("control") && keyboard.started("]")) {
+			topToolbar.setSnapValue(topToolbar.snapValue + TopToolbar.SNAP_STEP);
+		}
 	}
 
 	/** Deletes the selected elements, with everything inside them. */
@@ -255,12 +285,30 @@ class KouiEditor extends iron.Trait {
 	public function paste(): Void {
 		if (Clipboard.clipboardData.length == 0) return;
 
-		CanvasUtils.pasteElements(Clipboard.clipboardData, Selection.primary);
+		Selection.setAll(CanvasUtils.pasteElements(Clipboard.clipboardData, Selection.primary));
 		History.edited("Paste");
 		if (Clipboard.isCut) {
 			Clipboard.clipboardData = [];
 			Clipboard.isCut = false;
 		}
+		uiBase.hwnds[PanelHierarchy].redraws = 2;
+		uiBase.hwnds[PanelProperties].redraws = 2;
+	}
+
+	/**
+	 * Duplicates the selected elements, each into its own container, offset like
+	 * a paste. The copies become the selection; the clipboard is left as it is.
+	 */
+	public function duplicateSelection(): Void {
+		var copies: Array<Element> = [];
+		for (element in Selection.getTopLevel()) {
+			var data: Array<TElementData> = CanvasUtils.serializeElementTree(element);
+			for (copy in CanvasUtils.pasteElements(data, HierarchyUtils.getParentElement(element))) copies.push(copy);
+		}
+		if (copies.length == 0) return;
+
+		Selection.setAll(copies);
+		History.edited("Duplicate");
 		uiBase.hwnds[PanelHierarchy].redraws = 2;
 		uiBase.hwnds[PanelProperties].redraws = 2;
 	}

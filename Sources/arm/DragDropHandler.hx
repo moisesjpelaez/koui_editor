@@ -170,6 +170,7 @@ class DragDropHandler {
 			clickedInSelection = null;
 			draggedElements = [];
 			dragStarted = false;
+			topToolbar.snapInverted = false;
 		}
 
 		wasMouseDown = mouseDown;
@@ -208,7 +209,9 @@ class DragDropHandler {
 		var leadDirY: Int = dragDirection(lead.element, false);
 		var leadX: Float = lead.startX + (mouse.x - dragMouseX) / Koui.uiScale * leadDirX;
 		var leadY: Float = lead.startY + (mouse.y - dragMouseY) / Koui.uiScale * leadDirY;
-		if (topToolbar.snappingEnabled) {
+		// Holding Ctrl while dragging inverts snapping (pressing with Ctrl toggles the selection instead)
+		topToolbar.snapInverted = Input.getKeyboard().down("control");
+		if (topToolbar.isSnapping()) {
 			var snapValue: Float = topToolbar.snapValue;
 			leadX = Math.round(leadX / snapValue) * snapValue;
 			leadY = Math.round(leadY / snapValue) * snapValue;

@@ -90,15 +90,19 @@ class History {
 		return true;
 	}
 
-	/** Whether the canvas differs from the last saved or loaded one. */
+	/**
+	 * Whether the canvas differs from the last saved or loaded one, including a
+	 * drag still going on. Doesn't record anything, so asking during a drag
+	 * doesn't split it.
+	 */
 	public static function isDirty(): Bool {
-		commitPending();
-		return current != null && current.canvas != savedCanvas;
+		if (current == null) return false;
+		return capture().canvas != savedCanvas;
 	}
 
+	/** Remembers the canvas as just saved (including a pending edit, which the file contains). */
 	public static function markSaved(): Void {
-		commitPending();
-		if (current != null) savedCanvas = current.canvas;
+		if (current != null) savedCanvas = capture().canvas;
 	}
 
 	/** Whether the canvas still matches the last recorded step, i.e. no change went unrecorded. */
