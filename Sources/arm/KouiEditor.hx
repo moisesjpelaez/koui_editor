@@ -94,10 +94,10 @@ class KouiEditor extends iron.Trait {
 
 				var argCount = Krom.getArgCount();
 				// Arguments are: [0]=krom_path, [1]=koui_editor_path, [2]=koui_editor_path,
-				//                [3]=canvas_arg, [4]=uiscale, [5]=resolution_x, [6]=resolution_y, [7]=project_dir, [8]=project_ext
-				if (argCount >= 7) {
-					var resX: Int = Std.parseInt(Krom.getArg(5));
-					var resY: Int = Std.parseInt(Krom.getArg(6));
+				//                [3]=canvas_name, [4]=resolution_x, [5]=resolution_y, [6]=project_dir
+				if (argCount >= 6) {
+					var resX: Int = Std.parseInt(Krom.getArg(4));
+					var resY: Int = Std.parseInt(Krom.getArg(5));
 					if (resX != null && resY != null) {
 						canvasWidth = resX;
 						canvasHeight = resY;

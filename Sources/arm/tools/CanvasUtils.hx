@@ -40,7 +40,7 @@ class CanvasUtils {
 	 * Canvas name (trait name from Blender) is at Arg[3]
 	 */
 	public static function init(): Void {
-		// Args: [0]=krom_path, [1]=assets, [2]=shaders, [3]=canvas_name, [4]=uiscale, [5]=res_x, [6]=res_y, [7]=project_dir, [8]=project_ext
+		// Args: [0]=krom_path, [1]=assets, [2]=shaders, [3]=canvas_name, [4]=res_x, [5]=res_y, [6]=project_dir
 		var argCount: Int = Krom.getArgCount();
 
 		if (argCount > 3) {
@@ -50,8 +50,8 @@ class CanvasUtils {
 			}
 		}
 
-		if (argCount > 7) {
-			var dir: String = Krom.getArg(7);
+		if (argCount > 6) {
+			var dir: String = Krom.getArg(6);
 			if (dir != null && dir != "" && !StringTools.startsWith(dir, "--")) {
 				projectDir = StringTools.replace(dir, "/", "\\");
 			}

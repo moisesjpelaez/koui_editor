@@ -215,8 +215,8 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
         # like "//../../") so Krom receives a clean absolute path.
         project_dir = os.path.normpath(arm.utils.get_fp()) if bpy.data.filepath else os.getcwd()
 
-        uiscale = str(arm.utils.get_ui_scale())
-        cmd = [krom_path, koui_editor_path, koui_editor_path, canvas_name, uiscale]
+        # The editor reads: [3] canvas name, [4] and [5] resolution, [6] project folder
+        cmd = [krom_path, koui_editor_path, koui_editor_path, canvas_name]
 
         # Pass render resolution
         render_settings = context.scene.render
@@ -225,7 +225,6 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
 
         # Pass project directory
         cmd.append(project_dir)
-        cmd.append(ext)
 
         if arm.utils.get_os() == 'win':
             cmd.append('--consolepid')
