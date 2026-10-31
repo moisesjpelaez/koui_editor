@@ -27,10 +27,11 @@ import koui.utils.SceneManager;
  * - Better performance for complex UIs
  *
  * Supports multiple scenes within a single canvas. Use setScene() to switch
- * between scenes at runtime. The first scene is automatically activated on load.
+ * between scenes at runtime. On load, the scene saved as active is shown, or
+ * the first scene if none is.
  *
- * Note: Koui.init() is automatically called in Main.hx via the armory_hooks.py
- * library hook system. The game startup is wrapped inside Koui.init() callback.
+ * Note: Koui is started and drawn by the code that the koui_editor library's
+ * armory_hooks.py adds to Main.hx; this trait only builds the canvas.
  */
 @:access(koui.Koui, koui.elements.Element, koui.elements.layouts.GridLayout)
 class KouiCanvas extends Trait {
@@ -79,13 +80,9 @@ class KouiCanvas extends Trait {
 		radioGroups = new Map();
 
 		notifyOnInit(function() {
-			// Load canvas JSON
-			iron.data.Data.getBlob(canvasName + ".json", function(blob: kha.Blob) {
-				if (blob == null) {
-					trace('[KouiCanvas] Failed to load canvas: $canvasName.json');
-					return;
-				}
-
+			// Loaded through Kha rather than Iron's Data.getBlob, which doesn't report a missing file
+			var path: String = @:privateAccess iron.data.Data.resolvePath(canvasName + ".json");
+			kha.Assets.loadBlobFromPath(path, function(blob: kha.Blob) {
 				var canvasData: TCanvasData = null;
 				try {
 					canvasData = haxe.Json.parse(blob.toString());
@@ -106,15 +103,17 @@ class KouiCanvas extends Trait {
 
 				notifyOnRender2D(render2D);
 				notifyOnRemove(onRemove);
+			}, function(error: kha.AssetError) {
+				trace('[KouiCanvas] Failed to load canvas "$canvasName": $path not found (${error.error})');
 			});
 		});
 
 	}
 
 	function render2D(g: kha.graphics2.Graphics): Void {
-		if (!ready || !canvasVisible) return;
+		if (!ready) return;
 
-		// Execute ready callbacks (once per callback)
+		// Execute ready callbacks (once per callback), also while the canvas is hidden
 		if (onReadyFuncs != null && onReadyFuncs.length > 0) {
 			for (f in onReadyFuncs) {
 				f();
@@ -180,7 +179,9 @@ class KouiCanvas extends Trait {
 		for (scene in built.scenes) scenes.set(scene.key, scene);
 		for (group in built.radioGroups) radioGroups.set(group.id, group);
 
-		if (built.activeScene != null) setScene(built.activeScene);
+		// The scene saved as active, or the first one: the editor always saves one, a hand-edited file might not
+		var activeScene: Null<String> = built.activeScene != null ? built.activeScene : (built.scenes.length > 0 ? built.scenes[0].key : null);
+		if (activeScene != null) setScene(activeScene);
 	}
 
 	function onAppResized(w: Int, h: Int): Void {
@@ -546,7 +547,7 @@ class KouiCanvas extends Trait {
 	 */
 	public static function getActiveCanvas(): Null<KouiCanvas> {
 		var activeCanvas: Null<KouiCanvas> = iron.Scene.active.getTrait(KouiCanvas);
-		if (activeCanvas == null) {
+		if (activeCanvas == null && iron.Scene.active.camera != null) {
 			activeCanvas = iron.Scene.active.camera.getTrait(KouiCanvas);
 		}
 		return activeCanvas;
