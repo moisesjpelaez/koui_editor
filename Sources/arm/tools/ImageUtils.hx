@@ -4,10 +4,7 @@ import kha.graphics4.BlendingFactor;
 import kha.graphics4.PipelineState;
 import kha.graphics4.VertexStructure;
 import kha.graphics4.VertexData;
-import kha.Image;
 import kha.Shaders;
-import zui.Zui;
-import zui.Zui.State;
 
 /**
  * Utility class for rendering images with proper alpha blending.
@@ -22,7 +19,7 @@ class ImageUtils {
 	/**
 	 * Initialize the alpha-blended pipeline. Called automatically on first use.
 	 */
-	public static function init(): Void {
+	static function init(): Void {
 		if (alphaPipeline != null) return;
 
 		var structure: VertexStructure = new VertexStructure();
@@ -48,19 +45,6 @@ class ImageUtils {
 	public static function getPipeline(): PipelineState {
 		init();
 		return alphaPipeline;
-	}
-
-	/**
-	 * Draw an image with proper alpha blending using Zui.
-	 * Automatically sets and restores the pipeline.
-	 */
-	public static function image(ui: Zui, image: Image, tint: Int = 0xffffffff, h: Null<Float> = null,
-			sx: Int = 0, sy: Int = 0, sw: Int = 0, sh: Int = 0): State {
-		init();
-		ui.g.pipeline = alphaPipeline;
-		var result = ui.image(image, tint, h, sx, sy, sw, sh);
-		ui.g.pipeline = null;
-		return result;
 	}
 
 	/**

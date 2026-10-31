@@ -24,14 +24,8 @@ interface IElementEditor {
 	/** Category grouping in ElementsPanel (e.g. "Basic", "Buttons", "Layout", "Misc."). */
 	var category(get, never): String;
 
-	/** Whether this element type has internal children that shouldn't be individually selectable (e.g. Button, Checkbox). */
-	var isComposite(get, never): Bool;
-
 	/** Create a default instance for the ElementsPanel palette. */
 	function createDefault(?radioGroups: Array<RadioGroup>): Element;
-
-	/** Initialize Zui handles for the property panel. Called once at registration. */
-	function initHandles(): Void;
 
 	/**
 	 * Draw type-specific property fields in the PropertiesPanel for the selected

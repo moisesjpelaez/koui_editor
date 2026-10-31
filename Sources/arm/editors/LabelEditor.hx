@@ -6,7 +6,6 @@ import koui.elements.Element;
 import koui.elements.Label;
 import koui.utils.RadioGroup;
 import zui.Zui;
-import zui.Zui.Align;
 import zui.Zui.Handle;
 
 class LabelEditor implements IElementEditor {
@@ -17,12 +16,10 @@ class LabelEditor implements IElementEditor {
 	public var typeName(get, never): String;
 	public var displayName(get, never): String;
 	public var category(get, never): String;
-	public var isComposite(get, never): Bool;
 
 	function get_typeName(): String return "Label";
 	function get_displayName(): String return "Label";
 	function get_category(): String return "Basic";
-	function get_isComposite(): Bool return false;
 
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return new Label("New Label");

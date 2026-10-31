@@ -2,14 +2,12 @@ package arm.editors;
 
 import arm.data.SceneData;
 import arm.editors.IElementEditor;
+import arm.canvas.CanvasElements;
 import arm.panels.PropertyFields;
 import koui.elements.Element;
-import koui.elements.Panel;
 import koui.elements.RadioButton;
-import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
 import koui.utils.RadioGroup;
 import zui.Zui;
-import zui.Zui.Align;
 import zui.Zui.Handle;
 
 @:access(koui.elements.Element)
@@ -23,12 +21,10 @@ class RadioButtonEditor implements IElementEditor {
 	public var typeName(get, never): String;
 	public var displayName(get, never): String;
 	public var category(get, never): String;
-	public var isComposite(get, never): Bool;
 
 	function get_typeName(): String return "RadioButton";
 	function get_displayName(): String return "Radio Button";
 	function get_category(): String return "Buttons";
-	function get_isComposite(): Bool return true;
 
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		var group: RadioGroup = null;
@@ -56,9 +52,7 @@ class RadioButtonEditor implements IElementEditor {
 			if (checked) {
 				radioButton.group.setActiveButton(radioButton);
 			} else {
-				radioButton.isChecked = false;
-				var checkSquare: Panel = radioButton.getChild(new TypeMatchBehaviour(Panel));
-				if (checkSquare != null) checkSquare.setContextElement("");
+				CanvasElements.setChecked(radioButton, false);
 			}
 		});
 

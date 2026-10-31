@@ -2,7 +2,6 @@ package arm.panels;
 
 import arm.data.SceneData;
 import arm.editors.ElementRegistry;
-import arm.editors.IElementEditor;
 import arm.events.ElementEvents;
 import arm.base.UIBase;
 import arm.CanvasViewport.TScreenRect;

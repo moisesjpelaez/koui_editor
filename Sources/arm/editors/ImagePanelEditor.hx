@@ -9,7 +9,6 @@ import koui.elements.ImagePanel;
 import koui.Koui;
 import koui.utils.RadioGroup;
 import zui.Zui;
-import zui.Zui.Align;
 import zui.Zui.Handle;
 
 @:access(koui.Koui)
@@ -22,12 +21,10 @@ class ImagePanelEditor implements IElementEditor {
 	public var typeName(get, never): String;
 	public var displayName(get, never): String;
 	public var category(get, never): String;
-	public var isComposite(get, never): Bool;
 
 	function get_typeName(): String return "ImagePanel";
 	function get_displayName(): String return "Image Panel";
 	function get_category(): String return "Basic";
-	function get_isComposite(): Bool return false;
 
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		var imagePanel = new ImagePanel(null);

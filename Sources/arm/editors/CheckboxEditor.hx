@@ -1,14 +1,12 @@
 package arm.editors;
 
 import arm.editors.IElementEditor;
+import arm.canvas.CanvasElements;
 import arm.panels.PropertyFields;
 import koui.elements.Checkbox;
 import koui.elements.Element;
-import koui.elements.Panel;
-import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
 import koui.utils.RadioGroup;
 import zui.Zui;
-import zui.Zui.Align;
 import zui.Zui.Handle;
 
 @:access(koui.elements.Element)
@@ -21,12 +19,10 @@ class CheckboxEditor implements IElementEditor {
 	public var typeName(get, never): String;
 	public var displayName(get, never): String;
 	public var category(get, never): String;
-	public var isComposite(get, never): Bool;
 
 	function get_typeName(): String return "Checkbox";
 	function get_displayName(): String return "Checkbox";
 	function get_category(): String return "Buttons";
-	function get_isComposite(): Bool return true;
 
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return new Checkbox("New Checkbox");
@@ -42,11 +38,6 @@ class CheckboxEditor implements IElementEditor {
 		ui.separator();
 
 		PropertyFields.text(ui, textHandle, "Text", elements, e -> (cast e: Checkbox).text, (e, text) -> (cast e: Checkbox).text = text);
-		PropertyFields.check(ui, isCheckedHandle, "Is Checked", elements, e -> (cast e: Checkbox).isChecked, (e, checked) -> {
-			var checkbox: Checkbox = cast e;
-			checkbox.isChecked = checked;
-			var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
-			if (checkSquare != null) checkSquare.setContextElement(checked ? "checked" : "");
-		});
+		PropertyFields.check(ui, isCheckedHandle, "Is Checked", elements, e -> (cast e: Checkbox).isChecked, (e, checked) -> CanvasElements.setChecked(cast e, checked));
 	}
 }

@@ -66,7 +66,6 @@ class KouiCanvas extends Trait {
 	// Settings
 	var expandOnResize: Bool = false;
 	var scaleOnResize: Bool = false;
-	var autoScale: Bool = false;
 	var scaleHorizontal: Bool = false;
 	var scaleVertical: Bool = false;
 
@@ -154,7 +153,6 @@ class KouiCanvas extends Trait {
 		// Settings
 		expandOnResize = canvasData.canvas.settings.expandOnResize;
 		scaleOnResize = canvasData.canvas.settings.scaleOnResize;
-		autoScale = canvasData.canvas.settings.autoScale;
 		scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
 		scaleVertical = canvasData.canvas.settings.scaleVertical;
 		if (expandOnResize) {
@@ -162,6 +160,18 @@ class KouiCanvas extends Trait {
 			baseH = canvasData.canvas.height;
 			baseW = canvasData.canvas.width;
 			onAppResized(App.w(), App.h());
+		}
+
+		// An ImagePanel shows nothing if its image isn't loaded (e.g. with Assets.loadEverything) before the canvas
+		var reported: Array<String> = [];
+		for (sceneData in canvasData.scenes) {
+			for (element in sceneData.elements) {
+				if (element.type != "ImagePanel") continue;
+				var name: String = element.properties.imageName;
+				if (name == null || name == "" || reported.indexOf(name) >= 0 || Koui.getImage(name) != null) continue;
+				reported.push(name);
+				trace('[KouiCanvas] Image "$name" is not loaded; load it before the canvas "$cnvName" to show it');
+			}
 		}
 
 		// Radio groups are shared by all scenes
@@ -258,6 +268,8 @@ class KouiCanvas extends Trait {
 		}
 
 		SceneManager.setScene(sceneName);
+		// setScene shows the scene, also when the canvas is hidden
+		scene.root.visible = canvasVisible;
 		currentScene = scene;
 		return true;
 	}
@@ -575,10 +587,6 @@ class KouiCanvas extends Trait {
 		}
 		return activeCanvas;
 	}
-
-	// TODO: Consider adding hot-reload support in the future
-	// This would allow reloading the canvas JSON at runtime for development
-	// public function reloadCanvas(): Void { ... }
 
 }
 

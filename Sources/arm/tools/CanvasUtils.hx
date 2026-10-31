@@ -5,20 +5,15 @@ import arm.data.History;
 import arm.data.SceneData;
 import arm.data.Selection;
 import arm.events.SceneEvents;
-import arm.events.ElementEvents;
 import arm.canvas.CanvasElements;
 import arm.canvas.CanvasLoader;
-import arm.editors.ElementRegistry;
 import arm.types.Types;
 
 import haxe.Json;
 
 import koui.Koui;
-import koui.elements.Button;
 import koui.elements.Element;
 import koui.elements.ImagePanel;
-import koui.elements.Label;
-import koui.elements.RadioButton;
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.GridLayout;
 import koui.utils.RadioGroup;
@@ -30,8 +25,6 @@ class CanvasUtils {
 
 	// Project directory from command line args
 	public static var projectDir: String = "";
-	public static var buildPath: String = "";
-	public static var projectExt: String = "";
 
 	static var sceneData: SceneData = SceneData.data;
 
@@ -62,19 +55,8 @@ class CanvasUtils {
 			if (dir != null && dir != "" && !StringTools.startsWith(dir, "--")) {
 				projectDir = StringTools.replace(dir, "/", "\\");
 			}
-			var ext: String = Krom.getArg(8);
-			if (ext != null && ext != "" && !StringTools.startsWith(ext, "--")) {
-				projectExt = ext;
-			}
-			buildPath = "/Libraries/koui_editor/tools/" + projectExt;
 		} else { // Fallback for standalone testing
 			projectDir = StringTools.replace(Krom.getFilesLocation(), "/", "\\") + "/../../..";
-			#if kha_opengl
-			projectExt = "opengl";
-			#else
-			projectExt = "d3d11";
-			#end
-			buildPath = "/tools/" + projectExt;
 		}
 	}
 
@@ -517,13 +499,6 @@ class CanvasUtils {
 	}
 
 	/**
-	 * Returns the type string for an element.
-	 */
-	public static function getElementType(element: Element): String {
-		return ElementRegistry.getElementType(element);
-	}
-
-	/**
 	 * Rebuilds the editor from `canvasData`. Throws if the data can't be loaded,
 	 * before anything is changed, so the current canvas is kept.
 	 */
@@ -599,7 +574,7 @@ class CanvasUtils {
 
 		// If no scenes were loaded, create a default scene
 		if (sceneData.scenes.length == 0) {
-			SceneEvents.sceneAdded.emit("Scene_1");
+			SceneEvents.sceneAdded.emit(SceneData.FIRST_SCENE);
 		}
 		if (sceneKey == null || sceneData.getScene(sceneKey) == null) sceneKey = sceneData.currentScene.key;
 		SceneEvents.sceneChanged.emit(sceneKey);
@@ -701,6 +676,11 @@ class CanvasUtils {
 			sceneData.registerElement(element, proposedKey, scene);
 		}
 
+		// A pasted radio button whose group was deleted since the copy brings the group back
+		for (group in radioGroupMap) {
+			if (sceneData.radioGroups.indexOf(group) < 0) sceneData.radioGroups.push(group);
+		}
+
 		return pastedRoots;
 	}
 
@@ -725,7 +705,7 @@ class CanvasUtils {
 	/** The toolbar's Clear Canvas: removes everything and leaves one empty scene, as one undoable step. */
 	public static function clearToEmptyScene(): Void {
 		clearCanvas();
-		SceneEvents.sceneAdded.emit("Scene_1");
+		SceneEvents.sceneAdded.emit(SceneData.FIRST_SCENE);
 		History.edited("Clear canvas");
 	}
 }

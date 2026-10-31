@@ -1,14 +1,11 @@
 package arm.base;
 
 import armory.system.Signal;
-import kha.Font;
 import zui.Themes;
 
 class Base {
-	public static var font: Font = null;
 	public static var theme: TTheme = null;
 	@:isVar public static var isResizing(default, set): Bool = false;
-	public static var uiEnabled: Bool = true;
 
 	public static var resizing: Signal = new Signal();
 

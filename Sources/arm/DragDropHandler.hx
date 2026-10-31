@@ -73,6 +73,9 @@ class DragDropHandler {
 	var dragStarted: Bool = false;
 	var dragMouseX: Float = 0;
 	var dragMouseY: Float = 0;
+	/** The lead element's and the scene's screen rectangles when the drag started, for snapping to the grid. */
+	var dragLeadRect: TScreenRect;
+	var dragRootRect: TScreenRect;
 	/** Pressed on an already selected element: if the mouse doesn't move, only this one gets selected on release. */
 	var clickedInSelection: Null<Element> = null;
 	var wasMouseDown: Bool = false;
@@ -106,14 +109,6 @@ class DragDropHandler {
 
 	static function contains(rect: TScreenRect, x: Float, y: Float): Bool {
 		return x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h;
-	}
-
-	public function isInHierarchyPanel(): Bool {
-		var mouse: Mouse = Input.getMouse();
-		var tabx: Int = uiBase.getTabX() + Std.int(borderSize * 0.5);
-		var w: Int = uiBase.getSidebarW();
-		var h0: Int = uiBase.getSidebarH0() - Std.int(borderSize * 0.5);
-		return mouse.x > tabx && mouse.x < tabx + w && mouse.y > 0 && mouse.y < h0;
 	}
 
 	function isDynamicSized(element: Element): Bool {
@@ -167,10 +162,6 @@ class DragDropHandler {
 				boxToggles = toggle;
 				boxAdds = additive;
 			}
-		} else if (mouseJustPressed && isInHierarchyPanel()) {
-			// Clicked in hierarchy panel — clear canvas drag state only.
-			// The hierarchy panel updates the selection itself.
-			draggedElements = [];
 		} else if (mouseDown && resizeHandle != null) {
 			if (!dragStarted && (Math.abs(mouse.x - dragMouseX) > MOVE_THRESHOLD || Math.abs(mouse.y - dragMouseY) > MOVE_THRESHOLD)) {
 				dragStarted = true;
@@ -195,8 +186,7 @@ class DragDropHandler {
 					if (dragged.element.posX != dragged.startX || dragged.element.posY != dragged.startY) moved = true;
 				}
 				if (moved) History.edited("Move");
-				uiBase.hwnds[PanelHierarchy].redraws = 2;
-				uiBase.hwnds[PanelProperties].redraws = 2;
+				uiBase.redrawPanels();
 			}
 			if (resizeHandle != null) {
 				var resized: Bool = false;
@@ -246,18 +236,20 @@ class DragDropHandler {
 			if (element == clickedElement || HierarchyUtils.isDescendant(clickedElement, element)) draggedElements.unshift(dragged);
 			else draggedElements.push(dragged);
 		}
+		if (draggedElements.length > 0) {
+			dragLeadRect = viewport.getScreenRect(draggedElements[0].element);
+			dragRootRect = viewport.getScreenRect(SceneData.data.getRoot());
+		}
 	}
 
 	/**
 	 * Positions are in canvas units: the mouse movement divided by the zoom. The
 	 * anchors stay as they are; Koui lays the elements out before drawing. With
-	 * snapping, the first element snaps to the grid and the others move by the
-	 * same amount, so their spacing stays the same.
+	 * snapping, the first element's top-left corner lands on the grid (drawn
+	 * from the scene's corner, whatever the element's anchor or container) and
+	 * the others move by the same amount, so their spacing stays the same.
 	 */
 	function moveDraggedElements(mouse: Mouse): Void {
-		var lead: TDraggedElement = draggedElements[0];
-		var leadDirX: Int = dragDirection(lead.element, true);
-		var leadDirY: Int = dragDirection(lead.element, false);
 		var mouseMoveX: Float = mouse.x - dragMouseX;
 		var mouseMoveY: Float = mouse.y - dragMouseY;
 		// Holding Shift while dragging locks the movement to the axis moved along most
@@ -268,18 +260,26 @@ class DragDropHandler {
 			if (Math.abs(mouseMoveX) >= Math.abs(mouseMoveY)) lockY = true;
 			else lockX = true;
 		}
-		var leadX: Float = lockX ? lead.startX : lead.startX + mouseMoveX / Koui.uiScale * leadDirX;
-		var leadY: Float = lockY ? lead.startY : lead.startY + mouseMoveY / Koui.uiScale * leadDirY;
+		// The movement on screen, in canvas units
+		var moveX: Float = lockX ? 0 : mouseMoveX / Koui.uiScale;
+		var moveY: Float = lockY ? 0 : mouseMoveY / Koui.uiScale;
 		// Holding Ctrl while dragging inverts snapping (pressing with Ctrl toggles the selection instead)
 		topToolbar.snapInverted = Input.getKeyboard().down("control");
 		if (topToolbar.isSnapping()) {
 			var snapValue: Float = topToolbar.snapValue;
-			if (!lockX) leadX = Math.round(leadX / snapValue) * snapValue;
-			if (!lockY) leadY = Math.round(leadY / snapValue) * snapValue;
+			var lead: TDraggedElement = draggedElements[0];
+			// Directly in the scene, a left/top-anchored position is the corner in exact canvas units;
+			// otherwise the corner is measured as drawn (in whole pixels), like resizing does
+			var inScene: Bool = HierarchyUtils.getParentElement(lead.element) == SceneData.data.getRoot();
+			if (!lockX) {
+				var left: Float = inScene && anchorSide(lead.element, true) == -1 ? lead.startX : (dragLeadRect.x - dragRootRect.x) / Koui.uiScale;
+				moveX = Math.round((left + moveX) / snapValue) * snapValue - left;
+			}
+			if (!lockY) {
+				var top: Float = inScene && anchorSide(lead.element, false) == -1 ? lead.startY : (dragLeadRect.y - dragRootRect.y) / Koui.uiScale;
+				moveY = Math.round((top + moveY) / snapValue) * snapValue - top;
+			}
 		}
-		// The movement on screen, in canvas units
-		var moveX: Float = (leadX - lead.startX) * leadDirX;
-		var moveY: Float = (leadY - lead.startY) * leadDirY;
 
 		for (dragged in draggedElements) {
 			var element: Element = dragged.element;
@@ -508,14 +508,7 @@ class DragDropHandler {
 			}
 		}
 
-		var topMost: Array<Element> = inside.filter(element -> {
-			var parent: Element = HierarchyUtils.getParentElement(element);
-			while (parent != null) {
-				if (inside.indexOf(parent) >= 0) return false;
-				parent = HierarchyUtils.getParentElement(parent);
-			}
-			return true;
-		});
+		var topMost: Array<Element> = HierarchyUtils.topMost(inside);
 
 		if (boxToggles) {
 			var result: Array<Element> = Selection.elements.copy();

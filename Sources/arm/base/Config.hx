@@ -8,7 +8,6 @@ class Config {
 	public static function init() {
 		if (raw == null) {
 			raw = {};
-			raw.window_scale = 1.0;
 			raw.layout = [];
 			raw.layout[LayoutSidebarW] = 260;
 			raw.layout[LayoutSidebarH0] = 300;
@@ -19,6 +18,5 @@ class Config {
 }
 
 typedef TConfig = {
-	@:optional public var window_scale: Null<Float>;
 	@:optional public var layout: Array<Int>;
 }

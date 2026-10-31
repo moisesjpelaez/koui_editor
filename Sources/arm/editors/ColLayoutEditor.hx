@@ -12,12 +12,10 @@ class ColLayoutEditor implements IElementEditor {
 	public var typeName(get, never): String;
 	public var displayName(get, never): String;
 	public var category(get, never): String;
-	public var isComposite(get, never): Bool;
 
 	function get_typeName(): String return "ColLayout";
 	function get_displayName(): String return "ColLayout";
 	function get_category(): String return "Layout";
-	function get_isComposite(): Bool return false;
 
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return new ColLayout(0, 0, 200, 100, 0);

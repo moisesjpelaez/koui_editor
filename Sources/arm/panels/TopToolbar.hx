@@ -4,21 +4,16 @@ import arm.base.UIBase;
 import arm.CanvasViewport.TScreenRect;
 import arm.data.History;
 import arm.tools.CanvasUtils;
-import arm.tools.ImageUtils;
 import arm.tools.ZuiUtils;
 import arm.types.Enums.PanelHandle;
-import armory.system.Signal;
 import iron.App;
 import kha.Image;
 import zui.Id;
 import zui.Zui;
 import zui.Zui.Handle;
-using zui.Ext;
 
 @:access(zui.Zui)
 class TopToolbar {
-	public var snappingToggled: Signal = new Signal(); // args: (enabled: Bool, snapValue: Float)
-	public var snapValueChanged: Signal = new Signal(); // args: (snapValue: Float)
 
     public var snappingEnabled: Bool = false;
 	public var snapValue: Float = 8.0;
@@ -32,7 +27,6 @@ class TopToolbar {
 	static inline var TOOLBAR_WIDTH: Int = 378;
 	static inline var TOOLBAR_HEIGHT: Int = 32;
 	static inline var BUTTON_SIZE: Int = 28;
-	static inline var ICON_SIZE: Int = 50; // Icon tile size in atlas
 
 	var snapHandle: Handle;
 	var windowHandle: Handle;
@@ -52,7 +46,6 @@ class TopToolbar {
 
 	public function toggleSnapping(): Void {
 		snappingEnabled = !snappingEnabled;
-		snappingToggled.emit(snappingEnabled, snapValue);
 	}
 
 	/** Sets the snap size, rounded to a multiple of SNAP_STEP within the slider's range. */
@@ -62,7 +55,6 @@ class TopToolbar {
 		if (value == snapValue) return;
 		snapValue = value;
 		snapHandle.value = value;
-		snapValueChanged.emit(value);
 	}
 
 	// Wrapper for ZuiUtils.iconButton with local icons
@@ -137,14 +129,12 @@ class TopToolbar {
 
 			if (iconButton(ui, 6, 2, "Undo (Ctrl+Z)", false, !History.canUndo())) {
 				if (History.undo()) {
-					uiBase.hwnds[PanelHierarchy].redraws = 2;
-					uiBase.hwnds[PanelProperties].redraws = 2;
+					uiBase.redrawPanels();
 				}
 			}
 			if (iconButton(ui, 7, 2, "Redo (Ctrl+Shift+Z / Ctrl+Y)", false, !History.canRedo())) {
 				if (History.redo()) {
-					uiBase.hwnds[PanelHierarchy].redraws = 2;
-					uiBase.hwnds[PanelProperties].redraws = 2;
+					uiBase.redrawPanels();
 				}
 			}
 			hSeparator(ui, 1 * uiScale, 8 * uiScale);

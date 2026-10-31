@@ -4,6 +4,7 @@ import zui.Zui;
 import zui.Zui.Handle;
 import iron.App;
 import iron.system.Input;
+import arm.data.EditorSettings;
 import arm.types.Enums;
 
 class UIBase {
@@ -32,7 +33,7 @@ class UIBase {
 		ui = new Zui({
 			font: font,
 			theme: Base.theme,
-			scaleFactor: Config.raw.window_scale
+			scaleFactor: EditorSettings.getEditorUIScale()
 		});
 
 		// Set Zui callbacks
@@ -112,9 +113,13 @@ class UIBase {
 		}
 	}
 
-	function onBorderHover(handle: Handle, side: Int) {
-		if (!Base.uiEnabled) return;
+	/** Redraws the Hierarchy and Properties panels, after the canvas or the selection changed. */
+	public function redrawPanels(): Void {
+		hwnds[PanelHierarchy].redraws = 2;
+		hwnds[PanelProperties].redraws = 2;
+	}
 
+	function onBorderHover(handle: Handle, side: Int) {
 		// Only handle our panels
 		if (handle != hwnds[PanelHierarchy] && handle != hwnds[PanelProperties] && handle != hwnds[PanelBottom]) return;
 

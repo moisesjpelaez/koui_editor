@@ -75,7 +75,6 @@ typedef TSceneEntry = {
 	var root: AnchorPane;
 	/** The name of every user element in this scene. Their order comes from the Koui tree. */
 	var keys: Map<Element, String>;
-	var active: Bool;
 }
 
 typedef TElementEntry = {

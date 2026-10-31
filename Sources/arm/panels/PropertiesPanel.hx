@@ -13,7 +13,6 @@ import arm.types.Enums;
 import arm.types.Types;
 import arm.base.UIBase;
 import arm.data.EditorSettings;
-import arm.tools.CanvasUtils;
 import arm.tools.HierarchyUtils;
 import arm.tools.NameUtils;
 import arm.tools.ZuiUtils;
@@ -30,15 +29,10 @@ import koui.utils.RadioGroup;
 import zui.Zui;
 import zui.Zui.Handle;
 
-import haxe.ds.ObjectMap;
 import haxe.ds.StringMap;
-import StringTools;
 
 @:access(koui.Koui, koui.elements.Element, koui.utils.RadioGroup, zui.Zui)
 class PropertiesPanel {
-    static var instance: PropertiesPanel;
-    static var defaultRadioGroup: RadioGroup;
-
     var tabHandle: Handle;
 
     // Settings
@@ -105,9 +99,6 @@ class PropertiesPanel {
         // Create default RadioGroup on startup
         ensureRadioGroups();
 
-        instance = this;
-
-        ElementEvents.elementAdded.connect(onElementAdded);
         ElementEvents.selectionChanged.connect(onSelectionChanged);
         SceneEvents.canvasLoaded.connect(onCanvasLoaded);
     }
@@ -150,8 +141,7 @@ class PropertiesPanel {
                     var appliedScale: Float = EditorSettings.getEditorUIScale();
                     editorUiScaleHandle.value = appliedScale;
                     uiBase.ui.setScale(appliedScale);
-                    uiBase.hwnds[PanelHierarchy].redraws = 2;
-                    uiBase.hwnds[PanelProperties].redraws = 2;
+                    uiBase.redrawPanels();
                     uiBase.hwnds[PanelBottom].redraws = 2;
                 }
 
@@ -323,7 +313,6 @@ class PropertiesPanel {
         if (sceneData.radioGroups.length == 0) {
             sceneData.radioGroups.push(new RadioGroup("RadioGroup"));
         }
-        defaultRadioGroup = sceneData.radioGroups[0];
     }
 
     function getRadioGroupAddHandle(groupId: String): Handle {
@@ -354,24 +343,7 @@ class PropertiesPanel {
     }
 
     function getUniqueRadioGroupId(requestedId: String): String {
-        if (findRadioGroup(requestedId) == null) return requestedId;
-
-        var prefix = requestedId;
-        var nextIndex = 1;
-        var suffixPattern = ~/^(.*)_(\d+)$/;
-        if (suffixPattern.match(requestedId)) {
-            prefix = suffixPattern.matched(1);
-            var parsed = Std.parseInt(suffixPattern.matched(2));
-            if (parsed != null) nextIndex = parsed + 1;
-        }
-
-        var candidate = prefix + "_" + nextIndex;
-        while (findRadioGroup(candidate) != null) {
-            nextIndex++;
-            candidate = prefix + "_" + nextIndex;
-        }
-
-        return candidate;
+        return NameUtils.nextUniqueName(requestedId, [for (group in sceneData.radioGroups) group.id]);
     }
 
     function deleteRadioGroup(groupId: String): Void {
@@ -436,18 +408,6 @@ class PropertiesPanel {
 
         button.group = group;
         group.add(button);
-        History.edited("Change radio group");
-    }
-
-    function removeButtonFromGroup(group: RadioGroup, button: RadioButton): Void {
-        if (button == null || group == null) return;
-
-        group.remove(button);
-
-        // Move to default (first) group instead of creating orphan solo groups
-        var defaultGroup = sceneData.radioGroups[0];
-        button.group = defaultGroup;
-        defaultGroup.add(button);
         History.edited("Change radio group");
     }
 
@@ -546,8 +506,7 @@ class PropertiesPanel {
                     History.edited("Rename");
                 }
             }
-            uiBase.hwnds[PanelHierarchy].redraws = 2;
-            uiBase.hwnds[PanelProperties].redraws = 2;
+            uiBase.redrawPanels();
         }
     }
 
@@ -658,22 +617,6 @@ class PropertiesPanel {
         ui._y += 2;
     }
 
-    public function onElementAdded(entry: TElementEntry): Void {
-        ensureRadioGroups();
-
-        if (Std.isOfType(entry.element, RadioButton)) {
-            var radioButton: RadioButton = cast entry.element;
-            if (radioButton.group != null) {
-                // Ensure the button's group is registered globally
-                if (findRadioGroup(radioButton.group.id) == null) {
-                    sceneData.radioGroups.push(radioButton.group);
-                    radioGroupAddHandles.set(radioButton.group.id, new Handle({position: 0}));
-                    radioGroupRenameHandles.set(radioButton.group.id, new Handle({text: radioButton.group.id}));
-                }
-            }
-        }
-    }
-
     function onSelectionChanged(): Void {
         // Remember each element's first size, for "Reset Size"
         for (element in Selection.elements) {
@@ -687,11 +630,6 @@ class PropertiesPanel {
     function sizeKey(element: Element): String {
         var scene: TSceneEntry = sceneData.currentScene;
         return scene.key + ":" + CanvasLoader.getPath(element, scene.root, scene.keys);
-    }
-
-    public static function getDefaultRadioGroup(): RadioGroup {
-        if (instance != null) instance.ensureRadioGroups();
-        return defaultRadioGroup;
     }
 
     public function onCanvasLoaded(): Void {

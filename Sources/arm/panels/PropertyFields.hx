@@ -2,7 +2,10 @@ package arm.panels;
 
 import arm.data.History;
 
+import kha.FastFloat;
+
 import koui.elements.Element;
+import koui.elements.I_Range;
 
 import zui.Zui;
 import zui.Zui.Align;
@@ -15,6 +18,14 @@ import zui.Zui.Handle;
  * text field is blank and checkboxes and combos say "(mixed)". A change sets
  * the new value on every element and is recorded as one undo step.
  */
+/** The handles of the Min Value, Max Value, Precision and Value fields of range elements. */
+typedef TRangeHandles = {
+	var min: Handle;
+	var max: Handle;
+	var precision: Handle;
+	var value: Handle;
+}
+
 @:access(zui.Zui)
 class PropertyFields {
 	static inline var MIXED: String = "(mixed)";
@@ -126,5 +137,31 @@ class PropertyFields {
 		picked = Math.round(picked / steps) * steps;
 		handle.value = picked;
 		apply('Change $label', elements, set, picked);
+	}
+
+	/**
+	 * Min Value, Max Value, Precision and Value of range elements (Slider,
+	 * Progressbar). A new range or precision keeps each value inside it.
+	 * Value uses the first element's range and precision.
+	 */
+	public static function range(ui: Zui, handles: TRangeHandles, elements: Array<Element>,
+			getPrecision: Element->Int, setPrecision: (Element, Int)->Void): Void {
+		var range = (e: Element) -> (cast e: I_Range<FastFloat>);
+		float(ui, handles.min, "Min Value", elements, e -> range(e).minValue, (e, min) -> {
+			range(e).minValue = min;
+			range(e).value = Math.max(min, range(e).value);
+		});
+		float(ui, handles.max, "Max Value", elements, e -> range(e).maxValue, (e, max) -> {
+			range(e).maxValue = max;
+			range(e).value = Math.min(max, range(e).value);
+		});
+		int(ui, handles.precision, "Precision", elements, getPrecision, (e, precision) -> {
+			setPrecision(e, Std.int(Math.max(0, precision)));
+			var steps: Float = Math.pow(10, -getPrecision(e));
+			range(e).value = Math.round(range(e).value / steps) * steps;
+		});
+
+		var first: I_Range<FastFloat> = range(elements[0]);
+		slider(ui, handles.value, "Value", first.minValue, first.maxValue, getPrecision(elements[0]), elements, e -> range(e).value, (e, value) -> range(e).value = value);
 	}
 }

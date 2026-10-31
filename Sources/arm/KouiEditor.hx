@@ -44,8 +44,6 @@ import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.Layout.Anchor;
 import koui.utils.SceneManager;
 
-import arm.CanvasViewport;
-import arm.DragDropHandler;
 
 @:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane)
 class KouiEditor extends iron.Trait {
@@ -68,7 +66,6 @@ class KouiEditor extends iron.Trait {
 	var hierarchyPanel: HierarchyPanel = new HierarchyPanel();
 	var propertiesPanel: PropertiesPanel = new PropertiesPanel();
 	var elementsPanel: ElementsPanel = new ElementsPanel();
-	var baseH: Int = 576;
 
 	var canvasLoaded: Bool = false; // HACK: ensure canvas is loaded after Koui init
 	var canvasWidth: Int = 1024;
@@ -92,7 +89,6 @@ class KouiEditor extends iron.Trait {
 
 		Assets.loadEverything(function() {
 			// Initialize framework
-			Base.font = Assets.fonts.font_default;
 			Base.init();
 			Base.resizing.connect(onResized);
 
@@ -126,9 +122,8 @@ class KouiEditor extends iron.Trait {
 						canvasHeight = resY;
 					}
 				}
-				baseH = canvasHeight;
 
-				SceneManager.addScene("Scene_1", (scene) -> setupRootScene(scene, "Scene_1"));
+				SceneManager.addScene(SceneData.FIRST_SCENE, (scene) -> setupRootScene(scene, SceneData.FIRST_SCENE));
 				CanvasUtils.refreshTheme();
 
 				// Set snap max value based on canvas size
@@ -164,8 +159,7 @@ class KouiEditor extends iron.Trait {
 		var s: TSceneEntry = {
 		    key: sceneName,
 		    root: scene,
-		    keys: new Map(),
-		    active: true
+		    keys: new Map()
 		};
 		sceneData.scenes.push(s);
 		sceneData.currentScene = s;
@@ -214,8 +208,7 @@ class KouiEditor extends iron.Trait {
 		if (!isTyping && keyboard.down("control") && !keyboard.down("shift") && keyboard.started("z")) {
 			if (History.undo()) {
 				hierarchyPanel.updateTabPosition();
-				uiBase.hwnds[PanelHierarchy].redraws = 2;
-				uiBase.hwnds[PanelProperties].redraws = 2;
+				uiBase.redrawPanels();
 			}
 		}
 
@@ -223,8 +216,7 @@ class KouiEditor extends iron.Trait {
 		if (!isTyping && keyboard.down("control") && (keyboard.down("shift") && keyboard.started("z") || keyboard.started("y"))) {
 			if (History.redo()) {
 				hierarchyPanel.updateTabPosition();
-				uiBase.hwnds[PanelHierarchy].redraws = 2;
-				uiBase.hwnds[PanelProperties].redraws = 2;
+				uiBase.redrawPanels();
 			}
 		}
 
@@ -291,8 +283,7 @@ class KouiEditor extends iron.Trait {
 			Clipboard.clipboardData = [];
 			Clipboard.isCut = false;
 		}
-		uiBase.hwnds[PanelHierarchy].redraws = 2;
-		uiBase.hwnds[PanelProperties].redraws = 2;
+		uiBase.redrawPanels();
 	}
 
 	/**
@@ -309,8 +300,7 @@ class KouiEditor extends iron.Trait {
 
 		Selection.setAll(copies);
 		History.edited("Duplicate");
-		uiBase.hwnds[PanelHierarchy].redraws = 2;
-		uiBase.hwnds[PanelProperties].redraws = 2;
+		uiBase.redrawPanels();
 	}
 
 	function drawRightPanels() {
@@ -359,12 +349,11 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function applyResize(resetScale: Bool) {
-		viewport.onResized(resetScale ? false : sizeInit, baseH);
+		viewport.onResized(resetScale ? false : sizeInit, canvasHeight);
 	}
 
 	function onSelectionChanged(): Void {
-		uiBase.hwnds[PanelHierarchy].redraws = 2;
-		uiBase.hwnds[PanelProperties].redraws = 2;
+		uiBase.redrawPanels();
 	}
 
 	function onElementDropped(element: Element, target: Element, zone: DropZone): Void {
@@ -390,8 +379,7 @@ class KouiEditor extends iron.Trait {
 
 		// Validate newParent can accept children
 		if (!droppedOnScene && newParent != null && !HierarchyUtils.canAcceptChild(newParent)) {
-			uiBase.hwnds[PanelHierarchy].redraws = 2;
-			uiBase.hwnds[PanelProperties].redraws = 2;
+			uiBase.redrawPanels();
 			return;
 		}
 
@@ -407,7 +395,7 @@ class KouiEditor extends iron.Trait {
 		} else {
 			switch (zone) {
 				case AsChild:
-					HierarchyUtils.moveAsChild(element, target, rootPane);
+					HierarchyUtils.moveAsChild(element, target);
 				case BeforeSibling:
 					HierarchyUtils.moveRelativeToTarget(element, target, true);
 				case AfterSibling:
@@ -422,8 +410,7 @@ class KouiEditor extends iron.Trait {
 		}
 		History.edited("Move");
 
-		uiBase.hwnds[PanelHierarchy].redraws = 2;
-		uiBase.hwnds[PanelProperties].redraws = 2;
+		uiBase.redrawPanels();
 	}
 
 	function onElementAdded(entry: TElementEntry): Void {
@@ -505,13 +492,11 @@ class KouiEditor extends iron.Trait {
 		sceneEntry.root.destroy();
 
 		// Remove from SceneData
-		sceneEntry.active = false;
 		sceneData.scenes.splice(sceneIndex, 1);
 
 		// Switch to another scene
 		if (sceneData.scenes.length > 0) {
 			var idx = sceneIndex > 0 ? sceneIndex - 1 : 0;
-			if (idx >= sceneData.scenes.length) idx = sceneData.scenes.length - 1;
 			SceneManager.setScene(sceneData.scenes[idx].key);
 			SceneEvents.sceneChanged.emit(sceneData.scenes[idx].key);
 		}

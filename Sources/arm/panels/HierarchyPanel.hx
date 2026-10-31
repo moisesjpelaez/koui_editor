@@ -12,12 +12,10 @@ import arm.tools.NameUtils;
 import arm.tools.ZuiUtils;
 import arm.types.Enums;
 import arm.types.Types;
-import haxe.ds.ObjectMap;
 import iron.system.Input;
 import kha.Image;
 import koui.elements.Element;
 import zui.Zui;
-import zui.Zui.Align;
 import zui.Zui.Handle;
 
 @:access(zui.Zui)
@@ -106,8 +104,7 @@ class HierarchyPanel {
 			if (clickedEmptySpace && uiBase.ui.inputReleased && !isDragging && !Base.isResizing) {
 				clickedEmptySpace = false;
 				Selection.clear();
-				uiBase.hwnds[PanelHierarchy].redraws = 2;
-				uiBase.hwnds[PanelProperties].redraws = 2;
+				uiBase.redrawPanels();
 			}
 		}
 		if (!uiBase.ui.inputDown) clickedEmptySpace = false;
@@ -184,7 +181,6 @@ class HierarchyPanel {
 		// For root element, show scene name as text input for renaming
 		if (entry.element == sceneData.currentScene.root) {
 			var sceneTabs = getSceneTabs();
-			if (sceneTabs.length == 0) return; // nothing to edit
 			var currentIdx: Int = sceneTabHandle.position;
 			if (currentIdx >= sceneTabs.length) currentIdx = sceneTabs.length - 1;
 			if (currentIdx < 0) currentIdx = 0;
@@ -215,8 +211,7 @@ class HierarchyPanel {
 
 		// Delete icon button
 		if (entry.element != sceneData.currentScene.root) {
-			var deleteDisabled = entry.element == sceneData.currentScene.root;
-			var deleteClicked = ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete", false, deleteDisabled, 0.7);
+			var deleteClicked = ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete", false, false, 0.7);
 			if (deleteClicked) {
 				ElementEvents.elementRemoved.emit(entry.element);
 			}
@@ -256,23 +251,18 @@ class HierarchyPanel {
 	}
 
 	function handleItemInteraction(uiBase: UIBase, entry: TElementEntry) {
-		var isRoot: Bool = sceneData.currentScene.root != null && entry.element == sceneData.currentScene.root;
-
 		// Mouse down: begin drag tracking only (selection happens on release)
 		if (uiBase.ui.isPushed && uiBase.ui.inputStarted) {
 			mouseDownOnItem = true;
-			if (!isRoot) {
-				draggedItem = entry;
-				dragStartX = uiBase.ui.inputX;
-				dragStartY = uiBase.ui.inputY;
-			}
+			draggedItem = entry;
+			dragStartX = uiBase.ui.inputX;
+			dragStartY = uiBase.ui.inputY;
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 		}
 
 		// Mouse up: apply selection — but not if we just finished a drag drop
 		if (uiBase.ui.isReleased && !isDragging) {
 			draggedItem = null;
-			if (entry.element == sceneData.currentScene.root) return;
 
 			var shiftHeld: Bool = Input.getKeyboard().down("shift");
 			var ctrlHeld: Bool = Input.getKeyboard().down("control");
@@ -293,8 +283,7 @@ class HierarchyPanel {
 				Selection.select(entry.element);
 			}
 
-			uiBase.hwnds[PanelHierarchy].redraws = 2;
-			uiBase.hwnds[PanelProperties].redraws = 2;
+			uiBase.redrawPanels();
 		}
 
 		// Start drag after threshold
@@ -304,8 +293,7 @@ class HierarchyPanel {
 
             if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
 				isDragging = true;
-				uiBase.hwnds[PanelHierarchy].redraws = 2;
-				uiBase.hwnds[PanelProperties].redraws = 2;
+				uiBase.redrawPanels();
 			}
 		}
 	}
@@ -343,7 +331,7 @@ class HierarchyPanel {
 		var targetParent: Element = HierarchyUtils.getParentElement(target);
 		if (anchorParent == null || targetParent == null || anchorParent != targetParent) return [];
 
-		var siblings: Array<Element> = getVisibleHierarchyChildren(anchorParent);
+		var siblings: Array<Element> = sceneData.getChildren(anchorParent);
 		var iAnchor: Int = siblings.indexOf(anchor);
 		var iTarget: Int = siblings.indexOf(target);
 		if (iAnchor < 0 || iTarget < 0) return [];
@@ -381,7 +369,7 @@ class HierarchyPanel {
 		if (element == null) return;
 		if (!isRoot) out.push(element);
 
-		var children: Array<Element> = getVisibleHierarchyChildren(element);
+		var children: Array<Element> = sceneData.getChildren(element);
 		if (children.length == 0) return;
 
 		var isExpanded: Bool = !collapsed.exists(expandKey(element));
@@ -390,11 +378,6 @@ class HierarchyPanel {
 		for (child in children) {
 			collectVisibleElements(child, out, false);
 		}
-	}
-
-	function getVisibleHierarchyChildren(parent: Element): Array<Element> {
-		if (parent == null) return [];
-		return sceneData.getChildren(parent);
 	}
 
     function drawDragGhost(uiBase: UIBase) {
@@ -419,8 +402,7 @@ class HierarchyPanel {
 		var dragLabel: String = dragCount > 1 ? '${draggedItem.key} (+${dragCount - 1})' : draggedItem.key;
 		uiBase.ui.g.drawString(dragLabel, ghostX + 8, ghostY + 4);
 
-		uiBase.hwnds[PanelHierarchy].redraws = 2;
-		uiBase.hwnds[PanelProperties].redraws = 2;
+		uiBase.redrawPanels();
 	}
 
 	function handleDragEnd(uiBase:UIBase) {
@@ -493,8 +475,7 @@ class HierarchyPanel {
 			}
 		}
 
-		uiBase.hwnds[PanelHierarchy].redraws = 2;
-		uiBase.hwnds[PanelProperties].redraws = 2;
+		uiBase.redrawPanels();
 	}
 
 	function performDrop() {

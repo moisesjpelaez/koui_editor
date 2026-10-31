@@ -69,9 +69,7 @@ class CanvasElements {
 
 			case "Checkbox":
 				var checkbox: Checkbox = new Checkbox(p.text);
-				checkbox.isChecked = p.isChecked;
-				var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
-				if (checkSquare != null) checkSquare.setContextElement(checkbox.isChecked ? "checked" : "");
+				setChecked(checkbox, p.isChecked);
 				element = checkbox;
 
 			case "RadioButton":
@@ -119,6 +117,13 @@ class CanvasElements {
 		if (data.tID != "") element.setTID(data.tID);
 
 		return element;
+	}
+
+	/** Checks or unchecks `checkbox` (or radio button) and shows it: Koui's isChecked doesn't update the check square. */
+	public static function setChecked(checkbox: Checkbox, checked: Bool): Void {
+		checkbox.isChecked = checked;
+		var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
+		if (checkSquare != null) checkSquare.setContextElement(checked ? "checked" : "");
 	}
 
 	/** The type-specific properties of `element`, as saved in the "properties" field. */

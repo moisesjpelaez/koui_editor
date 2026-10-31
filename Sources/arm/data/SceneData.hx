@@ -10,6 +10,8 @@ import koui.utils.RadioGroup;
 
 class SceneData {
     public static var data: SceneData = new SceneData();
+    /** The scene a new or cleared canvas starts with. */
+    public static inline var FIRST_SCENE: String = "Scene_1";
     public var scenes: Array<TSceneEntry> = [];
     public var currentScene: TSceneEntry;
     public var radioGroups: Array<RadioGroup> = [];
@@ -17,8 +19,6 @@ class SceneData {
     public function new() {
         ElementEvents.elementAdded.connect(onElementAdded);
         SceneEvents.sceneChanged.connect(onSceneChanged);
-        // Note: sceneRemoved and elementRemoved are handled by KouiEditor directly
-        // to support undo/redo (commands need to capture state before mutation).
     }
 
     /** The root pane of the current scene, or null if there is no scene. */
@@ -99,37 +99,8 @@ class SceneData {
         registerElement(entry.element, entry.key);
     }
 
-    public function onElementRemoved(element: Element): Void {
-        unregisterElement(element);
-    }
-
     function onSceneChanged(sceneKey: String): Void {
-        if (currentScene != null) currentScene.active = false;
-        for (i in 0...scenes.length) {
-            if (scenes[i].key == sceneKey) {
-                currentScene = scenes[i];
-                currentScene.active = true;
-                return;
-            }
-        }
-    }
-
-    function onSceneRemoved(sceneKey: String): Void {
-        for (i in 0...scenes.length) {
-            if (scenes[i].key == sceneKey) {
-                scenes[i].active = false;
-                scenes.splice(i, 1);
-                // If the removed scene was the current scene, switch to another scene if available
-                if (currentScene != null && currentScene.key == sceneKey) {
-                    if (scenes.length > 0) {
-                        currentScene = scenes[i > 0 ? i - 1 : 0];
-                        currentScene.active = true;
-                    } else {
-                        currentScene = null;
-                    }
-                }
-                return;
-            }
-        }
+        var scene: Null<TSceneEntry> = getScene(sceneKey);
+        if (scene != null) currentScene = scene;
     }
 }

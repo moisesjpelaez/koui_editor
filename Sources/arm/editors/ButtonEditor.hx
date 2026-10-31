@@ -6,7 +6,6 @@ import koui.elements.Button;
 import koui.elements.Element;
 import koui.utils.RadioGroup;
 import zui.Zui;
-import zui.Zui.Align;
 import zui.Zui.Handle;
 
 class ButtonEditor implements IElementEditor {
@@ -19,12 +18,10 @@ class ButtonEditor implements IElementEditor {
 	public var typeName(get, never): String;
 	public var displayName(get, never): String;
 	public var category(get, never): String;
-	public var isComposite(get, never): Bool;
 
 	function get_typeName(): String return "Button";
 	function get_displayName(): String return "Button";
 	function get_category(): String return "Buttons";
-	function get_isComposite(): Bool return true;
 
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return new Button("New Button");

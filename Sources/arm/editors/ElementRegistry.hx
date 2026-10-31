@@ -12,9 +12,8 @@ class ElementRegistry {
 	static var editors: Array<IElementEditor> = [];
 	static var byTypeName: Map<String, IElementEditor> = new Map();
 
-	/** Register an element editor. Initializes its handles immediately. */
+	/** Register an element editor. */
 	public static function register(editor: IElementEditor): Void {
-		editor.initHandles();
 		editors.push(editor);
 		byTypeName.set(editor.typeName, editor);
 	}
@@ -29,12 +28,6 @@ class ElementRegistry {
 		var className: String = Type.getClassName(Type.getClass(element));
 		var short: String = className.substr(className.lastIndexOf(".") + 1);
 		return byTypeName.get(short);
-	}
-
-	/** Get the type name string for an element instance. */
-	public static function getElementType(element: Element): String {
-		var editor = getForElement(element);
-		return editor != null ? editor.typeName : "Unknown";
 	}
 
 	/** All registered editors, in registration order. */

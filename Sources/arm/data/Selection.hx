@@ -82,20 +82,7 @@ class Selection {
 	 * hierarchy order. Deleting or copying these covers the whole selection.
 	 */
 	public static function getTopLevel(): Array<Element> {
-		var result: Array<Element> = [];
-		for (element in SceneData.data.getElements()) {
-			if (contains(element) && !hasSelectedAncestor(element)) result.push(element);
-		}
-		return result;
-	}
-
-	static function hasSelectedAncestor(element: Element): Bool {
-		var current: Element = HierarchyUtils.getParentElement(element);
-		while (current != null) {
-			if (contains(current)) return true;
-			current = HierarchyUtils.getParentElement(current);
-		}
-		return false;
+		return HierarchyUtils.topMost([for (element in SceneData.data.getElements()) if (contains(element)) element]);
 	}
 
 	static inline function changed(): Void {

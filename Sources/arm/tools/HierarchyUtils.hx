@@ -3,20 +3,14 @@ package arm.tools;
 import haxe.ds.Vector;
 
 import koui.Koui;
-import koui.elements.Button;
-import koui.elements.Checkbox;
 import koui.elements.Element;
-import koui.elements.Label;
 import koui.elements.Panel;
-import koui.elements.Progressbar;
-import koui.elements.Slider;
 
 import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.Expander;
 import koui.elements.layouts.GridLayout;
 import koui.elements.layouts.Layout;
-import koui.elements.layouts.Layout.Anchor;
 import koui.elements.layouts.RowLayout;
 import koui.elements.layouts.ScrollPane;
 
@@ -26,15 +20,22 @@ class HierarchyUtils {
 		return target != null && (target is Layout || target is Panel);
 	}
 
-	public static function isUserContainer(element: Element): Bool {
-		if (element == null) return false;
-		return canAcceptChild(element);
-	}
-
 	public static function getParentElement(element: Element): Element {
 		if (element == null) return null;
 		if (element.layout != null) return cast(element.layout, Element);
 		return element.parent;
+	}
+
+	/** The elements of `list` that aren't inside another element of `list`, in the same order. */
+	public static function topMost(list: Array<Element>): Array<Element> {
+		return list.filter(element -> {
+			var parent: Element = getParentElement(element);
+			while (parent != null) {
+				if (list.indexOf(parent) >= 0) return false;
+				parent = getParentElement(parent);
+			}
+			return true;
+		});
 	}
 
 	public static function isDescendant(target: Element, ancestor: Element): Bool {
@@ -90,14 +91,11 @@ class HierarchyUtils {
 				untyped layout.remove(element);
 				return;
 			}
-			layout.resize(layout.layoutWidth, layout.layoutHeight);
-			layout.invalidateElem();
-			layout.onResize();
 		}
 		if (element.parent != null) element.parent.removeChild(element);
 	}
 
-	public static function moveAsChild(element: Element, target: Element, ?fallbackParent: AnchorPane): Void { // TODO: remove third arg?
+	public static function moveAsChild(element: Element, target: Element): Void {
 		detachFromCurrentParent(element);
 
 		if (target is RowLayout) {
@@ -309,10 +307,6 @@ class HierarchyUtils {
 		if (targetIdx < 0) return;
 		var insertIdx: Int = before ? targetIdx : targetIdx + 1;
 		elements.insert(insertIdx, element);
-	}
-
-	public static function shouldSkipInternalChild(parent: Element, child: Element): Bool {
-		return parent is Button || parent is Checkbox || parent is Progressbar || parent is Slider;
 	}
 
 	/**
