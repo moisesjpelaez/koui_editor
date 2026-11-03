@@ -50,6 +50,12 @@ class ImagePanelEditor extends ElementEditor {
 		PropertyFields.check(ui, scaleHandle, "Scale to Size", elements, e -> (cast e: ImagePanel).scale, (e, scale) -> (cast e: ImagePanel).scale = scale);
 	}
 
+	/** An ImagePanel with an image goes back to the image's size, in canvas units; without one, to the palette's 32 x 32. */
+	override public function resetSize(element: Element): { width: Int, height: Int } {
+		var image: Null<kha.Image> = (cast element: ImagePanel).image;
+		return image != null ? { width: image.width, height: image.height } : defaultSize();
+	}
+
 	/** Shows the image named `name` in `imagePanel`, or no image if `name` is "". */
 	public function applyImage(imagePanel: ImagePanel, name: String): Void {
 		if (name == "") {

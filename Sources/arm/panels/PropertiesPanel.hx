@@ -138,7 +138,7 @@ class PropertiesPanel {
 			if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.7)) {
 				// Each element goes back to the size a new one of its type has
 				PropertyFields.apply("Reset size", placeable, (e, _) -> {
-					var size = ElementRegistry.getForElement(e).defaultSize();
+					var size = ElementRegistry.getForElement(e).resetSize(e);
 					e.width = size.width;
 					e.height = size.height;
 					Koui.updateElementSize(e);

@@ -43,6 +43,11 @@ class ElementEditor {
 		return size;
 	}
 
+	/** The size "Reset Size" gives `element`: a new palette element's, unless the type knows better. */
+	public function resetSize(element: Element): { width: Int, height: Int } {
+		return defaultSize();
+	}
+
 	/** Draws the type's fields for `elements`, all of this type; a field edits every one of them (see `PropertyFields`). */
 	public function drawProperties(ui: Zui, elements: Array<Element>): Void {}
 }
