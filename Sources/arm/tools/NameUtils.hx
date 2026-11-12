@@ -4,24 +4,14 @@ import arm.data.SceneData;
 import koui.elements.Element;
 
 class NameUtils {
-	/**
-	 * Generate a unique name from a base name and a list of existing names.
-	 * Finds the lowest available number suffix (e.g., "Scene_1", "Scene_2", etc.)
-	 * Used for new elements and scenes.
-	 * @param baseName The base name (e.g., "Scene", "Button")
-	 * @param existingNames Array of existing names to check against
-	 * @param separator The separator between base name and number
-	 * @return A unique name with the lowest available number suffix
-	 */
+	// `baseName` with the lowest free number ("Scene_1", "Scene_2"), for new elements and scenes
 	public static function generateUniqueName(baseName: String, existingNames: Array<String>, separator: String = "_"): String {
-		// Collect existing numbers for this base name
 		var existingNumbers: Array<Int> = [];
 		for (name in existingNames) {
 			var num: Int = suffixNumber(name, baseName, separator);
 			if (num > 0) existingNumbers.push(num);
 		}
 
-		// Find the lowest available number starting from 1
 		var counter: Int = 1;
 		while (existingNumbers.indexOf(counter) != -1) {
 			counter++;
@@ -31,9 +21,8 @@ class NameUtils {
 	}
 
 	/**
-	 * `proposedName` if it is not taken, otherwise its base name with the
-	 * number after the highest one taken: "My_Button_2" becomes "My_Button_3",
-	 * "Label" becomes "Label_1". Used for paste, rename and reparent.
+	 * `proposedName` if it's free, otherwise its base name with the number after
+	 * the highest taken: "My_Button_2" becomes "My_Button_3", "Label" "Label_1".
 	 */
 	public static function nextUniqueName(proposedName: String, existingNames: Array<String>, separator: String = "_"): String {
 		if (existingNames.indexOf(proposedName) == -1) return proposedName;
@@ -47,14 +36,14 @@ class NameUtils {
 		return base + separator + (highest + 1);
 	}
 
-	/** `name` without a trailing separator and number: "My_Button_2" becomes "My_Button". */
+	// `name` without a trailing separator and number: "My_Button_2" becomes "My_Button"
 	public static function baseName(name: String, separator: String = "_"): String {
 		var index: Int = name.lastIndexOf(separator);
 		if (index <= 0) return name;
 		return isNumber(name.substr(index + separator.length)) ? name.substr(0, index) : name;
 	}
 
-	/** The number in `name` if it is `base` + separator + number, 0 if it is `base` itself, -1 otherwise. */
+	// The number in `base` + separator + number, 0 for `base` itself, -1 otherwise
 	static function suffixNumber(name: String, base: String, separator: String): Int {
 		if (name == base) return 0;
 		var prefix: String = base + separator;
@@ -72,12 +61,11 @@ class NameUtils {
 		return true;
 	}
 
-	/** The names of the user elements directly inside `parent`, except `element`. */
+	// The names of the user elements inside `parent`, except `element`
 	public static function getSiblingNames(element: Null<Element>, parent: Element): Array<String> {
 		var sceneData: SceneData = SceneData.data;
 		var existingNames: Array<String> = [];
 
-		// Collect sibling names (excluding the element itself)
 		for (sibling in sceneData.getChildren(parent)) {
 			if (sibling != element) existingNames.push(sceneData.getElementKey(sibling));
 		}

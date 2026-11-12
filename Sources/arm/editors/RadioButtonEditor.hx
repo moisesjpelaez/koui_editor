@@ -36,7 +36,6 @@ class RadioButtonEditor extends ElementEditor {
 			}
 		});
 
-		// Radio group combo
 		var groups: Array<RadioGroup> = SceneData.data.radioGroups;
 		var groupNames: Array<String> = [for (group in groups) group.id];
 		PropertyFields.combo(ui, groupHandle, "Radio Group", groupNames, elements, e -> groups.indexOf((cast e: RadioButton).group), (e, index) -> {

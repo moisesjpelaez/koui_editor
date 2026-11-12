@@ -26,8 +26,8 @@ typedef TScreenRect = {
 }
 
 @:access(koui.Koui, koui.elements.Element, koui.elements.layouts.AnchorPane)
+// Panning, zooming and the overlays drawn on the canvas
 class CanvasViewport {
-	// Viewport state
 	public var isPanning: Bool = false;
 	public var viewReset: Bool = false;
 	var panStartX: Float = 0;
@@ -37,7 +37,7 @@ class CanvasViewport {
 	public var initialScale: Float = 0.8;
 	public var currentScale: Float = 0.8;
 
-	// Shared references (set by KouiEditor)
+	// Set by KouiEditor
 	public var uiBase: UIBase;
 	public var topToolbar: TopToolbar;
 	public var sceneData: SceneData;
@@ -51,7 +51,7 @@ class CanvasViewport {
 		var mouse: Mouse = Input.getMouse();
 		var keyboard: Keyboard = Input.getKeyboard();
 
-		// Handle middle mouse button panning
+		// Middle mouse button pans
 		if (mouse.started("middle") && isInCanvas) {
 			isPanning = true;
 			panStartX = mouse.x;
@@ -91,7 +91,7 @@ class CanvasViewport {
 		viewReset = true;
 	}
 
-	/** Zooms to `newScale`, keeping the canvas point under the screen point (`x`, `y`) where it is. */
+	// Zooms to `newScale`, keeping the canvas point under (`x`, `y`) in place
 	public function zoomAt(x: Float, y: Float, newScale: Float): Void {
 		var rootPane: AnchorPane = sceneData.getRoot();
 		if (rootPane == null) return;
@@ -110,7 +110,7 @@ class CanvasViewport {
 		applyPan();
 	}
 
-	/** Places the current scene's root at the view's pan offset, e.g. after switching scenes or an undo. */
+	// Places the current scene's root at the view's pan offset, e.g. after switching scenes or an undo
 	public function applyPan(): Void {
 		var rootPane: AnchorPane = sceneData.getRoot();
 		if (rootPane == null) return;
@@ -146,7 +146,6 @@ class CanvasViewport {
 		var offsetX: Float = rootPane.drawX % cellSize;
 		var offsetY: Float = rootPane.drawY % cellSize;
 
-		// Minor grid lines
 		var minorAlpha: Int = 0x30;
 		g2.color = (minorAlpha << 24) | 0xffffff;
 
@@ -162,7 +161,7 @@ class CanvasViewport {
 			y += cellSize;
 		}
 
-		// Major grid lines (every 4 cells)
+		// A stronger line every 4 cells
 		var majorCellSize: Float = cellSize * 4;
 		var majorOffsetX: Float = rootPane.drawX % majorCellSize;
 		var majorOffsetY: Float = rootPane.drawY % majorCellSize;
@@ -201,7 +200,7 @@ class CanvasViewport {
 		}
 	}
 
-	/** Outlines every selected element. */
+	// Outlines every selected element
 	public function drawSelection(g2: Graphics): Void {
 		var rootPane: AnchorPane = sceneData.getRoot();
 		if (rootPane == null) return;
@@ -212,7 +211,7 @@ class CanvasViewport {
 		}
 	}
 
-	/** The rectangle `element` is drawn in, in screen pixels: every parent draws its children translated by its own position. */
+	// The rectangle `element` is drawn in, in screen pixels: each parent offsets its children by its own position
 	public function getScreenRect(element: Element): TScreenRect {
 		var x: Int = 0;
 		var y: Int = 0;
@@ -226,9 +225,8 @@ class CanvasViewport {
 	}
 
 	/**
-	 * The top-most user element of the current scene at the screen point
-	 * (`x`, `y`), at any depth, or null. Internal parts (a Button's label) are
-	 * not user elements, so clicking them finds their element.
+	 * The top-most user element at the screen point, at any depth, or null.
+	 * Clicking an internal part (a Button's label) finds its element.
 	 */
 	public function getElementAt(x: Int, y: Int): Null<Element> {
 		var rootPane: AnchorPane = sceneData.getRoot();
@@ -252,7 +250,6 @@ class CanvasViewport {
 		return null;
 	}
 
-	/** The selection box while it's being dragged. */
 	public function drawSelectionBox(g2: Graphics, rect: TScreenRect): Void {
 		g2.color = 0x30469cff;
 		g2.fillRect(rect.x, rect.y, rect.w, rect.h);

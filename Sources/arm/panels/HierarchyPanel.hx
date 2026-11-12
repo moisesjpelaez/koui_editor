@@ -18,7 +18,7 @@ import koui.elements.Element;
 import zui.Zui;
 import zui.Zui.Handle;
 
-/** An element's row as drawn, in screen pixels: its name starts at `nameX`, left of it are the indent and the +/- button. */
+// An element's row as drawn, in screen pixels; left of `nameX` are the indent and the +/- button
 typedef THierarchyRow = {
 	var element: Element;
 	var y: Float;
@@ -26,9 +26,10 @@ typedef THierarchyRow = {
 	var nameX: Float;
 }
 
+// The current scene's element tree: selecting, renaming, dragging to reorder, scenes
 @:access(zui.Zui)
 class HierarchyPanel {
-	// Layout constants, in pixels at UI scale 1
+	// Pixels at UI scale 1
 	static inline var INDENT_PER_DEPTH: Int = 15;
 	static inline var EXPAND_BUTTON_WIDTH: Int = 25;
 	static inline var DELETE_BUTTON_WIDTH: Int = 30;
@@ -39,16 +40,13 @@ class HierarchyPanel {
 	static inline var GHOST_OFFSET: Float = 10;
 	static inline var RESIZE_GUTTER: Int = 4;
 
-	// Scene management
 	var sceneTabHandle: Handle;
 
 	var sceneData: SceneData = SceneData.data;
 
-	// Expand/collapse state - keyed by element reference
 	// Collapsed elements by "scene:path", so the state survives an undo (which recreates elements)
 	var collapsed: Map<String, Bool> = new Map();
 
-	// Drag-drop state - use Element references instead of indices
 	var draggedItem: TElementEntry = null;
 	var mouseDownOnItem: Bool = false;
 	var dropTargetElement: Element = null;
@@ -57,12 +55,11 @@ class HierarchyPanel {
 	var dragStartX: Float = 0;
 	var dragStartY: Float = 0;
 
-	/** The rows drawn last, in screen pixels, for the selection box and pressing on empty space. */
+	// The rows drawn last frame, for the selection box and finding empty space
 	var rows: Array<THierarchyRow> = [];
-	/** The bottom of the scene's row: below it, a press outside the names is on empty space. */
 	var rootRowBottom: Float = 0;
 
-	// Selection box: pressing on empty space and dragging past DRAG_THRESHOLD pixels
+	// Selection box, from a press on empty space
 	var boxPending: Bool = false;
 	var boxActive: Bool = false;
 	var boxStartX: Float = 0;
@@ -83,16 +80,14 @@ class HierarchyPanel {
 		SceneEvents.sceneChanged.connect(onSceneChanged);
 		SceneEvents.sceneRemoved.connect(onSceneRemoved);
 
-		// Initialize handle position to current scene
 		updateTabPosition();
 	}
 
-	/** Get scene keys from SceneData - single source of truth */
 	function getSceneTabs(): Array<String> {
 		return [for (scene in sceneData.scenes) scene.key];
 	}
 
-	/** Update tab handle position to match current scene */
+	// Points the scene combo at the current scene
 	public function updateTabPosition(): Void {
 		if (sceneData.currentScene != null) {
 			var tabs = getSceneTabs();
@@ -108,7 +103,7 @@ class HierarchyPanel {
 		mouseDownOnItem = false;
 		if (ui.window(uiBase.hwnds[PanelHierarchy], params.tabx, 0, params.w, params.h0)) {
 			rows = [];
-			// The rows under the mouse set it again below; releasing over no row drops nowhere
+			// The row under the mouse sets the drop target again below
 			if (isDragging) {
 				dropTargetElement = null;
 				dropZone = None;
@@ -116,7 +111,6 @@ class HierarchyPanel {
 			drawSceneSelector(uiBase);
 			ui.separator();
 
-			// Draw root element (only if currentScene exists)
 			if (sceneData.currentScene != null) {
 				drawItem(uiBase, { key: sceneData.currentScene.key, element: sceneData.currentScene.root }, 0);
 			}
@@ -152,9 +146,8 @@ class HierarchyPanel {
 	}
 
 	/**
-	 * Whether the mouse is on the panel's empty space: inside it (not on its
-	 * resizable borders), below the scene's row, and not on a name, a +/- or a
-	 * delete button. The indent left of a nested row counts as empty.
+	 * Whether the mouse is on the panel's empty space: below the scene's row,
+	 * off the resizable borders, and not on a name or button. A row's indent counts.
 	 */
 	function isEmptySpace(uiBase: UIBase, params: Dynamic): Bool {
 		var ui: Zui = uiBase.ui;
@@ -169,17 +162,13 @@ class HierarchyPanel {
 		return true;
 	}
 
-	/** The selection box, in screen pixels. */
 	function getBoxRect(): { x: Float, y: Float, w: Float, h: Float } {
 		var x: Float = Math.min(boxStartX, boxEndX);
 		var y: Float = Math.min(boxStartY, boxEndY);
 		return { x: x, y: y, w: Math.abs(boxEndX - boxStartX), h: Math.abs(boxEndY - boxStartY) };
 	}
 
-	/**
-	 * Selects the rows the box touches vertically. Shift adds them to the
-	 * selection, Ctrl toggles them, otherwise they replace it.
-	 */
+	// Selects the rows the box overlaps vertically. Shift adds, Ctrl toggles, otherwise they replace the selection
 	function selectInBox(): Void {
 		var box = getBoxRect();
 		var picked: Array<Element> = [for (row in rows) if (row.y < box.y + box.h && row.y + row.h > box.y) row.element];
@@ -237,12 +226,10 @@ class HierarchyPanel {
 
 		var name: String = entry.key;
 		var isRoot: Bool = entry.element == sceneData.currentScene.root;
-		// Only user elements, not internal parts like a Button's label
 		var children: Array<Element> = sceneData.getChildren(entry.element);
 		var hasChildren: Bool = children.length > 0;
 		var isExpanded: Bool = !collapsed.exists(expandKey(entry.element));
 
-		// Cache window coordinates
 		var ui: Zui = uiBase.ui;
 		var winX: Float = ui._windowX;
 		var winY: Float = ui._windowY;
@@ -251,24 +238,21 @@ class HierarchyPanel {
 		var rowW: Float = ui._w;
 		var rowH: Float = ui.ELEMENT_H();
 
-		// Fixed-width columns (Zui takes a negative ratio as pixels): the +/- and delete
-		// columns are always there, so names at the same depth and the delete icons line up
+		// Fixed-width columns (Zui takes a negative ratio as pixels), always present so rows line up
 		var scale: Float = ui.SCALE();
 		var indentW: Float = depth * INDENT_PER_DEPTH * scale;
 		var expandW: Float = EXPAND_BUTTON_WIDTH * scale;
 		var deleteW: Float = isRoot ? 0 : DELETE_BUTTON_WIDTH * scale;
 		var nameW: Float = Math.max(1, rowW - indentW - expandW - deleteW);
 
-		// Draw drop zone indicator
 		drawDropIndicator(ui, entry.element, localX, localY, rowW, rowH, indentW);
 
 		var ratios: Array<Float> = [-indentW, -expandW, -nameW];
 		if (!isRoot) ratios.push(-deleteW);
 		ui.row(ratios);
 
-		ui.text(""); // Indent spacer
+		ui.text(""); // Indent
 
-		// Expand/collapse button; rows without children keep the space empty
 		if (hasChildren) {
 			if (ui.button(isExpanded ? "-" : "+")) {
 				isExpanded ? collapsed.set(expandKey(entry.element), true) : collapsed.remove(expandKey(entry.element));
@@ -280,7 +264,7 @@ class HierarchyPanel {
 		if (isRoot) rootRowBottom = winY + localY + rowH;
 		else rows.push({ element: entry.element, y: winY + localY, h: rowH, nameX: winX + localX + indentW });
 
-		// For root element, show scene name as text input for renaming
+		// The scene's row renames the scene
 		if (isRoot) {
 			var sceneTabs = getSceneTabs();
 			var currentIdx: Int = sceneTabHandle.position;
@@ -291,7 +275,6 @@ class HierarchyPanel {
 			var newName: String = uiBase.ui.textInput(sceneTabHandle, "Name", zui.Zui.Align.Left);
 
 			if (sceneTabHandle.changed && newName != "") {
-				// Collect other scene names (excluding current)
 				var otherScenes: Array<String> = [];
 				for (i in 0...sceneTabs.length) {
 					if (i != currentIdx) {
@@ -306,12 +289,10 @@ class HierarchyPanel {
 				SceneEvents.sceneNameChanged.emit(oldName, newName);
 			}
 		} else {
-			// Item button with selection highlighting
 			drawItemButton(uiBase.ui, name, entry.element);
 			handleItemInteraction(uiBase, entry);
 		}
 
-		// Delete icon button
 		if (entry.element != sceneData.currentScene.root) {
 			var deleteClicked = ZuiUtils.iconButton(uiBase.ui, icons, 1, 3, "Delete", false, false, 0.7);
 			if (deleteClicked) {
@@ -322,7 +303,6 @@ class HierarchyPanel {
 
 		handleDropDetection(uiBase, entry, winX, winY, localX, localY, rowW, rowH);
 
-		// Recursively draw children
 		if (hasChildren && isExpanded) {
 			for (child in children) {
 				drawItem(uiBase, { key: sceneData.getElementKey(child), element: child }, depth + 1);
@@ -333,7 +313,6 @@ class HierarchyPanel {
 	function drawItemButton(ui: Zui, name: String, element: Element) {
 		var isSelected: Bool = Selection.contains(element);
 
-		// Save theme colors
 		var savedCol: Int = ui.t.BUTTON_COL;
 		var savedHover: Int = ui.t.BUTTON_HOVER_COL;
 		var savedPressed: Int = ui.t.BUTTON_PRESSED_COL;
@@ -346,14 +325,13 @@ class HierarchyPanel {
 
 		ui.button(name, Align.Left);
 
-		// Restore theme colors
 		ui.t.BUTTON_COL = savedCol;
 		ui.t.BUTTON_HOVER_COL = savedHover;
 		ui.t.BUTTON_PRESSED_COL = savedPressed;
 	}
 
 	function handleItemInteraction(uiBase: UIBase, entry: TElementEntry) {
-		// Mouse down: begin drag tracking only (selection happens on release)
+		// Selecting waits for the release, so a press can start a drag
 		if (uiBase.ui.isPushed && uiBase.ui.inputStarted) {
 			mouseDownOnItem = true;
 			draggedItem = entry;
@@ -362,7 +340,6 @@ class HierarchyPanel {
 			uiBase.hwnds[PanelHierarchy].redraws = 2;
 		}
 
-		// Mouse up: apply selection — but not if we just finished a drag drop
 		if (uiBase.ui.isReleased && !isDragging) {
 			draggedItem = null;
 
@@ -388,7 +365,6 @@ class HierarchyPanel {
 			uiBase.redrawPanels();
 		}
 
-		// Start drag after threshold
 		// Entries are made anew each frame: compare their elements
 		if (draggedItem != null && draggedItem.element == entry.element && uiBase.ui.inputDown && !isDragging) {
 			var dx: Float = uiBase.ui.inputX - dragStartX;
@@ -515,12 +491,11 @@ class HierarchyPanel {
 			performDrop();
 		}
 
-		// Select the dragged element when the drag ends
 		if (draggedItem != null) {
 			var ctrlHeld: Bool = Input.getKeyboard().down("control");
 			var wasMultiSelected: Bool = Selection.elements.length > 1 && Selection.contains(draggedItem.element);
 			if (ctrlHeld || wasMultiSelected) {
-				// Keep the multi-selection, with the dragged element as the primary one
+				// The dragged element becomes the primary one
 				Selection.add(draggedItem.element);
 			} else {
 				Selection.select(draggedItem.element);
@@ -569,13 +544,7 @@ class HierarchyPanel {
 		} else if (ratio > DROP_ZONE_BOTTOM) {
 			dropZone = AfterSibling;
 		} else {
-			// Only allow AsChild if target can accept children
-			if (HierarchyUtils.canAcceptChild(item.element)) {
-				dropZone = AsChild;
-			} else {
-				// Fall back to AfterSibling for non-containers
-				dropZone = AfterSibling;
-			}
+			dropZone = HierarchyUtils.canAcceptChild(item.element) ? AsChild : AfterSibling;
 		}
 
 		uiBase.redrawPanels();
@@ -584,22 +553,17 @@ class HierarchyPanel {
 	function performDrop() {
 		if (draggedItem == null || dropTargetElement == null || dropZone == None) return;
 
-		// Determine which elements to drop
 		var isMulti: Bool = Selection.elements.length > 1 && Selection.contains(draggedItem.element);
 		// Selected elements inside other selected ones move with them
 		var elemsToDrop: Array<Element> = isMulti ? Selection.getTopLevel() : [draggedItem.element];
 
-		// Filter out the target itself and any ancestor of the target
+		// Not the target or its ancestors
 		elemsToDrop = elemsToDrop.filter(e -> e != dropTargetElement && !HierarchyUtils.isDescendant(dropTargetElement, e));
 		if (elemsToDrop.length == 0) return;
 
-		// Sort by hierarchy order so relative order is preserved
+		// They keep their hierarchy order; each one goes right after the target, so those go in reverse
 		var sceneElements: Array<Element> = sceneData.getElements();
 		elemsToDrop.sort((a, b) -> sceneElements.indexOf(a) - sceneElements.indexOf(b));
-
-		// For BeforeSibling: normal order → each inserts before target, pushing earlier ones ahead
-		// For AfterSibling:  reverse order → each inserts after target, pulling earlier ones forward
-		// For AsChild: order doesn't matter
 		if (dropZone == AfterSibling) elemsToDrop.reverse();
 
 		for (elem in elemsToDrop) {

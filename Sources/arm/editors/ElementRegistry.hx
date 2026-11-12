@@ -8,19 +8,12 @@ import koui.elements.layouts.AnchorPane;
 import koui.elements.layouts.ColLayout;
 import koui.elements.layouts.RowLayout;
 
-/**
- * Central registry for element type editors.
- * All element types register here at startup; panels and utilities
- * query the registry instead of using switch/if-else chains.
- */
+// The editor of every element type
 class ElementRegistry {
 	static var editors: Array<ElementEditor> = [];
 	static var byTypeName: Map<String, ElementEditor> = new Map();
 
-	/**
-	 * Registers the editor of every element type, in palette order. A type
-	 * without properties of its own needs no editor class, only a line here.
-	 */
+	// In palette order. A type without fields of its own needs no editor class
 	public static function registerAll(): Void {
 		register(new LabelEditor());
 		register(new ElementEditor("Panel", "Panel", "Basic", groups -> new Panel()));
@@ -39,34 +32,29 @@ class ElementRegistry {
 		register(new SliderEditor());
 	}
 
-	/** Register an element editor. */
 	public static function register(editor: ElementEditor): Void {
 		editors.push(editor);
 		byTypeName.set(editor.typeName, editor);
 	}
 
-	/** Look up an editor by JSON type name. */
 	public static function getByTypeName(typeName: String): ElementEditor {
 		return byTypeName.get(typeName);
 	}
 
-	/** Find the editor that handles a given element instance. */
 	public static function getForElement(element: Element): ElementEditor {
 		var typeName: Null<String> = CanvasElements.getType(element);
 		return typeName != null ? byTypeName.get(typeName) : null;
 	}
 
-	/** All registered editors, in registration order. */
 	public static function all(): Array<ElementEditor> {
 		return editors;
 	}
 
-	/** All editors in a given category, in registration order. */
 	public static function byCategory(category: String): Array<ElementEditor> {
 		return editors.filter(e -> e.category == category);
 	}
 
-	/** Ordered list of categories for the ElementsPanel. */
+	// In palette order
 	public static function categories(): Array<String> {
 		var result: Array<String> = [];
 		for (editor in editors) {

@@ -2,12 +2,7 @@ package arm.data;
 
 import arm.types.Enums;
 
-/**
- * The sizes of the editor's panels, in pixels, indexed by `LayoutSize`. They're
- * kept in the editor's settings file (see `EditorSettings`), so the panels
- * have the same sizes the next time the editor opens. UIBase keeps them within
- * the window every frame.
- */
+// The panel sizes in pixels, by `LayoutSize`, kept in the editor's settings file
 class LayoutSettings {
 	public static var sizes: Array<Int> = defaults();
 
@@ -20,7 +15,7 @@ class LayoutSettings {
 		return sizes;
 	}
 
-	/** Takes the saved sizes, or the defaults if there are none (or they aren't 4 positive numbers). */
+	// The saved sizes, or the defaults if they aren't 4 positive numbers
 	public static function init(): Void {
 		EditorSettings.init();
 		var saved: Null<Array<Int>> = EditorSettings.data.layout;
@@ -28,7 +23,7 @@ class LayoutSettings {
 		sizes = valid ? saved.copy() : defaults();
 	}
 
-	/** Saves the current sizes, after a panel border was dragged. */
+	// After a panel border was dragged
 	public static function save(): Void {
 		EditorSettings.data.layout = sizes.copy();
 		EditorSettings.save();

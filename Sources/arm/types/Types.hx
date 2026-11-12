@@ -3,16 +3,15 @@ package arm.types;
 import koui.elements.Element;
 import koui.elements.layouts.AnchorPane;
 
-// --- JSON serialization types (shared between editor and runtime) ---
-// Format 2.0. Elements are referenced by path: the names from the scene root
-// down to the element, joined by "/" (e.g. "Menu/Buttons/Play").
+// The canvas file, format 2.0. Elements are referenced by path: the names from
+// the scene root down, joined by "/" (e.g. "Menu/Buttons/Play")
 
 typedef TRadioGroupData = {
 	var id: String;
 	var activeButton: Null<TElementRef>;
 }
 
-/** An element anywhere in the canvas. */
+// An element anywhere in the canvas
 typedef TElementRef = {
 	var scene: String;
 	var path: String;
@@ -43,7 +42,7 @@ typedef TSettings = {
 typedef TSceneData = {
 	var key: String;
 	var active: Bool;
-	/** Parents always come before their children. */
+	// Parents always come before their children
 	var elements: Array<TElementData>;
 }
 
@@ -58,9 +57,9 @@ typedef TElementData = {
 	var anchor: Int;
 	var visible: Bool;
 	var disabled: Bool;
-	/** Path of the parent element; "" for the scene root. */
+	// Path of the parent element; "" for the scene root
 	var parent: String;
-	/** Paths of the elements focus moves to, in the same scene. */
+	// Paths of the elements focus moves to, in the same scene
 	var focusUp: Null<String>;
 	var focusDown: Null<String>;
 	var focusLeft: Null<String>;
@@ -68,12 +67,12 @@ typedef TElementData = {
 	var properties: Dynamic;
 }
 
-// --- Editor runtime types ---
+// Editor only
 
 typedef TSceneEntry = {
 	var key: String;
 	var root: AnchorPane;
-	/** The name of every user element in this scene. Their order comes from the Koui tree. */
+	// The name of every user element; their order comes from the Koui tree
 	var keys: Map<Element, String>;
 }
 

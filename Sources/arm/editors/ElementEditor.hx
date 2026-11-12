@@ -5,20 +5,15 @@ import koui.utils.RadioGroup;
 import zui.Zui;
 
 /**
- * The editor of one element type: its palette button and its section of the
- * Properties panel. Types without properties of their own use this class as
- * it is; the others extend it and override `drawProperties`.
- *
- * Creating elements from canvas data and saving them is shared with the game
- * runtime, see `arm.canvas.CanvasElements`. The common properties (position,
- * size, anchor, visibility, theme ID, focus) are drawn by the Properties panel.
+ * One element type's palette button and its own fields in the Properties
+ * panel. Types with fields of their own extend it and override `drawProperties`.
  */
 class ElementEditor {
-	/** The type's saved name (e.g. "Button"), as in `CanvasElements.types`. */
+	// As in `CanvasElements.types`
 	public final typeName: String;
-	/** The palette button's text (e.g. "Radio Button"). */
+	// The palette button's text
 	public final displayName: String;
-	/** The palette group (e.g. "Basic", "Buttons", "Layout", "Misc."). */
+	// The palette group
 	public final category: String;
 
 	final makeDefault: Array<RadioGroup>->Element;
@@ -30,12 +25,12 @@ class ElementEditor {
 		this.makeDefault = makeDefault;
 	}
 
-	/** A new element for the palette; a radio button joins the first of `radioGroups`. */
+	// A radio button joins the first of `radioGroups`
 	public function createDefault(?radioGroups: Array<RadioGroup>): Element {
 		return makeDefault(radioGroups != null ? radioGroups : []);
 	}
 
-	/** The size of a new element from the palette, for "Reset Size": measured on one made and freed for it. */
+	// Measured on a new palette element
 	public function defaultSize(): { width: Int, height: Int } {
 		var element: Element = makeDefault([]);
 		var size = { width: element.width, height: element.height };
@@ -43,11 +38,11 @@ class ElementEditor {
 		return size;
 	}
 
-	/** The size "Reset Size" gives `element`: a new palette element's, unless the type knows better. */
+	// For Reset Size
 	public function resetSize(element: Element): { width: Int, height: Int } {
 		return defaultSize();
 	}
 
-	/** Draws the type's fields for `elements`, all of this type; a field edits every one of them (see `PropertyFields`). */
+	// `elements` are all of this type
 	public function drawProperties(ui: Zui, elements: Array<Element>): Void {}
 }

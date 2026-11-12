@@ -13,7 +13,7 @@ class Base {
 	public static function init() {
 		LayoutSettings.init();
 		theme = Themes.dark;
-		theme.FILL_WINDOW_BG = true; // Fill window background with color
+		theme.FILL_WINDOW_BG = true;
 	}
 
 	static function set_isResizing(value: Bool) {

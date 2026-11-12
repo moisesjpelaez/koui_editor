@@ -11,11 +11,11 @@ import koui.utils.RadioGroup;
 
 class SceneData {
 	public static var data: SceneData = new SceneData();
-	/** The scene a new or cleared canvas starts with. */
+	// The scene a new or cleared canvas starts with
 	public static inline var FIRST_SCENE: String = "Scene_1";
 	public var scenes: Array<TSceneEntry> = [];
 	public var currentScene: TSceneEntry;
-	/** Canvas-wide, never empty: see `RadioGroups`. */
+	// Never empty, see `RadioGroups`
 	public var radioGroups: Array<RadioGroup> = [new RadioGroup("RadioGroup")];
 
 	public function new() {
@@ -23,7 +23,7 @@ class SceneData {
 		SceneEvents.sceneChanged.connect(onSceneChanged);
 	}
 
-	/** The root pane of the current scene, or null if there is no scene. */
+	// Null if there is no scene
 	public function getRoot(): Null<AnchorPane> {
 		return currentScene != null ? currentScene.root : null;
 	}
@@ -46,7 +46,7 @@ class SceneData {
 		return scene.keys.get(element);
 	}
 
-	/** Whether `element` is a user element of the scene (not an internal part like a Button's label). */
+	// User elements are the ones with a name, not internal parts like a Button's label
 	public function isRegistered(element: Element, ?scene: TSceneEntry): Bool {
 		if (scene == null) scene = currentScene;
 		return scene != null && scene.keys.exists(element);
@@ -64,14 +64,14 @@ class SceneData {
 		scene.keys.remove(element);
 	}
 
-	/** The user elements directly inside `parent`, in the order they are drawn. */
+	// In drawing order
 	public function getChildren(parent: Element, ?scene: TSceneEntry): Array<Element> {
 		if (scene == null) scene = currentScene;
 		if (scene == null) return [];
 		return [for (child in HierarchyUtils.getChildren(parent)) if (scene.keys.exists(child)) child];
 	}
 
-	/** All user elements of the scene, parents before their children, in the order they are drawn. */
+	// Parents before their children, in drawing order
 	public function getElements(?scene: TSceneEntry): Array<Element> {
 		if (scene == null) scene = currentScene;
 		var result: Array<Element> = [];
@@ -86,7 +86,7 @@ class SceneData {
 		}
 	}
 
-	/** Whether `element` is a user element attached to the current scene's tree. */
+	// Registered and attached to the current scene's tree
 	public function isInCurrentScene(element: Element): Bool {
 		if (currentScene == null || !currentScene.keys.exists(element)) return false;
 		var current: Element = HierarchyUtils.getParentElement(element);
@@ -97,7 +97,7 @@ class SceneData {
 		return false;
 	}
 
-	/** The element's path in the current scene, "scene: path" in another one, or null if it's in no scene. */
+	// The element's path, as "scene: path" if it's in another scene
 	public function getLabel(element: Element): Null<String> {
 		for (scene in scenes) {
 			if (!scene.keys.exists(element)) continue;

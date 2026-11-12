@@ -40,23 +40,17 @@ class KouiEditor extends iron.Trait {
 
 	var sizeInit: Bool = false;
 
-	// Created elements
 	var sceneData: SceneData = SceneData.data;
-
-	// Viewport controller
 	var viewport: CanvasViewport = new CanvasViewport();
-
-	// Mouse input on the canvas
 	var canvasInput: CanvasInput;
 
-	// Panels
 	var topToolbar: TopToolbar = new TopToolbar();
 	var bottomPanel: BottomPanel = new BottomPanel();
 	var hierarchyPanel: HierarchyPanel = new HierarchyPanel();
 	var propertiesPanel: PropertiesPanel = new PropertiesPanel();
 	var elementsPanel: ElementsPanel = new ElementsPanel();
 
-	/** Koui's init (theme, first scene) has finished; it may finish after the first updates. */
+	// Koui's init (theme, first scene) can finish after the first updates
 	var kouiReady: Bool = false;
 	var canvasLoaded: Bool = false;
 	var canvasWidth: Int = 1024;
@@ -65,21 +59,14 @@ class KouiEditor extends iron.Trait {
 	public function new() {
 		super();
 
-		// Register element editors
 		ElementRegistry.registerAll();
 
 		Assets.loadEverything(function() {
-			// Initialize framework
 			Base.init();
 			Base.resizing.connect(onResized);
-
-			// Initialize canvas utilities
 			CanvasUtils.init();
-
-			// Initialize editor settings
 			EditorSettings.init();
 
-			// Create UIBase with the loaded font
 			uiBase = new UIBase(Assets.fonts.font_default);
 			viewport.uiBase = uiBase;
 			viewport.sceneData = sceneData;
@@ -92,9 +79,8 @@ class KouiEditor extends iron.Trait {
 				canvasWidth = Std.int(App.w());
 				canvasHeight = Std.int(App.h());
 
+				// The game's resolution, see CanvasUtils.init for the arguments
 				var argCount = Krom.getArgCount();
-				// Arguments are: [0]=krom_path, [1]=koui_editor_path, [2]=koui_editor_path,
-				//                [3]=canvas_name, [4]=resolution_x, [5]=resolution_y, [6]=project_dir
 				if (argCount >= 6) {
 					var resX: Int = Std.parseInt(Krom.getArg(4));
 					var resY: Int = Std.parseInt(Krom.getArg(5));
@@ -107,7 +93,6 @@ class KouiEditor extends iron.Trait {
 				SceneManager.addScene(SceneData.FIRST_SCENE, (scene) -> setupRootScene(scene, SceneData.FIRST_SCENE));
 				CanvasUtils.refreshTheme();
 
-				// Set snap max value based on canvas size
 				topToolbar.snapMaxValue = Math.min(canvasWidth, canvasHeight) * 0.5;
 				topToolbar.applySavedSnap();
 				kouiReady = true;
@@ -167,51 +152,40 @@ class KouiEditor extends iron.Trait {
 
 		var keyboard: Keyboard = Input.getKeyboard();
 		var isTyping: Bool = uiBase.ui.isTyping;
-		// Shortcuts that replace or remove elements wait until no mouse button is held:
-		// a drag or resize going on would keep changing elements that are gone
+		// Shortcuts that replace or remove elements wait for the mouse buttons to be up:
+		// a drag or resize would keep changing elements that are gone
 		var canEdit: Bool = !isTyping && !mouseHeld;
 
 		if (canEdit && keyboard.started("delete")) {
 			deleteSelection();
 		}
-
-		// Copy (Ctrl+C)
 		if (!isTyping && keyboard.down("control") && keyboard.started("c")) {
 			copySelection(false);
 		}
-
-		// Cut (Ctrl+X)
 		if (canEdit && keyboard.down("control") && keyboard.started("x")) {
 			copySelection(true);
 		}
-
-		// Paste (Ctrl+V)
 		if (canEdit && keyboard.down("control") && keyboard.started("v")) {
 			paste();
 		}
-
-		// Undo (Ctrl+Z)
 		if (canEdit && keyboard.down("control") && !keyboard.down("shift") && keyboard.started("z")) {
 			if (History.undo()) {
 				hierarchyPanel.updateTabPosition();
 				uiBase.redrawPanels();
 			}
 		}
-
-		// Redo (Ctrl+Shift+Z or Ctrl+Y)
+		// Ctrl+Shift+Z or Ctrl+Y
 		if (canEdit && keyboard.down("control") && (keyboard.down("shift") && keyboard.started("z") || keyboard.started("y"))) {
 			if (History.redo()) {
 				hierarchyPanel.updateTabPosition();
 				uiBase.redrawPanels();
 			}
 		}
-
-		// Duplicate (Ctrl+D)
 		if (canEdit && keyboard.down("control") && keyboard.started("d")) {
 			duplicateSelection();
 		}
 
-		// Toolbar: save (Ctrl+S), load (Ctrl+O), clear (Ctrl+N), reload theme (Ctrl+R)
+		// Toolbar: save, load, clear, reload theme
 		if (!isTyping && keyboard.down("control") && keyboard.started("s")) {
 			CanvasUtils.saveCanvas();
 		}
@@ -225,7 +199,7 @@ class KouiEditor extends iron.Trait {
 			CanvasUtils.refreshTheme();
 		}
 
-		// Snapping: toggle (Shift+S), snap size (Ctrl+[ / Ctrl+])
+		// Snapping: toggle (Shift+S), size (Ctrl+[ / Ctrl+])
 		if (!isTyping && keyboard.down("shift") && !keyboard.down("control") && keyboard.started("s")) {
 			topToolbar.toggleSnapping();
 		}
@@ -237,14 +211,14 @@ class KouiEditor extends iron.Trait {
 		}
 	}
 
-	/** Deletes the selected elements, with everything inside them. */
+	// Deletes the selected elements, with everything inside them
 	public function deleteSelection(): Void {
 		for (element in Selection.getTopLevel()) {
 			ElementEvents.elementRemoved.emit(element);
 		}
 	}
 
-	/** Copies the selected elements to the clipboard, and removes them if `cut` is true. */
+	// Copies the selected elements to the clipboard, and removes them if `cut` is true
 	public function copySelection(cut: Bool): Void {
 		var topLevel: Array<Element> = Selection.getTopLevel();
 		if (topLevel.length == 0) return;
@@ -259,7 +233,7 @@ class KouiEditor extends iron.Trait {
 		if (cut) deleteSelection();
 	}
 
-	/** Pastes the clipboard into the primary selected container, or into the scene. */
+	// Pastes the clipboard into the primary selected container, or into the scene
 	public function paste(): Void {
 		if (Clipboard.clipboardData.length == 0) return;
 
@@ -272,10 +246,7 @@ class KouiEditor extends iron.Trait {
 		uiBase.redrawPanels();
 	}
 
-	/**
-	 * Duplicates the selected elements, each into its own container, offset like
-	 * a paste. The copies become the selection; the clipboard is left as it is.
-	 */
+	// Duplicates the selected elements in their containers, like a paste, without touching the clipboard
 	public function duplicateSelection(): Void {
 		var copies: Array<Element> = [];
 		for (element in Selection.getTopLevel()) {
@@ -347,7 +318,6 @@ class KouiEditor extends iron.Trait {
 
 		var rootPane: AnchorPane = sceneData.getRoot();
 
-		// Determine new parent before mutation
 		var newParent: Element = null;
 		switch (zone) {
 			case AsChild:
@@ -358,22 +328,20 @@ class KouiEditor extends iron.Trait {
 				return;
 		}
 
-		// Dropped on the scene itself (which has no parent): the element goes first in the scene
+		// Dropped on the scene's row: the element goes first in the scene
 		var droppedOnScene: Bool = target == rootPane;
 		if (droppedOnScene) newParent = rootPane;
 
-		// Validate newParent can accept children
 		if (!droppedOnScene && newParent != null && !HierarchyUtils.canAcceptChild(newParent)) {
 			uiBase.redrawPanels();
 			return;
 		}
 
-		// Get current name and ensure it's unique in new parent
+		// Names are unique among siblings: a taken name gets a free number in the new parent
 		var currentName: String = sceneData.getElementKey(element);
 		if (currentName == null) currentName = "";
 		var uniqueName: String = NameUtils.ensureUniqueName(currentName, element, newParent);
 
-		// Perform the mutation
 		if (droppedOnScene) {
 			var rootFirstElement: Element = rootPane.elements[0];
 			if (rootFirstElement != element) HierarchyUtils.moveRelativeToTarget(element, rootFirstElement, true);
@@ -389,7 +357,6 @@ class KouiEditor extends iron.Trait {
 			}
 		}
 
-		// Update name if it changed due to conflict
 		if (uniqueName != currentName) {
 			sceneData.updateElementKey(element, uniqueName);
 		}
@@ -404,7 +371,6 @@ class KouiEditor extends iron.Trait {
 
 		rootPane.add(entry.element, Anchor.TopLeft);
 
-		// Generate unique name based on parent's children
 		var uniqueName: String = NameUtils.generateName(entry.element, rootPane);
 		entry.key = uniqueName;
 		sceneData.updateElementKey(entry.element, uniqueName);
@@ -414,12 +380,11 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function onElementRemoved(element: Element): Void {
-		// Forget the element and everything inside it
 		for (descendant in collectDescendants(element)) {
 			sceneData.unregisterElement(descendant);
 		}
 
-		// Detach first: Row/ColLayouts close the gap; then free the elements
+		// Row/Col layouts close the gap
 		HierarchyUtils.detachFromCurrentParent(element);
 		element.destroy();
 
@@ -427,7 +392,7 @@ class KouiEditor extends iron.Trait {
 		History.edited("Delete");
 	}
 
-	/** `element` and the user elements inside it. */
+	// `element` and the user elements inside it
 	function collectDescendants(element: Element): Array<Element> {
 		var result: Array<Element> = [element];
 		for (child in sceneData.getChildren(element)) {
@@ -448,7 +413,6 @@ class KouiEditor extends iron.Trait {
 	function onSceneChanged(sceneName: String): Void {
 		SceneManager.setScene(sceneName);
 		viewport.applyPan();
-		// The selection belongs to the scene that was shown before
 		Selection.clear();
 	}
 
@@ -459,7 +423,6 @@ class KouiEditor extends iron.Trait {
 	}
 
 	function onSceneRemoved(sceneName: String): Void {
-		// Find the scene
 		var sceneEntry: TSceneEntry = null;
 		var sceneIndex: Int = 0;
 		for (i in 0...sceneData.scenes.length) {
@@ -472,14 +435,11 @@ class KouiEditor extends iron.Trait {
 
 		if (sceneEntry == null) return;
 
-		// Remove from SceneManager and free its elements
 		SceneManager.removeScene(sceneName);
 		sceneEntry.root.destroy();
-
-		// Remove from SceneData
 		sceneData.scenes.splice(sceneIndex, 1);
 
-		// Switch to another scene
+		// Show the scene before it
 		if (sceneData.scenes.length > 0) {
 			var idx = sceneIndex > 0 ? sceneIndex - 1 : 0;
 			SceneManager.setScene(sceneData.scenes[idx].key);

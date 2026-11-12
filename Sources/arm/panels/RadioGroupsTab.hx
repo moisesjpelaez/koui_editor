@@ -14,11 +14,11 @@ import koui.utils.RadioGroup;
 import zui.Zui;
 import zui.Zui.Handle;
 
-/** The Properties panel's Radio Groups tab: create, rename and delete groups, add buttons, pick the active one. */
+// The Radio Groups tab of the Properties panel
 @:access(koui.utils.RadioGroup, zui.Zui)
 class RadioGroupsTab {
 	var nameHandle: Handle = new Handle({text: "RadioGroup"});
-	/** Each group's fields, by group id: handles drawn in a loop need one each. */
+	// By group id: fields drawn in a loop need a handle each
 	var renameHandles: Map<String, Handle> = new Map();
 	var addHandles: Map<String, Handle> = new Map();
 
@@ -45,7 +45,7 @@ class RadioGroupsTab {
 		var sceneButtons: Array<RadioButton> = [for (element in SceneData.data.getElements()) if (Std.isOfType(element, RadioButton)) cast element];
 		var addOptions: Array<String> = ["(add radio button)"].concat([for (button in sceneButtons) SceneData.data.getLabel(button)]);
 
-		// Changes are applied after the loop, which iterates over the groups
+		// Applied after the loop over the groups
 		var groupToDelete: Null<RadioGroup> = null;
 		var groupToRename: Null<RadioGroup> = null;
 		var newId: String = "";

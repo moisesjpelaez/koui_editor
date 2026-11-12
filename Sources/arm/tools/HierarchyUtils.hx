@@ -14,12 +14,9 @@ import koui.elements.layouts.RowLayout;
 import koui.elements.layouts.ScrollPane;
 
 /**
- * Which element contains which, and in what order. Containers are layouts
- * (AnchorPane, RowLayout, ColLayout, ScrollPane, Expander) and panels.
- *
- * Every change reads a container's children with `getChildren`, changes the
- * list, and writes it back with `setChildren`. Shared by the editor and the
- * game runtime.
+ * Which element contains which, and in what order. Containers are layouts and
+ * Panels. Every change reads the children with `getChildren`, edits the list
+ * and writes it back with `setChildren`.
  */
 @:access(koui.elements.Element, koui.elements.layouts.Layout, koui.elements.layouts.AnchorPane, koui.elements.layouts.ScrollPane,
 	koui.elements.layouts.Expander, koui.elements.layouts.GridLayout)
@@ -34,7 +31,7 @@ class HierarchyUtils {
 		return element.parent;
 	}
 
-	/** The elements of `list` that aren't inside another element of `list`, in the same order. */
+	// The elements of `list` that aren't inside another element of `list`, in the same order
 	public static function topMost(list: Array<Element>): Array<Element> {
 		return list.filter(element -> {
 			var parent: Element = getParentElement(element);
@@ -56,10 +53,8 @@ class HierarchyUtils {
 	}
 
 	/**
-	 * The children of `parent` in order: drawing order, a RowLayout's from top
-	 * to bottom, a ColLayout's from left to right. A new array: change it and
-	 * give it to `setChildren`. Elements that aren't containers return their
-	 * own parts (a Button's label).
+	 * A copy of the children of `parent`, in drawing order (Row/Col layouts: top
+	 * to bottom, left to right). Other elements return their parts (a Button's label).
 	 */
 	public static function getChildren(parent: Element): Array<Element> {
 		if (parent == null) return [];
@@ -72,10 +67,9 @@ class HierarchyUtils {
 	}
 
 	/**
-	 * Makes `children` the children of the container `parent`, in this order.
-	 * Children it had before and aren't in the list are detached; new ones must
-	 * not be in another container. A RowLayout or ColLayout gets one cell per
-	 * child, so it has no gaps.
+	 * Makes `children` the children of `parent`, in this order; others are
+	 * detached. New ones must not be in another container. Row/Col layouts get
+	 * one cell per child.
 	 */
 	public static function setChildren(parent: Element, children: Array<Element>): Void {
 		if (parent is RowLayout || parent is ColLayout) {
@@ -111,7 +105,7 @@ class HierarchyUtils {
 		replaceAll(parent.children, children);
 	}
 
-	/** Takes `element` out of its container, if it's in one. */
+	// Takes `element` out of its container, if it's in one
 	public static function detachFromCurrentParent(element: Element): Void {
 		var parent: Element = getParentElement(element);
 		if (parent == null) return;
@@ -120,7 +114,7 @@ class HierarchyUtils {
 		setChildren(parent, siblings);
 	}
 
-	/** Moves `element` into the container `target`, after its children. */
+	// Moves `element` into the container `target`, after its children
 	public static function moveAsChild(element: Element, target: Element): Void {
 		detachFromCurrentParent(element);
 		var children: Array<Element> = getChildren(target);
@@ -128,7 +122,7 @@ class HierarchyUtils {
 		setChildren(target, children);
 	}
 
-	/** Moves `element` next to `target`, in the same container: before it if `before`, otherwise after it. */
+	// Moves `element` before or after `target`, in its container
 	public static function moveRelativeToTarget(element: Element, target: Element, before: Bool): Void {
 		var parent: Element = getParentElement(target);
 		if (parent == null || element == target) return;
@@ -141,7 +135,7 @@ class HierarchyUtils {
 		setChildren(parent, siblings);
 	}
 
-	/** The list of children of an AnchorPane, ScrollPane or Expander, or null for other elements. */
+	// The list of children of an AnchorPane, ScrollPane or Expander, or null for other elements
 	static function layoutList(element: Element): Null<Array<Element>> {
 		if (element is AnchorPane) return (cast element: AnchorPane).elements;
 		if (element is ScrollPane) return (cast element: ScrollPane).elements;
@@ -149,7 +143,7 @@ class HierarchyUtils {
 		return null;
 	}
 
-	/** One cell per child: a column of rows for a RowLayout, a row of columns for a ColLayout. */
+	// One cell per child: a column of rows for a RowLayout, a row of columns for a ColLayout
 	static function setCells(grid: GridLayout, children: Array<Element>, vertical: Bool): Void {
 		for (element in getChildren(grid)) {
 			if (children.indexOf(element) < 0) element.layout = null;
@@ -168,7 +162,6 @@ class HierarchyUtils {
 			}
 		}
 
-		// Every cell's size and place changes
 		layOut(grid);
 		for (row in 0...grid.amountRows) {
 			for (col in 0...grid.amountCols) grid.recalcElement(row, col);

@@ -8,42 +8,39 @@ import koui.elements.RadioButton;
 import koui.elements.layouts.AnchorPane;
 import koui.utils.RadioGroup;
 
-/** A built scene: its root pane and the name of each element in it. */
+// A built scene: its root pane and the name of each element in it
 typedef TBuiltScene = {
 	var key: String;
 	var root: AnchorPane;
 	var keys: Map<Element, String>;
 }
 
-/** A built canvas: its scenes and radio groups, in saved order. */
+// A built canvas: its scenes and radio groups, in saved order
 typedef TBuiltCanvas = {
 	var scenes: Array<TBuiltScene>;
-	/** The saved groups, then any group a radio button names that the canvas didn't list. */
+	// The saved groups, then any group a radio button names that the canvas didn't list
 	var radioGroups: Array<RadioGroup>;
-	/** The scene saved as shown, or null if none is. */
+	// The scene saved as shown, or null if none is
 	var activeScene: Null<String>;
 }
 
-/** Elements built under a container: each one's name, and each one by its path below the container. */
+// Elements built under a container: their names, and the elements by path
 typedef TBuiltTree = {
 	var keys: Map<Element, String>;
 	var byPath: Map<String, Element>;
 }
 
 /**
- * Builds canvases saved by the Koui Editor. Shared by the editor (loading,
- * undo, paste) and the game runtime, so all build exactly the same element
- * tree. Invalid data is reported with an exception naming the problem,
- * nothing is guessed.
+ * Builds canvases saved by the Koui Editor, for both the editor and the game.
+ * Invalid data throws an exception naming the problem.
  */
 class CanvasLoader {
-	/** Written to saved canvases; loading doesn't check it. */
+	// Written to saved canvases, never checked
 	public static inline var VERSION: String = "2.0";
 
 	/**
-	 * Builds every scene of `data`, each into the root pane `makeRoot` returns
-	 * for its name, and checks each group's active radio button. On an error the
-	 * panes `makeRoot` made are left to the caller.
+	 * Builds each scene into the root pane `makeRoot` returns for it. On an
+	 * error, freeing those panes is left to the caller.
 	 */
 	public static function buildCanvas(data: TCanvasData, makeRoot: String->AnchorPane): TBuiltCanvas {
 		var radioGroups: Array<RadioGroup> = [for (groupData in data.radioGroups) new RadioGroup(groupData.id)];
@@ -80,10 +77,9 @@ class CanvasLoader {
 	}
 
 	/**
-	 * Builds `elements` under the container `parent`: those whose parent is ""
-	 * go directly in it, the others below them by path. Radio buttons join the
-	 * groups in `radioGroups` by id, which are created if needed. `where` names
-	 * the place in error messages.
+	 * Builds `elements` under the container `parent`; a parent path of "" is
+	 * `parent` itself. Missing radio groups are added to `radioGroups`. `where`
+	 * names the place in error messages.
 	 */
 	public static function buildTree(elements: Array<TElementData>, parent: Element, radioGroups: Map<String, RadioGroup>, where: String): TBuiltTree {
 		var keys: Map<Element, String> = new Map();
@@ -108,7 +104,7 @@ class CanvasLoader {
 			byPath.set(path, element);
 		}
 
-		// Focus links point at elements of the same tree, so they're set once all exist
+		// Focus links are set once every element exists
 		for (data in elements) {
 			var element: Element = byPath.get(joinPath(data.parent, data.key));
 			element.focusUp = resolveFocus(byPath, data.focusUp, where);
@@ -127,7 +123,7 @@ class CanvasLoader {
 		return target;
 	}
 
-	/** The element at `path` below `root`, or null. */
+	// The element at `path` below `root`, or null
 	public static function findByPath(root: Element, keys: Map<Element, String>, path: String): Null<Element> {
 		if (path == "") return null;
 		var current: Element = root;
@@ -145,7 +141,7 @@ class CanvasLoader {
 		return current;
 	}
 
-	/** The path of `element` below `root`: the names from the root down, joined by "/". */
+	// The path of `element` below `root`: the names from the root down, joined by "/"
 	public static function getPath(element: Element, root: Element, keys: Map<Element, String>): String {
 		var names: Array<String> = [];
 		var current: Element = element;

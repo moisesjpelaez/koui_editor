@@ -19,10 +19,10 @@ class TopToolbar {
 	public var snappingEnabled: Bool = false;
 	public var snapValue: Float = 8.0;
 	public var snapMaxValue: Float = 288.0;
-	/** Set while a drag is going on with Ctrl held: snapping is inverted. */
+	// Ctrl held while dragging
 	public var snapInverted: Bool = false;
 
-	/** The snap size steps by this much (Ctrl+[ / Ctrl+]). */
+	// Snap size step, also for Ctrl+[ / Ctrl+]
 	public static inline var SNAP_STEP: Float = 8;
 
 	static inline var TOOLBAR_WIDTH: Int = 378;
@@ -40,7 +40,7 @@ class TopToolbar {
 
 	}
 
-	/** Whether moving elements snaps to the grid right now: the toggle, inverted while Ctrl is held during a drag. */
+	// The toggle, inverted while Ctrl is held during a drag
 	public function isSnapping(): Bool {
 		return snappingEnabled != snapInverted;
 	}
@@ -50,13 +50,13 @@ class TopToolbar {
 		EditorSettings.setSnap(snappingEnabled, snapValue);
 	}
 
-	/** Takes the snapping toggle and size saved in the editor's settings; the size is kept within `snapMaxValue`. */
+	// The toggle and size saved in the editor's settings
 	public function applySavedSnap(): Void {
 		snappingEnabled = EditorSettings.data.snapEnabled;
 		setSnapValue(EditorSettings.data.snapValue);
 	}
 
-	/** Sets the snap size, rounded to a multiple of SNAP_STEP within the slider's range. */
+	// Rounded to a multiple of SNAP_STEP within the slider's range
 	public function setSnapValue(value: Float): Void {
 		value = Math.round(value / SNAP_STEP) * SNAP_STEP;
 		value = Math.max(SNAP_STEP, Math.min(snapMaxValue, value));
@@ -66,7 +66,6 @@ class TopToolbar {
 		EditorSettings.setSnap(snappingEnabled, snapValue);
 	}
 
-	// Wrapper for ZuiUtils.iconButton with local icons
 	function iconButton(ui: Zui, tileX: Int, tileY: Int, tooltip: String, highlight: Bool = false, disabled: Bool = false): Bool {
 		return ZuiUtils.iconButton(ui, icons, tileX, tileY, tooltip, highlight, disabled);
 	}
@@ -74,20 +73,17 @@ class TopToolbar {
 	function hSeparator(ui: Zui, w: Float = 1, spacing: Float = 8): Void {
 		var sepH: Float = BUTTON_SIZE - 8;
 
-		// Add spacing before the line
 		ui._x += spacing;
 
-		// Draw the vertical line
 		var startX: Float = ui._x;
 		var startY: Float = ui._y + (ui.ELEMENT_H() - sepH) / 2;
 		ui.g.color = ui.t.SEPARATOR_COL;
 		ui.g.fillRect(startX, startY, w, sepH);
 
-		// Add spacing after the line
 		ui._x += w + spacing;
 	}
 
-	/** Where the toolbar floats over the canvas, centered at the top, in screen pixels. */
+	// Centered at the top of the canvas, in screen pixels
 	public function getRect(uiBase: UIBase): TScreenRect {
 		var uiScale: Float = uiBase.ui.SCALE();
 		var w: Int = Std.int(TOOLBAR_WIDTH * uiScale);
@@ -109,12 +105,11 @@ class TopToolbar {
 		var centerX: Int = rect.x;
 		var topY: Int = rect.y;
 
-		// Don't fill background, make it floating
+		// Floats over the canvas
 		var savedFillBg: Bool = ui.t.FILL_WINDOW_BG;
 		ui.t.FILL_WINDOW_BG = false;
 
 		if (ui.window(windowHandle, centerX, topY, toolbarWidth, toolbarHeight, false)) {
-			// Center elements vertically within the toolbar
 			var yOffset: Float = (toolbarHeight - buttonSize) / 2;
 			ui._y += yOffset;
 
@@ -124,7 +119,7 @@ class TopToolbar {
 				buttonSize / toolbarWidth,
 				buttonSize / toolbarWidth, (buttonSize * 4) / toolbarWidth]);
 
-			ui._x += 8 * uiScale; // Small padding on the left
+			ui._x += 8 * uiScale;
 			if (iconButton(ui, 3, 1, "Clear Canvas (Ctrl+N)")) {
 				CanvasUtils.clearToEmptyScene();
 			}
@@ -156,7 +151,7 @@ class TopToolbar {
 			if (iconButton(ui, 0, 3, "Toggle Snapping (Shift+S; hold Ctrl while dragging to invert, Shift to lock the axis or keep proportions)", isSnapping())) {
 				toggleSnapping();
 			}
-			ui._x += 4 * uiScale; // Small padding on the left
+			ui._x += 4 * uiScale;
 			snapHandle.value = snapValue;
 			var newSnapValue: Float = ui.slider(snapHandle, "Snap", SNAP_STEP, snapMaxValue, true, 1 / SNAP_STEP, true, Align.Right);
 			if (snapHandle.changed) setSnapValue(newSnapValue);

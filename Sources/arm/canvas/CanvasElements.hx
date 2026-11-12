@@ -18,24 +18,23 @@ import koui.elements.layouts.RowLayout;
 import koui.utils.ElementMatchBehaviour.TypeMatchBehaviour;
 import koui.utils.RadioGroup;
 
-/** How canvases create and save one element type. */
+// How canvases create and save one element type
 typedef TElementType = {
-	/** The saved "type", which is also the Koui class' name. */
+	// The saved "type", which is also the Koui class' name
 	var name: String;
-	/** Creates the element from its saved data; `p` is its "properties". Position, size and the other common fields are set after. */
+	// `p` is the element's "properties"; the common fields are set after
 	var create: (p: Dynamic, data: TElementData, radioGroups: Map<String, RadioGroup>) -> Element;
-	/** The element's "properties" to save. */
+	// The element's "properties" to save
 	var save: Element -> Dynamic;
 }
 
 /**
- * Creates elements from canvas data and saves their type-specific properties.
- * Shared by the editor and the game runtime, so it must not use editor UI code.
- * A new element type is one entry in `types`.
+ * Creates elements from canvas data and saves their own properties. Used by the
+ * game too, so no editor UI code. A new element type is one entry in `types`.
  */
 @:access(koui.Koui, koui.elements.Element)
 class CanvasElements {
-	/** The element types a canvas can contain. */
+	// The element types a canvas can contain
 	public static final types: Array<TElementType> = [
 		{
 			name: "Label",
@@ -137,17 +136,14 @@ class CanvasElements {
 		}
 	];
 
-	/** The saved type of `element`, or null if a canvas can't contain it. */
+	// The saved type of `element`, or null if a canvas can't contain it
 	public static function getType(element: Element): Null<String> {
 		var className: String = Type.getClassName(Type.getClass(element));
 		var name: String = className.substr(className.lastIndexOf(".") + 1);
 		return find(name) != null ? name : null;
 	}
 
-	/**
-	 * Creates an element from its data, or returns null for an unknown type.
-	 * Radio buttons join the group with the saved id, which is created if needed.
-	 */
+	// Null for an unknown type. Radio buttons join their group, which is created if needed
 	public static function create(data: TElementData, radioGroups: Map<String, RadioGroup>): Null<Element> {
 		var type: Null<TElementType> = find(data.type);
 		if (type == null) return null;
@@ -165,20 +161,20 @@ class CanvasElements {
 		return element;
 	}
 
-	/** The type-specific properties of `element`, as saved in the "properties" field. */
+	// The type-specific properties of `element`, as saved in the "properties" field
 	public static function serializeProperties(element: Element): Dynamic {
 		var type: Null<TElementType> = find(getType(element));
 		return type != null ? type.save(element) : {};
 	}
 
-	/** Checks or unchecks `checkbox` (or radio button) and shows it: Koui's isChecked doesn't update the check square. */
+	// Koui's isChecked alone doesn't update the check square
 	public static function setChecked(checkbox: Checkbox, checked: Bool): Void {
 		checkbox.isChecked = checked;
 		var checkSquare: Panel = checkbox.getChild(new TypeMatchBehaviour(Panel));
 		if (checkSquare != null) checkSquare.setContextElement(checked ? "checked" : "");
 	}
 
-	/** The asset name of `image` in `Koui.imageMap`, or "" if it has none. */
+	// The asset name of `image` in `Koui.imageMap`, or "" if it has none
 	public static function getImageName(image: kha.Image): String {
 		if (image == null) return "";
 		for (key in Koui.imageMap.keys()) {

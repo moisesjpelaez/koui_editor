@@ -20,14 +20,13 @@ import koui.theme.Style;
 import zui.Zui;
 import zui.Zui.Handle;
 
-/** The right-hand panel's tabs: the selected elements' properties, plus the Radio Groups and Settings tabs. */
+// The right-hand panel: the selected elements' properties, radio groups and settings
 @:access(koui.Koui, koui.elements.Element, zui.Zui)
 class PropertiesPanel {
 	var tabHandle: Handle;
 	var radioGroupsTab: RadioGroupsTab = new RadioGroupsTab();
 	var settingsTab: SettingsTab = new SettingsTab();
 
-	// Element handles
 	var nameHandle: Handle;
 	var tidHandle: Handle;
 	var posXHandle: Handle;
@@ -49,7 +48,6 @@ class PropertiesPanel {
 	public function new() {
 		tabHandle = new Handle({position: 0});
 
-		// Initialize property handles
 		nameHandle = new Handle({text: ""});
 		tidHandle = new Handle({text: ""});
 		posXHandle = new Handle({text: "0"});
@@ -85,7 +83,7 @@ class PropertiesPanel {
 		var elements: Array<Element> = Selection.elements;
 		var single: Bool = elements.length == 1;
 
-		// The type-specific section only shows when all selected elements share a type
+		// The type's own fields only show when all selected elements share a type
 		var editor: ElementEditor = PropertyFields.shared(elements, e -> ElementRegistry.getForElement(e));
 		if (!single) ui.text('${elements.length} elements selected', Left);
 		ui.text(editor != null ? editor.typeName : "Mixed types", Right);
@@ -96,7 +94,7 @@ class PropertiesPanel {
 
 		if (single) drawKeyField(uiBase, elements[0]);
 
-		// TID: a theme ID the theme doesn't have is rejected
+		// A theme ID the theme doesn't have is rejected
 		PropertyFields.value(ui, tidHandle, "TID", elements, e -> e.getTID(), setTID, s -> s, s -> {
 			if (s != "" && Style.getStyle(s) != null) return s;
 			trace('Error: TID "${s}" not found in theme.');
@@ -120,7 +118,6 @@ class PropertiesPanel {
 			ui.text("Anchor", Left);
 			drawAnchorGrid(ui, placeable);
 
-			// Position - label, X/Y inputs and reset button in one row
 			ui.row([1/4, 5/16, 5/16, 1/8]);
 			ui.text("Position", Left);
 			PropertyFields.int(ui, posXHandle, "X", placeable, e -> e.posX, (e, x) -> e.posX = x);
@@ -130,13 +127,11 @@ class PropertiesPanel {
 			}
 			ui._y += 4;
 
-			// Size - label, W/H inputs and reset button in one row
 			ui.row([1/4, 5/16, 5/16, 1/8]);
 			ui.text("Size", Left);
 			PropertyFields.int(ui, widthHandle, "W", placeable, e -> e.width, (e, w) -> { e.width = w; Koui.updateElementSize(e); });
 			PropertyFields.int(ui, heightHandle, "H", placeable, e -> e.height, (e, h) -> { e.height = h; Koui.updateElementSize(e); });
 			if (ZuiUtils.iconButton(ui, icons, 6, 2, "Reset Size", false, false, 0.7)) {
-				// Each element goes back to the size a new one of its type has
 				PropertyFields.apply("Reset size", placeable, (e, _) -> {
 					var size = ElementRegistry.getForElement(e).resetSize(e);
 					e.width = size.width;
@@ -153,7 +148,7 @@ class PropertiesPanel {
 		if (single && elements[0].canFocus) drawNavigation(ui, elements[0]);
 	}
 
-	/** The Key (name) field of a single element; names are unique among siblings. */
+	// The Key (name) field of a single element; names are unique among siblings
 	function drawKeyField(uiBase: UIBase, element: Element): Void {
 		var ui: Zui = uiBase.ui;
 		var elemName: String = sceneData.getElementKey(element);
@@ -161,13 +156,13 @@ class PropertiesPanel {
 
 		nameHandle.text = elemName;
 		var newName: String = ui.textInput(nameHandle, "Key", Right);
-		// The rename goes to the element it was typed for, even if the selection changed since
+		// The element it was typed for, even if the selection changed since
 		element = PropertyFields.textEditTargets(ui, nameHandle, [element])[0];
 		elemName = sceneData.getElementKey(element);
 		if (nameHandle.changed) {
-			// "/" separates the names in an element's path
+			// "/" separates the names in a path
 			if (elemName != null && newName != null && newName != "" && newName != elemName && newName.indexOf("/") < 0) {
-				// Names are unique among siblings; a taken name gets a free number instead
+				// A taken name gets a free number
 				var uniqueName: String = NameUtils.ensureUniqueName(newName, element, HierarchyUtils.getParentElement(element));
 				if (uniqueName != elemName) {
 					sceneData.updateElementKey(element, uniqueName);
@@ -195,7 +190,7 @@ class PropertiesPanel {
 		ui.text("Navigation", Left);
 		ui.separator();
 
-		// Listed by path and picked by position: names are only unique among siblings
+		// Listed by path: names are only unique among siblings
 		var focusable: Array<Element> = [for (other in sceneData.getElements()) if (other != element && other.canFocus) other];
 		var labels: Array<String> = ["(none)"].concat([for (other in focusable) sceneData.getLabel(other)]);
 
@@ -215,17 +210,15 @@ class PropertiesPanel {
 	}
 
 	function drawAnchorGrid(ui: Zui, elements: Array<Element>) {
-		// No anchor is highlighted when the elements' anchors differ
+		// Null when the anchors differ: none is highlighted
 		var currentAnchor: Null<Anchor> = PropertyFields.shared(elements, e -> e.anchor);
 
-		// Define the anchor positions in a 3x3 grid
 		var anchors = [
 			[Anchor.TopLeft, Anchor.TopCenter, Anchor.TopRight],
 			[Anchor.MiddleLeft, Anchor.MiddleCenter, Anchor.MiddleRight],
 			[Anchor.BottomLeft, Anchor.BottomCenter, Anchor.BottomRight]
 		];
 
-		// Store original colors and sizes
 		var origButtonCol = ui.t.BUTTON_COL;
 		var origButtonHoverCol = ui.t.BUTTON_HOVER_COL;
 		var origButtonPressedCol = ui.t.BUTTON_PRESSED_COL;
@@ -233,13 +226,12 @@ class PropertiesPanel {
 		var origElementH = ui.t.ELEMENT_H;
 		var origElementOffset = ui.t.ELEMENT_OFFSET;
 
-		// Make buttons square and smaller, reduce spacing
+		// Smaller buttons, closer together
 		var buttonSize = Std.int(origButtonH * 0.8);
 		ui.t.BUTTON_H = buttonSize;
 		ui.t.ELEMENT_H = buttonSize;
 		ui.t.ELEMENT_OFFSET = 4;
 
-		// Draw 3 rows
 		for (row in 0...3) {
 			ui.row([1/3, 1/3, 1/3]);
 
@@ -247,19 +239,16 @@ class PropertiesPanel {
 				var anchor = anchors[row][col];
 				var isSelected = (anchor == currentAnchor);
 
-				// Highlight selected anchor with different color
 				if (isSelected) {
 					ui.t.BUTTON_COL = ui.t.HIGHLIGHT_COL;
 					ui.t.BUTTON_HOVER_COL = ui.t.HIGHLIGHT_COL;
 					ui.t.BUTTON_PRESSED_COL = ui.t.HIGHLIGHT_COL;
 				}
 
-				// Use simple icon representation
 				if (ui.button("")) {
 					PropertyFields.apply("Change anchor", elements, (e, a) -> { e.anchor = a; e.invalidateElem(); }, anchor);
 				}
 
-				// Restore colors if they were changed
 				if (isSelected) {
 					ui.t.BUTTON_COL = origButtonCol;
 					ui.t.BUTTON_HOVER_COL = origButtonHoverCol;
@@ -268,7 +257,6 @@ class PropertiesPanel {
 			}
 		}
 
-		// Restore original button height and spacing
 		ui.t.BUTTON_H = origButtonH;
 		ui.t.ELEMENT_H = origElementH;
 		ui.t.ELEMENT_OFFSET = origElementOffset;

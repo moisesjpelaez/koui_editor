@@ -27,7 +27,7 @@ class ImagePanelEditor extends ElementEditor {
 		ui.text("Image Properties", Center);
 		ui.separator();
 
-		// Available images from Koui.imageMap; a missing image shows as "(none)"
+		// A missing image shows as "(none)"
 		var imageNames: Array<String> = ["(none)"];
 		for (key in Koui.imageMap.keys()) {
 			imageNames.push(key);
@@ -50,13 +50,13 @@ class ImagePanelEditor extends ElementEditor {
 		PropertyFields.check(ui, scaleHandle, "Scale to Size", elements, e -> (cast e: ImagePanel).scale, (e, scale) -> (cast e: ImagePanel).scale = scale);
 	}
 
-	/** An ImagePanel with an image goes back to the image's size, in canvas units; without one, to the palette's 32 x 32. */
+	// The image's size, or the palette's 32 x 32 without one
 	override public function resetSize(element: Element): { width: Int, height: Int } {
 		var image: Null<kha.Image> = (cast element: ImagePanel).image;
 		return image != null ? { width: image.width, height: image.height } : defaultSize();
 	}
 
-	/** Shows the image named `name` in `imagePanel`, or no image if `name` is "". */
+	// No image if `name` is ""
 	public function applyImage(imagePanel: ImagePanel, name: String): Void {
 		if (name == "") {
 			imagePanel.image = null;
@@ -67,7 +67,7 @@ class ImagePanelEditor extends ElementEditor {
 			if (img == null) return;
 			imagePanel.image = img;
 		}
-		// A chosen image (or none) replaces a missing one
+		// Replaces a missing image's name
 		CanvasUtils.setImageName(imagePanel, name);
 		Koui.updateElementSize(imagePanel);
 		History.edited("Change image");

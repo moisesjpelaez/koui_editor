@@ -6,19 +6,10 @@ import kha.graphics4.VertexStructure;
 import kha.graphics4.VertexData;
 import kha.Shaders;
 
-/**
- * Utility class for rendering images with proper alpha blending.
- *
- * The default Kha pipeline uses BlendOne which causes transparent areas
- * to show incorrectly. This class provides a pipeline with SourceAlpha
- * blending for proper transparency handling.
- */
+// A pipeline that blends by source alpha: Kha's default (BlendOne) draws transparent areas wrong
 class ImageUtils {
 	static var alphaPipeline: PipelineState = null;
 
-	/**
-	 * Initialize the alpha-blended pipeline. Called automatically on first use.
-	 */
 	static function init(): Void {
 		if (alphaPipeline != null) return;
 
@@ -31,7 +22,6 @@ class ImageUtils {
 		alphaPipeline.fragmentShader = Shaders.painter_image_frag;
 		alphaPipeline.vertexShader = Shaders.painter_image_vert;
 		alphaPipeline.inputLayout = [structure];
-		// Use SourceAlpha blending for proper alpha transparency
 		alphaPipeline.blendSource = BlendingFactor.SourceAlpha;
 		alphaPipeline.blendDestination = BlendingFactor.InverseSourceAlpha;
 		alphaPipeline.alphaBlendSource = BlendingFactor.SourceAlpha;
@@ -39,17 +29,12 @@ class ImageUtils {
 		alphaPipeline.compile();
 	}
 
-	/**
-	 * Get the alpha-blended pipeline for manual use.
-	 */
 	public static function getPipeline(): PipelineState {
 		init();
 		return alphaPipeline;
 	}
 
-	/**
-	 * Helper to get a tile rectangle from an atlas.
-	 */
+	// A tile's rectangle in an atlas
 	public static inline function tile(x: Int, y: Int, ?size: Int = 50): TTileRect {
 		return { x: x * size, y: y * size, w: size, h: size };
 	}

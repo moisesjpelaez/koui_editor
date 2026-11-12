@@ -6,10 +6,8 @@ import koui.elements.RadioButton;
 import koui.utils.RadioGroup;
 
 /**
- * The canvas' radio groups, in `SceneData.data.radioGroups`. Groups are
- * canvas-wide: their buttons can be in any scene. There's always at least one
- * group, the first, which can't be deleted. Edits here don't record undo
- * steps; the callers do, with their own labels.
+ * The canvas' radio groups; their buttons can be in any scene. The first group
+ * always exists. Callers record the undo steps.
  */
 @:access(koui.utils.RadioGroup)
 class RadioGroups {
@@ -23,7 +21,7 @@ class RadioGroups {
 		return null;
 	}
 
-	/** Adds a group named `requestedId`, or "RadioGroup" if it's empty, with a number if the name is taken. */
+	// "RadioGroup" if `requestedId` is empty; a taken name gets a number
 	public static function create(requestedId: String): RadioGroup {
 		var baseId: String = StringTools.trim(requestedId != null ? requestedId : "");
 		if (baseId == "") baseId = "RadioGroup";
@@ -33,7 +31,7 @@ class RadioGroups {
 		return group;
 	}
 
-	/** Deletes `group`; its buttons move to the first group. Returns false for the first group. */
+	// Its buttons move to the first group, which can't be deleted
 	public static function delete(group: RadioGroup): Bool {
 		var index: Int = all.indexOf(group);
 		if (index <= 0) return false;
@@ -43,7 +41,7 @@ class RadioGroups {
 		return true;
 	}
 
-	/** Renames `group`; returns false if `newId` is empty or another group has it. */
+	// False if `newId` is empty or taken
 	public static function rename(group: RadioGroup, newId: String): Bool {
 		var id: String = StringTools.trim(newId);
 		if (id == "" || id == group.id || find(id) != null) return false;
@@ -52,7 +50,7 @@ class RadioGroups {
 		return true;
 	}
 
-	/** Moves `button` into `group`; returns false if it's already there. */
+	// False if it's already there
 	public static function moveButton(button: RadioButton, group: RadioGroup): Bool {
 		if (button.group == group) return false;
 

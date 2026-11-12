@@ -61,11 +61,10 @@ def _make_new_canvas_execute(original):
 
         self.canvas_name = self.canvas_name.replace(' ', '')
 
-        # Create empty canvas JSON file so it shows up in the list
+        # An empty canvas file, so it shows up in the canvas list
         canvas_file = koui_canvas_file(self.canvas_name)
         os.makedirs(os.path.dirname(canvas_file), exist_ok=True)
         if not os.path.exists(canvas_file):
-            # Create a minimal empty canvas with one scene
             render_settings = bpy.context.scene.render
             empty_canvas = {
                 "name": self.canvas_name,
@@ -94,16 +93,13 @@ def _make_new_canvas_execute(original):
                 json.dump(empty_canvas, f, indent=2)
             log.info(f"Koui Editor: Created canvas file '{canvas_file}'")
 
-        # Refresh scripts so the new canvas shows up in the list
         bpy.ops.arm.refresh_scripts()
 
-        # Set the canvas name on the trait
         item = obj.arm_traitlist[obj.arm_traitlist_index]
         item.canvas_name_prop = self.canvas_name
 
         log.info(f"Koui Editor: Created canvas trait '{self.canvas_name}'")
 
-        # Auto-launch Koui Editor for new canvas
         bpy.ops.koui.launch_editor(canvas_name=self.canvas_name)
 
         return {'FINISHED'}
@@ -207,23 +203,18 @@ class KOUI_OT_launch_editor(bpy.types.Operator):
             return {'CANCELLED'}
         os.chdir(krom_location)
 
-        # Ensure canvas_name is not empty
         canvas_name = self.canvas_name if self.canvas_name else "UntitledCanvas"
 
-        # Get project root (respects arm_project_root, falls back to blend file directory).
-        # os.path.normpath resolves any ".." segments (e.g. from a relative arm_project_root
-        # like "//../../") so Krom receives a clean absolute path.
+        # normpath resolves a relative arm_project_root like "//../../"
         project_dir = os.path.normpath(arm.utils.get_fp()) if bpy.data.filepath else os.getcwd()
 
         # The editor reads: [3] canvas name, [4] and [5] resolution, [6] project folder
         cmd = [krom_path, koui_editor_path, koui_editor_path, canvas_name]
 
-        # Pass render resolution
         render_settings = context.scene.render
         cmd.append(str(render_settings.resolution_x))
         cmd.append(str(render_settings.resolution_y))
 
-        # Pass project directory
         cmd.append(project_dir)
 
         if arm.utils.get_os() == 'win':
@@ -271,7 +262,7 @@ def register():
     except Exception as e:
         log.warn(f"Koui Editor: Could not refresh the canvas list: {e}")
 
-    # Ensure Assets/koui_canvas exist and default files are copied on import
+    # The project needs the default theme
     try:
         if bpy.data.filepath:
             setup_assets_dir()
@@ -306,10 +297,9 @@ def setup_assets_dir():
         os.makedirs(theme_dir)
         print(f"Koui Editor: Created Assets/koui_canvas directory")
 
-    # Ensure ui_override.ksn exists in project Assets directory
+    # The default theme, unless the project has its own
     ui_override_project = os.path.join(theme_dir, 'ui_override.ksn')
     if not os.path.exists(ui_override_project):
-        # Copy default from library
         ui_override_default = os.path.join(_KOUI_EDITOR_DIR, 'Assets', 'koui_canvas', 'ui_override.ksn')
         if os.path.exists(ui_override_default):
             import shutil

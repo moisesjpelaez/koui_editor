@@ -19,28 +19,22 @@ import koui.elements.layouts.GridLayout;
 import koui.utils.RadioGroup;
 import koui.utils.SceneManager;
 
+// Loading, saving and pasting canvases, and loading the project's theme, fonts and images
 class CanvasUtils {
-	// Canvas name from command line args (e.g., "MyCanvas")
 	public static var canvasName: String = "UntitledCanvas";
-
-	// Project directory from command line args
 	public static var projectDir: String = "";
 
 	static var sceneData: SceneData = SceneData.data;
 
 	/**
-	 * The name of each ImagePanel's image. Saving uses it rather than looking
-	 * the image object up: reloading the images replaces the objects, and an
-	 * image the project doesn't have has no object.
+	 * Each ImagePanel's image name, saved instead of looking the image up:
+	 * reloading replaces the image objects, and a missing image has none.
 	 */
 	static var imageNames: Map<ImagePanel, String> = new Map();
 
-	/**
-	 * Initializes the canvas name from command line arguments.
-	 * Canvas name (trait name from Blender) is at Arg[3]
-	 */
+	// Reads the canvas name and project folder from the arguments blender.py passes
 	public static function init(): Void {
-		// Args: [0]=krom_path, [1]=assets, [2]=shaders, [3]=canvas_name, [4]=res_x, [5]=res_y, [6]=project_dir
+		// [0] Krom, [1] assets, [2] shaders, [3] canvas name, [4] [5] resolution, [6] project folder
 		var argCount: Int = Krom.getArgCount();
 
 		if (argCount > 3) {
@@ -55,28 +49,21 @@ class CanvasUtils {
 			if (dir != null && dir != "" && !StringTools.startsWith(dir, "--")) {
 				projectDir = StringTools.replace(dir, "/", "\\");
 			}
-		} else { // Fallback for standalone testing
+		} else { // Started without arguments
 			projectDir = StringTools.replace(Krom.getFilesLocation(), "/", "\\") + "/../../..";
 		}
 	}
 
-	/**
-	 * The editor's own data folder (tools/<backend>/data), for files that
-	 * belong to the editor rather than to the game: settings and scratch files.
-	 */
+	// The editor's own data folder (tools/<backend>/data), for its settings and scratch files
 	public static function editorDataDir(): String {
 		return Krom.getFilesLocation() + "/data";
 	}
 
-	/**
-	 * Gets the full path for the canvas JSON file.
-	 * Path: Bundled/koui_canvas/[canvasName].json
-	 */
 	public static function getCanvasPath(): String {
 		return projectDir + "/Bundled/koui_canvas/" + canvasName + ".json";
 	}
 
-	/** The name of the image `panel` shows (or would show, if the project has it), or "" for none. */
+	// The name of the image `panel` shows, or would show if the project had it; "" for none
 	public static function getImageName(panel: ImagePanel): String {
 		var name: Null<String> = imageNames.get(panel);
 		return name != null ? name : CanvasElements.getImageName(panel.image);
@@ -86,22 +73,16 @@ class CanvasUtils {
 		imageNames.set(panel, name);
 	}
 
-	/** Whether `panel` names an image the project doesn't have. */
+	// Whether `panel` names an image the project doesn't have
 	public static function isImageMissing(panel: ImagePanel): Bool {
 		var name: String = getImageName(panel);
 		return name != "" && Koui.getImage(name) == null;
 	}
 
-	/**
-	 * Gets the directory path for canvas files.
-	 */
 	public static function getCanvasDir(): String {
 		return projectDir + "/Bundled/koui_canvas";
 	}
 
-	/**
-	 * Ensures the koui_canvas directory exists by creating it if needed.
-	 */
 	public static function ensureCanvasDir(): Void {
 		var dir: String = getCanvasDir();
 		var cmd: String = kha.System.systemId == "Windows"
@@ -110,10 +91,7 @@ class CanvasUtils {
 		Krom.sysCommand(cmd);
 	}
 
-	/**
-	 * Reloads the theme from the project's Assets/ui_override.ksn file.
-	 * Also loads any custom fonts referenced in the theme from Assets/fonts/.
-	 */
+	// Reloads the project's fonts, images and theme (Assets/koui_canvas/ui_override.ksn)
 	public static function refreshTheme(): Void {
 		var assetsPath: String = projectDir + "/Assets/koui_canvas/ui_override.ksn";
 		var blob: js.lib.ArrayBuffer = Krom.loadBlob(assetsPath);
@@ -121,13 +99,12 @@ class CanvasUtils {
 		if (blob != null) {
 			var themeContent: String = haxe.io.Bytes.ofData(blob).toString();
 
-			// Load all fonts and images from Assets/ directory first
+			// The theme can use the fonts and images, so they load first
 			loadAllFonts(function() {
 				loadAllImages(function() {
-					// After assets are loaded, apply the theme
 					var error: String = koui.theme.RuntimeThemeLoader.parseAndApply(themeContent);
 
-					// The images were loaded again as new objects: panels show the new ones, and missing ones that now exist
+					// Panels show the reloaded images, including ones that were missing before
 					for (panel => name in imageNames) {
 						var image: kha.Image = name != "" ? Koui.getImage(name) : null;
 						if (image != null) panel.image = image;
@@ -143,18 +120,13 @@ class CanvasUtils {
 		}
 	}
 
-	/**
-	 * Normalizes a filename to an asset name (like Kha does).
-	 * Replaces hyphens, dots, spaces and other special characters with underscores.
-	 */
+	// The asset name Kha gives a file: no extension, and characters other than letters, digits and "_" become "_"
 	static function normalizeAssetName(filename: String): String {
-		// Remove extension
 		var name: String = filename;
 		var dotIdx: Int = name.lastIndexOf(".");
 		if (dotIdx >= 0) {
 			name = name.substring(0, dotIdx);
 		}
-		// Replace special characters with underscores (matching Kha's behavior)
 		var result: StringBuf = new StringBuf();
 		for (i in 0...name.length) {
 			var c: String = name.charAt(i);
@@ -167,18 +139,14 @@ class CanvasUtils {
 		return result.toString();
 	}
 
-	/**
-	 * Loads all fonts from the project's Assets/fonts/ directory.
-	 * Each font is registered in Koui.fontMap with its normalized name.
-	 * @param done Callback when all fonts are loaded
-	 */
+	// Loads the fonts in Assets/fonts into Koui.fontMap, by asset name, then calls `done`
 	static function loadAllFonts(done: Void->Void): Void {
 		var fontsDir: String = projectDir + "/Assets/fonts";
 		if (kha.System.systemId == "Windows") {
 			fontsDir = StringTools.replace(fontsDir, "/", "\\");
 		}
 
-		// Use system command to list font files
+		// Krom can't list a folder: a shell command writes the list to a file
 		var listFile: String = editorDataDir() + "/_fontlist.txt";
 		if (kha.System.systemId == "Windows") {
 			listFile = StringTools.replace(listFile, "/", "\\");
@@ -186,7 +154,6 @@ class CanvasUtils {
 
 		var cmd: String;
 		if (kha.System.systemId == "Windows") {
-			// List .ttf and .otf files, output just filenames
 			cmd = 'cmd /c dir /b "' + fontsDir + '\\*.ttf" "' + fontsDir + '\\*.otf" > "' + listFile + '" 2>nul';
 		} else {
 			cmd = 'ls -1 "' + fontsDir + '"/*.ttf "' + fontsDir + '"/*.otf > "' + listFile + '" 2>/dev/null || true';
@@ -194,7 +161,6 @@ class CanvasUtils {
 
 		Krom.sysCommand(cmd);
 
-		// Read the list file
 		var listBlob: js.lib.ArrayBuffer = Krom.loadBlob(listFile);
 		if (listBlob == null) {
 			done();
@@ -208,7 +174,7 @@ class CanvasUtils {
 			var trimmed: String = StringTools.trim(line);
 			var lower: String = trimmed.toLowerCase();
 			if (trimmed.length > 0 && (StringTools.endsWith(lower, ".ttf") || StringTools.endsWith(lower, ".otf"))) {
-				// On Windows, dir /b gives just filename; on Linux ls -1 gives full path
+				// dir /b lists file names, ls full paths
 				var filename: String = trimmed;
 				var slashIdx: Int = Std.int(Math.max(filename.lastIndexOf("/"), filename.lastIndexOf("\\")));
 				if (slashIdx >= 0) {
@@ -229,7 +195,6 @@ class CanvasUtils {
 			var assetName: String = normalizeAssetName(filename);
 			var fontPath: String = fontsDir + (kha.System.systemId == "Windows" ? "\\" : "/") + filename;
 
-			// Capture in closure
 			var name: String = assetName;
 			kha.Assets.loadFontFromPath(fontPath, function(font: kha.Font) {
 				if (font != null) {
@@ -246,18 +211,13 @@ class CanvasUtils {
 		}
 	}
 
-	/**
-	 * Loads all images from the project's Assets/ directory and subdirectories.
-	 * Each image is registered in Koui.imageMap with its normalized filename (matching Kha's behavior).
-	 * @param done Callback when all images are loaded
-	 */
+	// Loads the images in Assets and its subfolders into Koui.imageMap, by asset name, then calls `done`
 	static function loadAllImages(done: Void->Void): Void {
 		var assetsDir: String = projectDir + "/Assets";
 		if (kha.System.systemId == "Windows") {
 			assetsDir = StringTools.replace(assetsDir, "/", "\\");
 		}
 
-		// Use system command to list image files recursively
 		var listFile: String = editorDataDir() + "/_imagelist.txt";
 		if (kha.System.systemId == "Windows") {
 			listFile = StringTools.replace(listFile, "/", "\\");
@@ -265,16 +225,13 @@ class CanvasUtils {
 
 		var cmd: String;
 		if (kha.System.systemId == "Windows") {
-			// List image files recursively with relative paths using /s and /b flags
 			cmd = 'cmd /c dir /b /s "' + assetsDir + '\\*.png" "' + assetsDir + '\\*.jpg" "' + assetsDir + '\\*.k" > "' + listFile + '" 2>nul';
 		} else {
-			// Use find to recursively list image files
 			cmd = 'find "' + assetsDir + '" -type f \\( -iname "*.png" -o -iname "*.jpg" -o -iname "*.k" \\) > "' + listFile + '" 2>/dev/null || true';
 		}
 
 		Krom.sysCommand(cmd);
 
-		// Read the list file
 		var listBlob: js.lib.ArrayBuffer = Krom.loadBlob(listFile);
 		if (listBlob == null) {
 			done();
@@ -282,9 +239,8 @@ class CanvasUtils {
 		}
 
 		var listContent: String = haxe.io.Bytes.ofData(listBlob).toString();
-		var imageFiles: Array<String> = [];  // Stores relative paths from assetsDir
+		var imageFiles: Array<String> = []; // Relative to assetsDir
 
-		// Get the base path length to calculate relative paths
 		var basePath: String = assetsDir + (kha.System.systemId == "Windows" ? "\\" : "/");
 		var baseLen: Int = basePath.length;
 
@@ -293,7 +249,6 @@ class CanvasUtils {
 			if (trimmed.length > 0) {
 				var lower: String = trimmed.toLowerCase();
 				if (StringTools.endsWith(lower, ".png") || StringTools.endsWith(lower, ".jpg") || StringTools.endsWith(lower, ".k")) {
-					// Extract relative path from the full path
 					var relativePath: String = trimmed;
 					if (StringTools.startsWith(trimmed, basePath) || StringTools.startsWith(trimmed, assetsDir)) {
 						relativePath = trimmed.substring(baseLen);
@@ -311,13 +266,12 @@ class CanvasUtils {
 		var remaining: Int = imageFiles.length;
 
 		for (filename in imageFiles) {
-			// Extract just the filename (without directory) for normalization - matches Kha's behavior
+			// Kha names images by file name, without the folder
 			var slashIdx: Int = Std.int(Math.max(filename.lastIndexOf("/"), filename.lastIndexOf("\\")));
 			var justFilename: String = slashIdx >= 0 ? filename.substring(slashIdx + 1) : filename;
 			var assetName: String = normalizeAssetName(justFilename);
 			var imagePath: String = assetsDir + (kha.System.systemId == "Windows" ? "\\" : "/") + filename;
 
-			// Capture in closure
 			var name: String = assetName;
 			kha.Assets.loadImageFromPath(imagePath, false, function(image: kha.Image) {
 				if (image != null) {
@@ -334,9 +288,6 @@ class CanvasUtils {
 		}
 	}
 
-	/**
-	 * Saves the current canvas to Bundled/koui_canvas/[canvasName].json
-	 */
 	public static function saveCanvas(): Void {
 		ensureCanvasDir();
 
@@ -353,10 +304,7 @@ class CanvasUtils {
 		}
 	}
 
-	/**
-	 * Loads the canvas from Bundled/koui_canvas/[canvasName].json if it exists.
-	 * If the file can't be loaded, the current canvas is kept.
-	 */
+	// Loads the canvas file; if it can't be loaded, the current canvas stays
 	public static function loadCanvas(): Void {
 		var blob: js.lib.ArrayBuffer = Krom.loadBlob(getCanvasPath());
 		if (blob == null) {
@@ -375,18 +323,12 @@ class CanvasUtils {
 		SceneEvents.canvasLoaded.emit();
 	}
 
-	/**
-	 * Serializes the current canvas state to a TCanvasData structure.
-	 */
 	public static function serializeCanvas(): TCanvasData {
 		var scenesData: Array<TSceneData> = [];
-
-		// Serialize each scene
 		for (scene in sceneData.scenes) {
 			scenesData.push(serializeScene(scene));
 		}
 
-		// Get canvas dimensions from current scene's root
 		var currentRoot: AnchorPane = sceneData.currentScene != null ? sceneData.currentScene.root : null;
 		var canvasWidth: Int = currentRoot != null ? currentRoot.width : 800;
 		var canvasHeight: Int = currentRoot != null ? currentRoot.height : 600;
@@ -410,18 +352,12 @@ class CanvasUtils {
 		};
 	}
 
-	/**
-	 * Serializes a single scene to TSceneData.
-	 */
 	static function serializeScene(scene: TSceneEntry): TSceneData {
 		var elementsData: Array<TElementData> = [];
-
-		// Serialize elements in hierarchy order (depth-first traversal), parents first
 		serializeChildren(scene.root, "", scene, true, elementsData);
 
 		return {
 			key: scene.key,
-			// The scene shown when loading is the one shown when saving
 			active: scene == sceneData.currentScene,
 			elements: elementsData
 		};
@@ -434,7 +370,7 @@ class CanvasUtils {
 		}];
 	}
 
-	/** Where `element` is in the canvas, or null if it is not in any scene. */
+	// Where `element` is in the canvas, or null if it is not in any scene
 	static function findElementRef(element: Null<Element>): Null<TElementRef> {
 		if (element == null) return null;
 		for (scene in sceneData.scenes) {
@@ -445,10 +381,7 @@ class CanvasUtils {
 		return null;
 	}
 
-	/**
-	 * Serializes the elements inside `parent`, and theirs, in hierarchy order.
-	 * `parentPath` is the path saved as the children's parent.
-	 */
+	// Serializes everything inside `parent`, parents before their children. `parentPath` is saved as the children's parent
 	static function serializeChildren(parent: Element, parentPath: String, scene: TSceneEntry, withFocus: Bool, output: Array<TElementData>): Void {
 		for (child in sceneData.getChildren(parent, scene)) {
 			var elementData: Null<TElementData> = serializeElement(child, scene.keys.get(child), parentPath, scene, withFocus);
@@ -459,10 +392,7 @@ class CanvasUtils {
 		}
 	}
 
-	/**
-	 * Serializes a single element. Returns null (and skips its children) for a
-	 * type a canvas can't contain.
-	 */
+	// Null for a type a canvas can't contain; its children are skipped too
 	static function serializeElement(element: Element, key: String, parentPath: String, scene: TSceneEntry, withFocus: Bool): Null<TElementData> {
 		var type: Null<String> = CanvasElements.getType(element);
 		if (type == null) {
@@ -498,10 +428,7 @@ class CanvasUtils {
 		};
 	}
 
-	/**
-	 * Rebuilds the editor from `canvasData`. Throws if the data can't be loaded,
-	 * before anything is changed, so the current canvas is kept.
-	 */
+	// Throws before changing anything if `canvasData` can't be loaded
 	static function deserializeCanvas(canvasData: TCanvasData): Void {
 		checkBuildable(canvasData);
 		rebuildCanvas(canvasData, null);
@@ -514,29 +441,26 @@ class CanvasUtils {
 		}
 	}
 
-	/** If `data` is an ImagePanel, remembers its image's name for saving. */
+	// If `data` is an ImagePanel, remembers its image's name for saving
 	static function rememberImageName(element: Null<Element>, data: TElementData): Void {
 		if (element == null || data.type != "ImagePanel") return;
 		imageNames.set(cast element, data.properties.imageName);
 	}
 
 	/**
-	 * Replaces the editor's canvas with `canvasData`, which must be valid, and
-	 * shows the scene `sceneKey` (or the one saved as shown if it is null).
-	 * Used by loading and by undo/redo.
+	 * Replaces the canvas with `canvasData`, which must be valid, and shows the
+	 * scene `sceneKey`, or the one saved as active if null. Used by loading and undo.
 	 */
 	public static function rebuildCanvas(canvasData: TCanvasData, sceneKey: Null<String>): Void {
-		// Remove and free the existing scenes
 		clearCanvas();
 
-		// Load canvas settings
 		CanvasSettings.expandOnResize = canvasData.canvas.settings.expandOnResize;
 		CanvasSettings.scaleOnResize = canvasData.canvas.settings.scaleOnResize;
 		CanvasSettings.autoScale = canvasData.canvas.settings.autoScale;
 		CanvasSettings.scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
 		CanvasSettings.scaleVertical = canvasData.canvas.settings.scaleVertical;
 
-		// Each scene is built into an editor scene (KouiEditor.onSceneAdded sets it up)
+		// KouiEditor.onSceneAdded makes each scene's root
 		var built: TBuiltCanvas = CanvasLoader.buildCanvas(canvasData, key -> {
 			SceneEvents.sceneAdded.emit(key);
 			return sceneData.currentScene.root;
@@ -553,11 +477,10 @@ class CanvasUtils {
 			}
 		}
 
-		// Radio groups are shared by all scenes; the editor always has at least one
+		// The editor always has a radio group and a scene
 		if (built.radioGroups.length == 0) built.radioGroups.push(new RadioGroup("RadioGroup"));
 		sceneData.radioGroups = built.radioGroups;
 
-		// If no scenes were loaded, create a default scene
 		if (sceneData.scenes.length == 0) {
 			SceneEvents.sceneAdded.emit(SceneData.FIRST_SCENE);
 		}
@@ -568,7 +491,7 @@ class CanvasUtils {
 		Selection.clear();
 	}
 
-	/** Builds `canvasData` into throwaway panes, so invalid data throws before the editor is changed. */
+	// Builds `canvasData` into throwaway panes, so invalid data throws before the editor is changed
 	static function checkBuildable(canvasData: TCanvasData): Void {
 		var roots: Array<AnchorPane> = [];
 		var makeRoot = key -> {
@@ -586,9 +509,8 @@ class CanvasUtils {
 	}
 
 	/**
-	 * Serializes an element and all its user-facing children into a flat array.
-	 * The element's parent is saved as "", its children's parents as paths
-	 * starting at the element. Focus links are not copied.
+	 * An element and everything inside it, for the clipboard: the element's
+	 * parent is "", the others' paths start at it. Focus links are left out.
 	 */
 	public static function serializeElementTree(element: Element): Array<TElementData> {
 		var result: Array<TElementData> = [];
@@ -605,17 +527,13 @@ class CanvasUtils {
 	}
 
 	/**
-	 * Pastes elements from clipboard data into the current scene and returns
-	 * the root of each pasted tree. Creates new elements with unique names and
-	 * restores parent-child relationships. If targetParent is a container, each
-	 * copied tree is pasted into it, otherwise into the scene. Pasted trees are
-	 * offset by 10 units, except in grid cells.
+	 * Pastes clipboard data into `targetParent` if it's a container, otherwise
+	 * into the scene, and returns the root of each pasted tree.
 	 */
 	public static function pasteElements(clipboardData: Array<TElementData>, ?targetParent: Element): Array<Element> {
 		var scene = sceneData.currentScene;
 		if (scene == null || clipboardData.length == 0) return [];
 
-		// Determine where to paste the root element
 		var pasteParent: Element = HierarchyUtils.canAcceptChild(targetParent) ? targetParent : scene.root;
 
 		// Pasted radio buttons join the canvas' groups
@@ -630,7 +548,7 @@ class CanvasUtils {
 		}
 
 		for (tree in trees) {
-			// Pasted next to the original, except in a Row/Col cell, without changing the clipboard
+			// Offset from the original, except in a Row/Col cell; the clipboard isn't changed
 			var rootData: TElementData = Reflect.copy(tree[0]);
 			if (!Std.isOfType(pasteParent, GridLayout)) {
 				rootData.posX += 10;
@@ -638,8 +556,7 @@ class CanvasUtils {
 			}
 			tree[0] = rootData;
 
-			// Names are unique among siblings: the tree's root gets a free name in the container
-			// it's pasted into (before it's there); the elements inside it keep theirs
+			// The root gets a free name among its new siblings; the elements inside it keep theirs
 			var rootKey: String = NameUtils.nextUniqueName(rootData.key, NameUtils.getSiblingNames(null, pasteParent));
 			var built: TBuiltTree = CanvasLoader.buildTree(tree, pasteParent, radioGroupMap, "pasted elements");
 			var pastedRoot: Element = built.byPath.get(rootData.key);
@@ -656,17 +573,13 @@ class CanvasUtils {
 		return pastedRoots;
 	}
 
-	/**
-	 * Removes all scenes and frees their elements, leaving no scene. Callers
-	 * create or load scenes right after.
-	 */
+	// Removes and frees every scene, leaving none; callers add or load scenes right after
 	public static function clearCanvas(): Void {
 		for (scene in sceneData.scenes) {
 			SceneManager.removeScene(scene.key);
 			scene.root.destroy();
 		}
 
-		// Clear the scenes array and reset current scene
 		sceneData.scenes.resize(0);
 		sceneData.currentScene = null;
 		imageNames.clear();
@@ -674,7 +587,7 @@ class CanvasUtils {
 		Selection.clear();
 	}
 
-	/** The toolbar's Clear Canvas: removes everything and leaves one empty scene, as one undoable step. */
+	// Clear Canvas: leaves one empty scene, as one undo step
 	public static function clearToEmptyScene(): Void {
 		clearCanvas();
 		SceneEvents.sceneAdded.emit(SceneData.FIRST_SCENE);

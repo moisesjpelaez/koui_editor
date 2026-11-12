@@ -9,7 +9,7 @@ import arm.types.Enums;
 import zui.Zui;
 import zui.Zui.Handle;
 
-/** The Properties panel's Settings tab: the editor's UI scale and the canvas' window resize settings. */
+// The Settings tab of the Properties panel: the editor's UI scale and the canvas' resize settings
 @:access(zui.Zui)
 class SettingsTab {
 	var uiScaleHandle: Handle = new Handle({value: 1.0});
@@ -25,7 +25,6 @@ class SettingsTab {
 		ui.text("Editor UI", Center);
 		ui.separator();
 
-		// The scale is applied when Zui is made (UIBase) and here when it changes
 		uiScaleHandle.value = EditorSettings.getEditorUIScale();
 		var scale: Float = ui.slider(uiScaleHandle, "Scale", 0.5, 4.0, true, 100, true, Right);
 		if (uiScaleHandle.changed && !Math.isNaN(scale)) {
@@ -40,7 +39,7 @@ class SettingsTab {
 		ui.text("On Window Resize", Center);
 		ui.separator();
 
-		// The checkboxes show the canvas' settings, which loading and undo change
+		// Loading and undo change the settings
 		expandOnResizeHandle.selected = CanvasSettings.expandOnResize;
 		scaleOnResizeHandle.selected = CanvasSettings.scaleOnResize;
 		CanvasSettings.expandOnResize = ui.check(expandOnResizeHandle, "Expand");

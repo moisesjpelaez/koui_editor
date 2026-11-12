@@ -18,46 +18,28 @@ import koui.utils.SceneManager;
 
 
 /**
- * Runtime trait for loading and displaying Koui canvases.
- * Attach this trait to a game object in Blender to render a UI canvas.
+ * Loads a canvas saved by the Koui Editor and shows its scenes.
  *
- * Unlike Armory2D's immediate mode canvas, Koui uses retained mode:
- * - Elements are created once from JSON and persist in memory
- * - Direct property modification on elements (no handle lookups)
- * - Better performance for complex UIs
- *
- * Supports multiple scenes within a single canvas. Use setScene() to switch
- * between scenes at runtime. On load, the scene saved as active is shown, or
- * the first scene if none is.
- *
- * Note: Koui is started and drawn by the code that the koui_editor library's
- * armory_hooks.py adds to Main.hx; this trait only builds the canvas.
+ * The scene saved as active is shown first; `setScene` switches scenes.
+ * Koui itself is started and drawn by the code armory_hooks.py adds to
+ * Main.hx; this trait only builds the canvas.
  */
 @:access(koui.Koui, koui.elements.Element, koui.elements.layouts.GridLayout)
 class KouiCanvas extends Trait {
-	/** The canvas name (without .json extension) */
+	// The canvas name, without ".json"
 	public var cnvName: String;
 
-	/** All scenes in this canvas */
 	private var scenes: Map<String, TBuiltScene>;
-
-	/** Global radio groups shared across all scenes */
+	// Shared by all scenes
 	private var radioGroups: Map<String, RadioGroup>;
-
-	/** The currently active scene */
 	private var currentScene: TBuiltScene;
 
-	/** Whether the canvas has finished loading */
 	public var ready(get, null): Bool;
 	private function get_ready(): Bool { return currentScene != null; }
 
-	/** Callbacks to execute when canvas is ready */
 	private var onReadyFuncs: Array<Void->Void> = null;
-
-	/** Whether the canvas is visible */
 	private var canvasVisible: Bool = true;
 
-	// Settings
 	var expandOnResize: Bool = false;
 	var scaleOnResize: Bool = false;
 	var scaleHorizontal: Bool = false;
@@ -66,10 +48,6 @@ class KouiCanvas extends Trait {
 	var baseH: Int = 576;
 	var baseW: Int = 1024;
 
-	/**
-	 * Create a new KouiCanvas trait.
-	 * @param canvasName Name of the canvas (without .json extension)
-	 */
 	public function new(canvasName: String) {
 		super();
 
@@ -80,7 +58,7 @@ class KouiCanvas extends Trait {
 		radioGroups = new Map();
 
 		notifyOnInit(function() {
-			// Loaded through Kha rather than Iron's Data.getBlob, which doesn't report a missing file
+			// Kha rather than Iron's Data.getBlob, which doesn't report a missing file
 			var path: String = @:privateAccess iron.data.Data.resolvePath(canvasName + ".json");
 			kha.Assets.loadBlobFromPath(path, function(blob: kha.Blob) {
 				var canvasData: TCanvasData = null;
@@ -113,7 +91,7 @@ class KouiCanvas extends Trait {
 	function render2D(g: kha.graphics2.Graphics): Void {
 		if (!ready) return;
 
-		// Execute ready callbacks (once per callback), also while the canvas is hidden
+		// Each callback runs once, also while the canvas is hidden
 		if (onReadyFuncs != null && onReadyFuncs.length > 0) {
 			for (f in onReadyFuncs) {
 				f();
@@ -126,7 +104,7 @@ class KouiCanvas extends Trait {
 		clearCanvas();
 	}
 
-	/** Removes and frees this canvas' scenes (only its own: other canvases keep theirs). */
+	// Removes and frees this canvas' scenes; other canvases keep theirs
 	function clearCanvas(): Void {
 		for (scene in scenes) {
 			SceneManager.removeScene(scene.key);
@@ -138,11 +116,7 @@ class KouiCanvas extends Trait {
 		if (expandOnResize) App.resized.disconnect(onAppResized);
 	}
 
-	/**
-	 * Build the canvas from parsed JSON data.
-	 */
 	private function buildCanvas(canvasData: TCanvasData): Void {
-		// Settings
 		expandOnResize = canvasData.canvas.settings.expandOnResize;
 		scaleOnResize = canvasData.canvas.settings.scaleOnResize;
 		scaleHorizontal = canvasData.canvas.settings.scaleHorizontal;
@@ -154,7 +128,7 @@ class KouiCanvas extends Trait {
 			onAppResized(App.w(), App.h());
 		}
 
-		// An ImagePanel shows nothing if its image isn't loaded (e.g. with Assets.loadEverything) before the canvas
+		// An ImagePanel shows nothing if its image isn't loaded before the canvas
 		var reported: Array<String> = [];
 		for (sceneData in canvasData.scenes) {
 			for (element in sceneData.elements) {
@@ -166,7 +140,7 @@ class KouiCanvas extends Trait {
 			}
 		}
 
-		// Each scene is built into a Koui scene; registered first, so one that fails to build is still cleaned up
+		// Scenes are registered before they're built, so one that fails to build is still cleaned up
 		var built: TBuiltCanvas = CanvasLoader.buildCanvas(canvasData, key -> {
 			var scene: TBuiltScene = { key: key, root: null, keys: new Map() };
 			scenes.set(key, scene);
@@ -179,7 +153,7 @@ class KouiCanvas extends Trait {
 		for (scene in built.scenes) scenes.set(scene.key, scene);
 		for (group in built.radioGroups) radioGroups.set(group.id, group);
 
-		// The scene saved as active, or the first one: the editor always saves one, a hand-edited file might not
+		// The first scene if none is saved as active (a hand-edited file)
 		var activeScene: Null<String> = built.activeScene != null ? built.activeScene : (built.scenes.length > 0 ? built.scenes[0].key : null);
 		if (activeScene != null) setScene(activeScene);
 	}
@@ -199,32 +173,15 @@ class KouiCanvas extends Trait {
 		Koui.onResize(w, h);
 	}
 
-	// =========================================================================
-	// Public API
-	// =========================================================================
-
-	/**
-	 * Register a callback to be executed when the canvas is ready.
-	 * If the canvas is already ready, the callback is executed on the next render.
-	 *
-	 * @param f Callback function
-	 */
+	// Calls `f` once the canvas is loaded; if it already is, on the next frame
 	public function notifyOnReady(f: Void->Void): Void {
 		if (onReadyFuncs == null) onReadyFuncs = [];
 		onReadyFuncs.push(f);
 	}
 
-	// -------------------------------------------------------------------------
-	// Scene Management
-	// -------------------------------------------------------------------------
+	// Scenes
 
-	/**
-	 * Switch to a different scene by name.
-	 * The previous scene is hidden and the new scene is shown.
-	 *
-	 * @param sceneName The name of the scene to switch to
-	 * @return True if the scene was found and switched, false otherwise
-	 */
+	// Shows the scene `sceneName` instead of the current one. Returns false if there is no such scene
 	public function setScene(sceneName: String): Bool {
 		var scene: TBuiltScene = scenes.get(sceneName);
 		if (scene == null) {
@@ -239,20 +196,11 @@ class KouiCanvas extends Trait {
 		return true;
 	}
 
-	/**
-	 * Get the name of the currently active scene.
-	 *
-	 * @return The current scene name, or null if no scene is active
-	 */
+	// The current scene's name, or null if no scene is shown
 	public function getCurrentSceneName(): Null<String> {
 		return currentScene != null ? currentScene.key : null;
 	}
 
-	/**
-	 * Get all scene names in this canvas.
-	 *
-	 * @return Array of scene names
-	 */
 	public function getSceneNames(): Array<String> {
 		var names: Array<String> = [];
 		for (key in scenes.keys()) {
@@ -261,21 +209,12 @@ class KouiCanvas extends Trait {
 		return names;
 	}
 
-	// -------------------------------------------------------------------------
-	// Element Access
-	// -------------------------------------------------------------------------
+	// Elements
 
 	/**
-	 * Get an element by its path: the element names from the scene root down,
-	 * joined by "/".
-	 *
-	 * - "player_ui" (an element directly in the scene root)
-	 * - "player_ui/health_bar" (nested element)
-	 * - "menu/buttons/play_button" (nested deeper)
-	 *
-	 * @param path The element's path
-	 * @param sceneName The scene to look in; the current scene if omitted
-	 * @return The element, or null if not found
+	 * The element at `path`: the names from the scene root down, joined by "/"
+	 * (e.g. "menu/buttons/play"). Looks in the current scene if `sceneName`
+	 * is omitted. Returns null if not found.
 	 */
 	public function getElement(path: String, ?sceneName: String): Null<Element> {
 		var scene: TBuiltScene = getSceneForAccess(sceneName);
@@ -289,19 +228,12 @@ class KouiCanvas extends Trait {
 	}
 
 	/**
-	 * Get an element by its path, cast to a specific type.
-	 * Returns null if the element doesn't exist or isn't of the requested type.
+	 * Like `getElement`, cast to `cls`; null if the element isn't one.
 	 *
-	 * Example:
 	 * ```haxe
-	 * var button = canvas.getElementAs(Button, "menu/buttons/play_button");
+	 * var button = canvas.getElementAs(Button, "menu/buttons/play");
 	 * var score = canvas.getElementAs(Label, "score", "hud");
 	 * ```
-	 *
-	 * @param cls The class type to cast to
-	 * @param path The element's path
-	 * @param sceneName The scene to look in; the current scene if omitted
-	 * @return The element cast to type T, or null
 	 */
 	public function getElementAs<T: Element>(cls: Class<T>, path: String, ?sceneName: String): Null<T> {
 		var element: Element = getElement(path, sceneName);
@@ -311,13 +243,7 @@ class KouiCanvas extends Trait {
 		return casted;
 	}
 
-	/**
-	 * Get all element paths in a scene (e.g., "player_ui/health_bar").
-	 * Elements directly in the scene root return just their name.
-	 *
-	 * @param sceneName The scene to list; the current scene if omitted
-	 * @return Array of all element paths
-	 */
+	// The paths of all elements in a scene, the current one if `sceneName` is omitted
 	public function getElementKeys(?sceneName: String): Array<String> {
 		var scene: TBuiltScene = getSceneForAccess(sceneName);
 		if (scene == null) return [];
@@ -326,24 +252,18 @@ class KouiCanvas extends Trait {
 		return paths;
 	}
 
-	/**
-	 * Internal helper to recursively collect element paths.
-	 */
 	private function collectElementPaths(scene: TBuiltScene, parent: Element, parentPath: String, output: Array<String>): Void {
 		for (child in HierarchyUtils.getChildren(parent)) {
 			var childKey = scene.keys.get(child);
 			if (childKey == null) continue;
 
-			// Build the full path
 			var fullPath = CanvasLoader.joinPath(parentPath, childKey);
 			output.push(fullPath);
-
-			// Recursively collect from this child's children
 			collectElementPaths(scene, child, fullPath, output);
 		}
 	}
 
-	/** The named scene, or the current one if `sceneName` is null; traces why if there is none. */
+	// The named scene, or the current one if `sceneName` is null; traces why if there is none
 	private function getSceneForAccess(sceneName: Null<String>): Null<TBuiltScene> {
 		if (sceneName == null) {
 			if (currentScene == null) trace('[KouiCanvas] No scene active');
@@ -354,16 +274,9 @@ class KouiCanvas extends Trait {
 		return scene;
 	}
 
-	// -------------------------------------------------------------------------
-	// Canvas Properties
-	// -------------------------------------------------------------------------
+	// Canvas
 
-	/**
-	 * Set whether the canvas is visible.
-	 * Invisible canvases are not rendered and don't process events.
-	 *
-	 * @param visible Whether the canvas should be visible
-	 */
+	// A hidden canvas isn't drawn and doesn't get input
 	public function setCanvasVisible(visible: Bool): Void {
 		canvasVisible = visible;
 		if (currentScene != null && currentScene.root != null) {
@@ -371,21 +284,11 @@ class KouiCanvas extends Trait {
 		}
 	}
 
-	/**
-	 * Get whether the canvas is visible.
-	 *
-	 * @return Whether the canvas is visible
-	 */
 	public function getCanvasVisible(): Bool {
 		return canvasVisible;
 	}
 
-	/**
-	 * Set the canvas dimensions for all scenes.
-	 *
-	 * @param width The new width
-	 * @param height The new height
-	 */
+	// Sets the size of every scene
 	public function setCanvasDimensions(width: Int, height: Int): Void {
 		for (scene in scenes) {
 			if (scene.root != null) {
@@ -395,36 +298,24 @@ class KouiCanvas extends Trait {
 		}
 	}
 
-	/**
-	 * Get the root AnchorPane of the current scene.
-	 *
-	 * @return The root pane, or null if no scene is active
-	 */
+	// The current scene's root pane, or null if no scene is shown
 	public function getRoot(): Null<AnchorPane> {
 		return currentScene != null ? currentScene.root : null;
 	}
 
 	/**
-	 * Add an element made in code to a scene, at the scene's root or inside
-	 * a container made in the editor (AnchorPane, RowLayout, ColLayout, Panel).
+	 * Adds an element made in code to a scene: to its root, or to the container
+	 * at `parentKey` (AnchorPane, RowLayout, ColLayout, Panel).
 	 *
-	 * Example:
 	 * ```haxe
-	 * var imagePanel = new koui.elements.ImagePanel(kha.Assets.images.logo);
-	 * imagePanel.setPosition(100, 50);
-	 * imagePanel.setSize(200, 150);
-	 * canvas.addElement("Scene_1", "logo_image", imagePanel);
-	 *
-	 * // Centered, inside a container made in the editor:
-	 * canvas.addElement("Scene_1", "icon", imagePanel, Anchor.MiddleCenter, "header/icons");
+	 * var logo = new koui.elements.ImagePanel(kha.Assets.images.logo);
+	 * logo.setPosition(100, 50);
+	 * canvas.addElement("Scene_1", "logo", logo);
+	 * canvas.addElement("Scene_1", "icon", icon, Anchor.MiddleCenter, "header/icons");
 	 * ```
 	 *
-	 * @param sceneName The scene to add the element to
-	 * @param key The element's name; unique among its siblings, not empty, without "/"
-	 * @param element The element to add
-	 * @param anchor The element's anchor
-	 * @param parentKey The path of the container to add it to; the scene's root if null
-	 * @return True if added, false otherwise (the reason is traced)
+	 * @param key The element's name: not empty, without "/", unique among its siblings
+	 * @return False if it couldn't be added; the reason is traced
 	 */
 	public function addElement(sceneName: String, key: String, element: Element, anchor: Anchor = Anchor.TopLeft, parentKey: String = null): Bool {
 		var scene: TBuiltScene = scenes.get(sceneName);
@@ -440,7 +331,6 @@ class KouiCanvas extends Trait {
 
 		element.anchor = anchor;
 
-		// Find parent
 		var parent: Element = null;
 		if (parentKey != null) {
 			parent = getElement(parentKey, sceneName);
@@ -452,7 +342,6 @@ class KouiCanvas extends Trait {
 			parent = scene.root;
 		}
 
-		// Names only need to be unique among siblings
 		for (sibling in HierarchyUtils.getChildren(parent)) {
 			if (scene.keys.get(sibling) == key) {
 				trace('[KouiCanvas] Element key "$key" already exists in "${parentKey != null ? parentKey : sceneName}"');
@@ -460,7 +349,7 @@ class KouiCanvas extends Trait {
 			}
 		}
 
-		// Same as loading a canvas: Row/Col layouts get a new slot, Panels a new child
+		// As when loading: Row/Col layouts get a new cell, Panels a new child
 		if (parent == scene.root) {
 			scene.root.add(element, anchor);
 		} else if (HierarchyUtils.canAcceptChild(parent)) {
@@ -470,20 +359,13 @@ class KouiCanvas extends Trait {
 			return false;
 		}
 
-		// Register in scene
 		scene.keys.set(element, key);
-
 		return true;
 	}
 
 	/**
-	 * Set the z-index/render order of an element relative to its siblings.
-	 * Index 0 renders first (back), higher indices render later (front).
-	 *
-	 * @param sceneName The scene containing the element
-	 * @param keyOrPath The element's key or path
-	 * @param index The desired index (0 = back, high = front)
-	 * @return True if moved successfully, false otherwise
+	 * Moves an element to `index` among its siblings: 0 is drawn first (at the
+	 * back). Not for elements in a Row/Col layout. Returns false if it wasn't moved.
 	 */
 	public function setElementZIndex(sceneName: String, keyOrPath: String, index: Int): Bool {
 		var element: Element = getElement(keyOrPath, sceneName);
@@ -499,11 +381,9 @@ class KouiCanvas extends Trait {
 		}
 		var children: Array<Element> = HierarchyUtils.getChildren(parent);
 
-		// Clamp index
 		if (index < 0) index = 0;
 		if (index >= children.length) index = children.length - 1;
 
-		// Move to desired index
 		children.remove(element);
 		children.insert(index, element);
 		HierarchyUtils.setChildren(parent, children);
@@ -512,12 +392,8 @@ class KouiCanvas extends Trait {
 	}
 
 	/**
-	 * Remove an element, with everything inside it, from a scene and free it.
-	 * To hide an element for a while, set its `visible` to false instead.
-	 *
-	 * @param sceneName The scene containing the element
-	 * @param keyOrPath The element's path (just its name if it's in the scene's root)
-	 * @return True if removed, false if it wasn't found
+	 * Removes an element and everything inside it, and frees them. To hide an
+	 * element for a while, set its `visible` instead. Returns false if not found.
 	 */
 	public function removeElement(sceneName: String, keyOrPath: String): Bool {
 		var scene: TBuiltScene = scenes.get(sceneName);
@@ -526,7 +402,7 @@ class KouiCanvas extends Trait {
 		var element: Element = CanvasLoader.findByPath(scene.root, scene.keys, keyOrPath);
 		if (element == null) return false;
 
-		// Detached the way the editor does it (Row/Col layouts close the gap), then freed
+		// Row/Col layouts close the gap
 		HierarchyUtils.detachFromCurrentParent(element);
 		forgetKeys(scene, element);
 		element.destroy();
@@ -534,17 +410,13 @@ class KouiCanvas extends Trait {
 		return true;
 	}
 
-	/** Removes the names of `element` and everything inside it. */
+	// Removes the names of `element` and everything inside it
 	function forgetKeys(scene: TBuiltScene, element: Element): Void {
 		for (child in HierarchyUtils.getChildren(element)) forgetKeys(scene, child);
 		scene.keys.remove(element);
 	}
 
-	/**
-	 * Get the active KouiCanvas trait from the current scene or camera.
-	 *
-	 * @return The active KouiCanvas trait, or null if not found
-	 */
+	// The KouiCanvas on the active scene or its camera, or null
 	public static function getActiveCanvas(): Null<KouiCanvas> {
 		var activeCanvas: Null<KouiCanvas> = iron.Scene.active.getTrait(KouiCanvas);
 		if (activeCanvas == null && iron.Scene.active.camera != null) {

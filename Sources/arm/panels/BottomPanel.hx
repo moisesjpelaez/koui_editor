@@ -15,7 +15,6 @@ class BottomPanel {
 	public function draw(uiBase: UIBase): Void {
 		var bottomH: Int = uiBase.getBottomH();
 
-		// Skip drawing if panel is too small
 		if (bottomH < UIBase.MIN_PANEL_SIZE) return;
 
 		var panelX: Int = 0;
@@ -23,7 +22,7 @@ class BottomPanel {
 		var panelW: Int = uiBase.getTabX();
 
 		if (uiBase.ui.window(uiBase.hwnds[PanelBottom], panelX, panelY, panelW, bottomH)) {
-			uiBase.ui.tab(themeTabHandle, "Assets"); // images for icons and image panels
+			uiBase.ui.tab(themeTabHandle, "Assets"); // Empty for now: meant for images
 		}
 	}
 }

@@ -11,16 +11,16 @@ import zui.Zui.Handle;
 
 @:access(zui.Zui)
 class ElementsPanel {
-	/** One per category: a handle made in the loop would be shared by every category. */
+	// One per category: a handle made in the loop would be shared
 	var categoryHandles: Map<String, Handle> = new Map();
-	/** Height of what the panel drew; below it the canvas shows through. */
+	// Below the content, the canvas shows through
 	var contentHeight: Int = 0;
 
 	public function new() {
 
 	}
 
-	/** The part of the panel drawn over the canvas, in screen pixels. */
+	// The part drawn over the canvas, in screen pixels
 	public function getRect(uiBase: UIBase): TScreenRect {
 		var window: TScreenRect = getWindowRect(uiBase);
 		window.h = Std.int(Math.min(window.h, contentHeight));

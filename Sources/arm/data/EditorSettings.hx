@@ -6,7 +6,7 @@ typedef TEditorSettings = {
 	?editorUIScale: Float,
 	?snapEnabled: Bool,
 	?snapValue: Float,
-	/** The panel sizes, see `LayoutSettings`. */
+	// The panel sizes, see `LayoutSettings`
 	?layout: Array<Int>,
 }
 
@@ -25,9 +25,6 @@ class EditorSettings {
 		return Math.max(0.5, Math.min(4.0, scale));
 	}
 
-	/**
-	 * Initialize settings and load from file if it exists
-	 */
 	public static function init(): Void {
 		if (initialized) return;
 		initialized = true;
@@ -42,7 +39,7 @@ class EditorSettings {
 					data.editorUIScale = sanitizeScale(loaded.editorUIScale);
 				}
 				if (Std.isOfType(loaded.snapEnabled, Bool)) data.snapEnabled = loaded.snapEnabled;
-				// The toolbar keeps the value within its range
+				// The toolbar keeps it in range
 				if (Std.isOfType(loaded.snapValue, Float) && Math.isFinite(loaded.snapValue)) data.snapValue = loaded.snapValue;
 				// LayoutSettings checks the sizes
 				if (Std.isOfType(loaded.layout, Array)) data.layout = loaded.layout;
@@ -52,9 +49,6 @@ class EditorSettings {
 		}
 	}
 
-	/**
-	 * Save current settings to file
-	 */
 	public static function save(): Void {
 		try {
 			var jsonString: String = Json.stringify(data, null, "\t");
@@ -65,23 +59,17 @@ class EditorSettings {
 		}
 	}
 
-	/**
-	 * The settings file, in the editor's own folder: the game's Bundled/ folder is packed into every build
-	 */
+	// In the editor's folder: the game's Bundled folder goes into every build
 	private static function getSettingsPath(): String {
 		return arm.tools.CanvasUtils.editorDataDir() + "/koui_editor_settings.json";
 	}
 
-	/**
-	 * Get the editor UI scale setting
-	 */
 	public static function getEditorUIScale(): Float {
 		if (!initialized) init();
 		var scale = data.editorUIScale;
 		return sanitizeScale(scale != null ? scale : 1.0);
 	}
 
-	/** Remembers the grid snapping toggle and size, and saves them to file. */
 	public static function setSnap(enabled: Bool, value: Float): Void {
 		if (!initialized) init();
 		if (data.snapEnabled == enabled && data.snapValue == value) return;
@@ -90,9 +78,6 @@ class EditorSettings {
 		save();
 	}
 
-	/**
-	 * Set the editor UI scale and save to file
-	 */
 	public static function setEditorUIScale(scale: Float): Void {
 		if (!initialized) init();
 		data.editorUIScale = sanitizeScale(scale);
