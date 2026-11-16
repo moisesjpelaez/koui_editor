@@ -149,6 +149,7 @@ class CanvasElements {
 		if (type == null) return null;
 
 		var element: Element = type.create(data.properties, data, radioGroups);
+		if (data.tID != "") element.setTID(data.tID);
 		element.posX = data.posX;
 		element.posY = data.posY;
 		element.width = data.width;
@@ -156,7 +157,6 @@ class CanvasElements {
 		element.anchor = cast data.anchor;
 		element.visible = data.visible;
 		element.disabled = data.disabled;
-		if (data.tID != "") element.setTID(data.tID);
 
 		return element;
 	}
