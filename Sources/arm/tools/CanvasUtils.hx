@@ -107,7 +107,13 @@ class CanvasUtils {
 					// Panels show the reloaded images, including ones that were missing before
 					for (panel => name in imageNames) {
 						var image: kha.Image = name != "" ? Koui.getImage(name) : null;
-						if (image != null) panel.image = image;
+						if (image == null) continue;
+						// The image setter resizes the panel to the image, so its size is restored
+						var layoutWidth: Int = @:privateAccess panel.layoutWidth;
+						var layoutHeight: Int = @:privateAccess panel.layoutHeight;
+						panel.image = image;
+						@:privateAccess panel.layoutWidth = layoutWidth;
+						@:privateAccess panel.layoutHeight = layoutHeight;
 					}
 
 					if (error != null) {
